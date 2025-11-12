@@ -350,15 +350,19 @@ def parse_interpretations_from_report(report_data: Dict[str, Any]) -> Dict[str, 
     # Extraire 'data' (structure RapidAPI) ou 'report' (structure alternative)
     report = report_data.get('data') or report_data.get('report', {})
     
-    if not report:
-        logger.warning("[Parser] Pas d'interprétations disponibles (clé 'data' ou 'report' absente)")
+    logger.info(f"[DEBUG] Type de report: {type(report)}")
+    if isinstance(report, dict):
+        logger.info(f"[DEBUG] Clés dans report/data: {list(report.keys())[:20]}")
+        if len(str(report)) < 500:
+            logger.info(f"[DEBUG] Contenu complet: {report}")
+    
+    if not report or (isinstance(report, dict) and not report):
+        logger.warning("[Parser] Pas d'interprétations disponibles (clé 'data' ou 'report' absente/vide)")
         return {
             'positions_interpretations': {},
             'aspects_interpretations': {},
             'general_summary': None
         }
-    
-    logger.info(f"[DEBUG] Clés dans report/data: {list(report.keys()) if isinstance(report, dict) else type(report)}")
     
     # Interprétations des positions
     positions_interp = report.get('positions', {})
