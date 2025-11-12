@@ -272,25 +272,126 @@ def build_summary(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+async def call_rapidapi_natal_report(birth_data: Dict[str, Any], language: str = "fr") -> Dict[str, Any]:
+    """
+    Appelle l'endpoint d'interprétation /api/v3/analysis/natal-report
+    Retourne les textes d'interprétation pour chaque élément du thème
+    """
+    url = f"{settings.BASE_RAPID_URL}/api/v3/analysis/natal-report"
+    
+    payload = {
+        "subject": {
+            "name": birth_data.get('city', 'User'),
+            "birth_data": birth_data
+        },
+        "options": {
+            "language": language,
+            "report_style": "detailed",  # detailed, brief, or comprehensive
+            "include_positions": True,
+            "include_aspects": True,
+            "include_summary": True
+        }
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "x-rapidapi-host": settings.RAPIDAPI_HOST,
+        "x-rapidapi-key": settings.RAPIDAPI_KEY,
+    }
+    
+    logger.info(f"🌐 Appel RapidAPI: /api/v3/analysis/natal-report pour {birth_data.get('city')}")
+    
+    try:
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        logger.info(f"✅ Interprétations reçues")
+        return data
+        
+    except httpx.HTTPStatusError as e:
+        logger.warning(f"⚠️ Erreur HTTP interprétations: {e.response.status_code} - {e.response.text[:200]}")
+        # Non bloquant : retourne vide si erreur
+        return {}
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur interprétations (non bloquant): {str(e)}")
+        return {}
+
+
+def parse_interpretations_from_report(report_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse les interprétations depuis /api/v3/analysis/natal-report
+    
+    Structure attendue:
+    {
+      "report": {
+        "positions": {
+          "Sun": { "in_sign": "...", "in_house": "...", "overall": "..." },
+          "Moon": { ... }
+        },
+        "aspects": {
+          "Sun_Moon_opposition": "...",
+          ...
+        },
+        "summary": "..."
+      }
+    }
+    """
+    if not report_data or 'report' not in report_data:
+        logger.warning("[Parser] Pas d'interprétations disponibles")
+        return {
+            'positions_interpretations': {},
+            'aspects_interpretations': {},
+            'general_summary': None
+        }
+    
+    report = report_data.get('report', {})
+    
+    # Interprétations des positions
+    positions_interp = report.get('positions', {})
+    
+    # Interprétations des aspects
+    aspects_interp = report.get('aspects', {})
+    
+    # Résumé général
+    summary_text = report.get('summary') or report.get('general_interpretation')
+    
+    logger.info(f"[Parser] ✅ Interprétations parsées: {len(positions_interp)} positions, {len(aspects_interp)} aspects")
+    
+    return {
+        'positions_interpretations': positions_interp,
+        'aspects_interpretations': aspects_interp,
+        'general_summary': summary_text
+    }
+
+
 async def generate_natal_reading(
     birth_data: Dict[str, Any],
     options: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     Génère une lecture complète de thème natal
-    Utilise UNIQUEMENT /api/v3/charts/natal (1 seul appel API)
+    
+    Appels API (2 total):
+    1. /api/v3/charts/natal → données brutes (positions, aspects)
+    2. /api/v3/analysis/natal-report → interprétations textuelles
     
     Returns:
         {
-            'reading': { positions, aspects, lunar, summary, full_report_text },
-            'api_calls_count': 1
+            'reading': { positions, aspects, interpretations, summary },
+            'api_calls_count': 2
         }
     """
     options = options or {}
+    language = options.get('language', 'fr')
+    include_interpretations = options.get('include_interpretations', True)
+    
     logger.info(f"🌟 Génération lecture natal pour {birth_data.get('city')}")
     
-    # Appel unique à /charts/natal
+    api_calls_count = 0
+    
+    # APPEL 1: Données brutes (positions + aspects)
     chart_response = await call_rapidapi_natal_chart(birth_data)
+    api_calls_count += 1
     
     # Parser positions et aspects
     positions = parse_positions_from_natal_chart(chart_response)
@@ -299,8 +400,22 @@ async def generate_natal_reading(
     # Construire le résumé
     summary = build_summary(positions)
     
-    # Informations lunaires basiques (du subject_data si disponible)
-    subject_data = chart_response.get("subject_data", {})
+    # APPEL 2: Interprétations (si demandé)
+    interpretations = {
+        'positions_interpretations': {},
+        'aspects_interpretations': {},
+        'general_summary': None
+    }
+    
+    if include_interpretations:
+        try:
+            report_response = await call_rapidapi_natal_report(birth_data, language)
+            api_calls_count += 1
+            interpretations = parse_interpretations_from_report(report_response)
+        except Exception as e:
+            logger.warning(f"⚠️ Interprétations non disponibles (non bloquant): {e}")
+    
+    # Informations lunaires basiques
     lunar = {
         'phase': 'Unknown',
         'phase_angle': None,
@@ -314,16 +429,16 @@ async def generate_natal_reading(
     reading = {
         'positions': positions,
         'aspects': aspects,
+        'interpretations': interpretations,
         'lunar': lunar,
         'summary': summary,
-        'full_report_text': None
     }
     
-    logger.info(f"✅ Lecture générée: {len(positions)} positions, {len(aspects)} aspects (1 appel API)")
+    logger.info(f"✅ Lecture générée: {len(positions)} positions, {len(aspects)} aspects, interprétations={include_interpretations} ({api_calls_count} appel{'s' if api_calls_count > 1 else ''} API)")
     
     return {
         'reading': reading,
-        'api_calls_count': 1
+        'api_calls_count': api_calls_count
     }
 
 

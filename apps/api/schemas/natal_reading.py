@@ -28,7 +28,7 @@ class NatalReadingOptions(BaseModel):
     house_system: str = Field(default="P")  # Placidus
     tradition: str = Field(default="psychological")
     detail_level: str = Field(default="detailed")
-    include_full_report: bool = Field(default=False)
+    include_interpretations: bool = Field(default=True, description="Inclure les interprétations textuelles (2ème appel API)")
     force_refresh: bool = Field(default=False, description="Bypass cache et force un nouvel appel API")
 
 
@@ -89,6 +89,13 @@ class NatalSummary(BaseModel):
     dominant_mode: Optional[str] = None
 
 
+class InterpretationsData(BaseModel):
+    """Interprétations textuelles du thème"""
+    positions_interpretations: dict = {}  # { "Sun": { "in_sign": "...", "in_house": "..." } }
+    aspects_interpretations: dict = {}  # { "Sun_Moon_opposition": "..." }
+    general_summary: Optional[str] = None
+
+
 class NatalReadingResponse(BaseModel):
     """Réponse complète d'une lecture de thème natal"""
     id: int
@@ -96,9 +103,9 @@ class NatalReadingResponse(BaseModel):
     birth_data: BirthData
     positions: List[CorePoint]
     aspects: List[Aspect]
+    interpretations: Optional[InterpretationsData] = None
     lunar: LunarInfo
     summary: NatalSummary
-    full_report_text: Optional[str] = None
     source: Literal["api", "cache"]
     api_calls_count: int
     created_at: datetime
