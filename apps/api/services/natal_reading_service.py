@@ -1,0 +1,415 @@
+"""
+Service pour générer des lectures complètes de thèmes natals
+Optimisé pour minimiser les appels API (plan BASIC : 100 req/mois)
+"""
+
+import httpx
+import hashlib
+import json
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# Client HTTP réutilisable
+client = httpx.AsyncClient(timeout=60.0)
+
+
+def generate_cache_key(birth_data: Dict[str, Any]) -> str:
+    """
+    Génère une clé de cache unique basée sur les données de naissance
+    Format: hash(yyyy-mm-ddThh:mm:ss|lat|lon|city|country)
+    """
+    key_parts = [
+        f"{birth_data['year']:04d}-{birth_data['month']:02d}-{birth_data['day']:02d}",
+        f"T{birth_data['hour']:02d}:{birth_data['minute']:02d}:{birth_data.get('second', 0):02d}",
+        f"{birth_data['latitude']:.6f}",
+        f"{birth_data['longitude']:.6f}",
+        birth_data.get('city', 'unknown'),
+        birth_data.get('country_code', 'XX'),
+    ]
+    key_string = "|".join(key_parts)
+    return hashlib.sha256(key_string.encode()).hexdigest()[:32]
+
+
+async def call_rapidapi_endpoint(
+    endpoint_path: str,
+    payload: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Appel générique à un endpoint RapidAPI Best Astrology
+    
+    Args:
+        endpoint_path: Chemin de l'endpoint (ex: "/api/v3/data/positions/enhanced")
+        payload: Données à envoyer
+    
+    Returns:
+        Réponse JSON de l'API
+    """
+    url = f"{settings.BASE_RAPID_URL}{endpoint_path}"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "x-rapidapi-host": settings.RAPIDAPI_HOST,
+        "x-rapidapi-key": settings.RAPIDAPI_KEY,
+    }
+    
+    logger.info(f"🌐 Appel RapidAPI: {endpoint_path}")
+    
+    try:
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        logger.info(f"✅ Réponse RapidAPI reçue: {endpoint_path}")
+        return data
+        
+    except httpx.HTTPStatusError as e:
+        logger.error(f"❌ Erreur HTTP RapidAPI {endpoint_path}: {e.response.status_code} - {e.response.text}")
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur RapidAPI {endpoint_path}: {str(e)}")
+        raise
+
+
+async def get_enhanced_positions(
+    birth_data: Dict[str, Any],
+    language: str = "fr"
+) -> Dict[str, Any]:
+    """
+    Appel 1: Positions enrichies avec interprétations
+    Endpoint: POST /api/v3/data/positions/enhanced
+    """
+    payload = {
+        "subject": {
+            "name": f"{birth_data.get('city', 'User')}",
+            "birth_data": birth_data
+        },
+        "options": {
+            "house_system": "P",  # Placidus
+            "language": language,
+            "tradition": "psychological",
+            "detail_level": "detailed",
+            "zodiac_type": "Tropic",
+            "active_points": [
+                "Sun", "Moon", "Mercury", "Venus", "Mars",
+                "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
+                "Ascendant", "Medium_Coeli", "Moon_Node", "Chiron"
+            ],
+            "precision": 2
+        }
+    }
+    
+    return await call_rapidapi_endpoint("/api/v3/data/positions/enhanced", payload)
+
+
+async def get_enhanced_aspects(
+    birth_data: Dict[str, Any],
+    language: str = "fr"
+) -> Dict[str, Any]:
+    """
+    Appel 2: Aspects enrichis avec interprétations
+    Endpoint: POST /api/v3/data/aspects/enhanced
+    """
+    payload = {
+        "subject": {
+            "name": f"{birth_data.get('city', 'User')}",
+            "birth_data": birth_data
+        },
+        "options": {
+            "aspect_types": ["major"],  # conjunction, opposition, trine, square, sextile
+            "language": language,
+            "orb_system": "standard",
+            "include_interpretations": True
+        }
+    }
+    
+    return await call_rapidapi_endpoint("/api/v3/data/aspects/enhanced", payload)
+
+
+async def get_lunar_metrics(
+    birth_data: Dict[str, Any],
+    language: str = "fr"
+) -> Dict[str, Any]:
+    """
+    Appel 3: Métriques lunaires
+    Endpoint: POST /api/v3/data/lunar_metrics
+    """
+    payload = {
+        "subject": {
+            "name": f"{birth_data.get('city', 'User')}",
+            "birth_data": birth_data
+        },
+        "options": {
+            "language": language,
+            "include_mansion": True,
+            "include_voc": True
+        }
+    }
+    
+    return await call_rapidapi_endpoint("/api/v3/data/lunar_metrics", payload)
+
+
+async def get_natal_report(
+    birth_data: Dict[str, Any],
+    language: str = "fr"
+) -> Dict[str, Any]:
+    """
+    Appel 4 (optionnel): Rapport natal complet
+    Endpoint: POST /api/v3/reports/natal
+    """
+    payload = {
+        "subject": {
+            "name": f"{birth_data.get('city', 'User')}",
+            "birth_data": birth_data
+        },
+        "options": {
+            "language": language,
+            "report_type": "comprehensive",
+            "house_system": "P"
+        }
+    }
+    
+    return await call_rapidapi_endpoint("/api/v3/reports/natal", payload)
+
+
+def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Convertit les positions enrichies en CorePoints
+    """
+    core_points = []
+    
+    # Mapping signes abrégés → français
+    sign_mapping = {
+        'Ari': 'Bélier', 'Tau': 'Taureau', 'Gem': 'Gémeaux', 'Can': 'Cancer',
+        'Leo': 'Lion', 'Vir': 'Vierge', 'Lib': 'Balance', 'Sco': 'Scorpion',
+        'Sag': 'Sagittaire', 'Cap': 'Capricorne', 'Aqu': 'Verseau', 'Pis': 'Poissons',
+    }
+    
+    # Mapping éléments
+    element_mapping = {
+        'Fire': 'Feu', 'Earth': 'Terre', 'Air': 'Air', 'Water': 'Eau'
+    }
+    
+    subject_data = positions_data.get('subject_data', {})
+    
+    # Points principaux à extraire
+    point_names = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 
+                   'saturn', 'uranus', 'neptune', 'pluto', 'ascendant', 
+                   'medium_coeli', 'chiron', 'mean_node']
+    
+    for point_name in point_names:
+        point_data = subject_data.get(point_name)
+        if not point_data:
+            continue
+            
+        # Extraire la maison (format: "Ninth_House" → 9)
+        house_str = point_data.get('house', 'First_House')
+        if isinstance(house_str, str) and '_House' in house_str:
+            house_parts = house_str.split('_')[0]
+            house_map = {
+                'First': 1, 'Second': 2, 'Third': 3, 'Fourth': 4,
+                'Fifth': 5, 'Sixth': 6, 'Seventh': 7, 'Eighth': 8,
+                'Ninth': 9, 'Tenth': 10, 'Eleventh': 11, 'Twelfth': 12
+            }
+            house = house_map.get(house_parts, 1)
+        else:
+            house = point_data.get('house', 1)
+        
+        core_point = {
+            'name': point_data['name'],
+            'sign': point_data['sign'],
+            'sign_fr': sign_mapping.get(point_data['sign'], point_data['sign']),
+            'degree': point_data.get('position', 0),
+            'house': house,
+            'is_retrograde': point_data.get('retrograde', False),
+            'emoji': point_data.get('emoji', '⭐'),
+            'element': element_mapping.get(point_data.get('element', 'Air'), 'Inconnu'),
+            'interpretations': {
+                'in_sign': point_data.get('interpretation_in_sign'),
+                'in_house': point_data.get('interpretation_in_house'),
+                'dignity': point_data.get('dignity'),
+            }
+        }
+        
+        core_points.append(core_point)
+    
+    return core_points
+
+
+def parse_aspects(aspects_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Convertit les aspects enrichis
+    """
+    aspects = []
+    
+    chart_data = aspects_data.get('chart_data', {})
+    aspects_list = chart_data.get('aspects', [])
+    
+    for aspect in aspects_list:
+        # Calculer la force de l'aspect basée sur l'orbe
+        orb = abs(aspect.get('orb', 10))
+        if orb < 1:
+            strength = "strong"
+        elif orb < 3:
+            strength = "medium"
+        else:
+            strength = "weak"
+        
+        aspects.append({
+            'from': aspect.get('point1'),
+            'to': aspect.get('point2'),
+            'aspect_type': aspect.get('aspect_type'),
+            'orb': aspect.get('orb'),
+            'strength': strength,
+            'interpretation': aspect.get('interpretation')
+        })
+    
+    return aspects
+
+
+def parse_lunar_info(lunar_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convertit les métriques lunaires
+    """
+    subject_data = lunar_data.get('subject_data', {})
+    lunar_phase = subject_data.get('lunar_phase', {})
+    
+    return {
+        'phase': lunar_phase.get('moon_phase_name', 'Unknown'),
+        'phase_angle': lunar_phase.get('degrees_between_s_m'),
+        'lunar_day': lunar_phase.get('moon_phase'),
+        'emoji': lunar_phase.get('moon_emoji', '🌙'),
+        'mansion': lunar_data.get('mansion'),
+        'void_of_course': lunar_data.get('void_of_course', False),
+        'interpretation': lunar_data.get('interpretation')
+    }
+
+
+def build_summary(positions: List[Dict], aspects: List[Dict]) -> Dict[str, Any]:
+    """
+    Construit un résumé du thème
+    """
+    # Extraire Big 3
+    sun = next((p for p in positions if p['name'] == 'Sun'), None)
+    moon = next((p for p in positions if p['name'] == 'Moon'), None)
+    asc = next((p for p in positions if p['name'] == 'Ascendant'), None)
+    
+    # Compter les éléments
+    elements = {}
+    for pos in positions:
+        elem = pos['element']
+        elements[elem] = elements.get(elem, 0) + 1
+    
+    dominant_element = max(elements, key=elements.get) if elements else None
+    
+    # Highlights simples
+    highlights = []
+    if sun:
+        highlights.append(f"Soleil en {sun['sign_fr']} - {sun['interpretations'].get('in_sign', '')[:50]}...")
+    if moon:
+        highlights.append(f"Lune en {moon['sign_fr']} - {moon['interpretations'].get('in_sign', '')[:50]}...")
+    
+    return {
+        'big_three': {
+            'sun': sun,
+            'moon': moon,
+            'ascendant': asc
+        },
+        'personality_highlights': highlights,
+        'dominant_element': dominant_element,
+        'dominant_mode': None  # À calculer si besoin
+    }
+
+
+async def generate_natal_reading(
+    birth_data: Dict[str, Any],
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Génère une lecture complète de thème natal
+    Fait 3-4 appels API selon les options
+    
+    Returns:
+        NatalReading complet
+    """
+    if options is None:
+        options = {}
+    
+    language = options.get('language', 'fr')
+    include_full_report = options.get('include_full_report', False)
+    
+    api_calls_count = 0
+    
+    logger.info(f"🌟 Génération lecture natal pour {birth_data.get('city')}")
+    
+    # Appel 1: Positions enrichies
+    try:
+        positions_data = await get_enhanced_positions(birth_data, language)
+        api_calls_count += 1
+    except Exception as e:
+        logger.error(f"Erreur positions enrichies: {e}")
+        # Fallback vers l'endpoint simple
+        positions_data = await call_rapidapi_endpoint(
+            "/api/v3/charts/natal",
+            {"subject": {"name": birth_data.get('city', 'User'), "birth_data": birth_data}}
+        )
+        api_calls_count += 1
+    
+    # Appel 2: Aspects enrichis
+    try:
+        aspects_data = await get_enhanced_aspects(birth_data, language)
+        api_calls_count += 1
+    except Exception as e:
+        logger.error(f"Erreur aspects enrichis: {e}")
+        # Utiliser les aspects du premier appel
+        aspects_data = positions_data
+    
+    # Appel 3: Métriques lunaires
+    try:
+        lunar_data = await get_lunar_metrics(birth_data, language)
+        api_calls_count += 1
+    except Exception as e:
+        logger.error(f"Erreur métriques lunaires: {e}")
+        # Utiliser les données lunaires du premier appel
+        lunar_data = positions_data
+    
+    # Appel 4 (optionnel): Rapport complet
+    full_report_text = None
+    if include_full_report:
+        try:
+            report_data = await get_natal_report(birth_data, language)
+            full_report_text = report_data.get('report_text') or report_data.get('interpretation')
+            api_calls_count += 1
+        except Exception as e:
+            logger.warning(f"Erreur rapport complet (non bloquant): {e}")
+    
+    # Parser les données
+    positions = parse_positions_to_core_points(positions_data)
+    aspects = parse_aspects(aspects_data)
+    lunar = parse_lunar_info(lunar_data)
+    summary = build_summary(positions, aspects)
+    
+    reading = {
+        'positions': positions,
+        'aspects': aspects,
+        'lunar': lunar,
+        'summary': summary,
+        'full_report_text': full_report_text,
+    }
+    
+    logger.info(f"✅ Lecture générée avec {api_calls_count} appel(s) API")
+    
+    return {
+        'reading': reading,
+        'api_calls_count': api_calls_count,
+        'source': 'api'
+    }
+
+
+async def close_client():
+    """Ferme le client HTTP"""
+    await client.aclose()
+
