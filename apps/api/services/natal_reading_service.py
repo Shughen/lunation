@@ -19,7 +19,10 @@ client = httpx.AsyncClient(timeout=60.0)
 def generate_cache_key(birth_data: Dict[str, Any]) -> str:
     """
     Génère une clé de cache unique basée sur les données de naissance
-    Format: hash(yyyy-mm-ddThh:mm:ss|lat|lon|city|country)
+    Format: hash(yyyy-mm-ddThh:mm:ss|lat|lon|city|country|timezone)
+    
+    IMPORTANT: Le timezone est CRITIQUE pour le calcul de l'Ascendant !
+    Deux villes aux mêmes coordonnées mais timezones différents = thèmes différents
     """
     key_parts = [
         f"{birth_data['year']:04d}-{birth_data['month']:02d}-{birth_data['day']:02d}",
@@ -28,6 +31,7 @@ def generate_cache_key(birth_data: Dict[str, Any]) -> str:
         f"{birth_data['longitude']:.6f}",
         birth_data.get('city', 'unknown'),
         birth_data.get('country_code', 'XX'),
+        birth_data.get('timezone', 'UTC'),  # ← AJOUTÉ !
     ]
     key_string = "|".join(key_parts)
     return hashlib.sha256(key_string.encode()).hexdigest()[:32]
