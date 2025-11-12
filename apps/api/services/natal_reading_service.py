@@ -425,6 +425,16 @@ async def generate_natal_reading(
     try:
         aspects_data = await get_enhanced_aspects(birth_data, language)
         api_calls_count += 1
+        
+        # DEBUG: Logger la structure complète de la réponse aspects
+        if aspects_data and 'data' in aspects_data:
+            aspects_content = aspects_data['data']
+            if 'aspects' in aspects_content:
+                logger.info(f"[DEBUG] RapidAPI aspects array has {len(aspects_content['aspects'])} elements")
+                if len(aspects_content['aspects']) == 0:
+                    logger.warning(f"⚠️ RapidAPI returned 0 aspects. Full response keys: {list(aspects_data.keys())}")
+                    logger.warning(f"⚠️ Data keys: {list(aspects_content.keys())}")
+                    logger.warning(f"⚠️ Strongest aspects: {aspects_content.get('strongest_aspects', 'N/A')[:200] if aspects_content.get('strongest_aspects') else 'N/A'}")
     except Exception as e:
         logger.error(f"Erreur aspects enrichis: {e}")
         # Utiliser les aspects du premier appel
