@@ -203,84 +203,85 @@ def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[
         'Ascendant': '⬆️', 'Medium_Coeli': '⬆️', 'Mean_Node': '☊', 'Chiron': '⚷',
     }
     
-    # Gérer l'enveloppe API (structure: { success, data: { positions: [...] } })
-    if 'data' in positions_data:
-        logger.info('[Parser] Détection enveloppe API, extraction data')
-        data_content = positions_data['data']
-        logger.info(f'[Parser] Keys dans data: {list(data_content.keys())}')
-        
-        # Les positions enrichies sont dans data['positions'] (array)
-        if 'positions' in data_content and isinstance(data_content['positions'], list):
-            logger.info(f'[Parser] ✅ Utilisation data.positions (array de {len(data_content["positions"])} éléments)')
-            positions_list = data_content['positions']
-            
-            # DEBUG: Afficher la structure du premier élément
-            if positions_list and len(positions_list) > 0:
-                logger.info(f'[Parser] 🔍 DEBUG Premier élément: {positions_list[0]}')
-            
-            # Parser chaque position de l'array
-            for pos in positions_list:
-                if not pos or 'name' not in pos:
-                    continue
-                
-                point_name = pos.get('name', 'Unknown')
-                logger.info(f'[Parser] ✅ Parsing {point_name} depuis array')
-                
-                # Extraire les données
-                sign = pos.get('sign', 'Ari')
-                house = pos.get('house', 1)
-                
-                # Calculer le degré depuis absolute_longitude (0-360°)
-                # Le degré dans le signe = absolute_longitude % 30
-                absolute_lon = pos.get('absolute_longitude', 0.0)
-                degree_in_sign = round(absolute_lon % 30, 2)
-                
-                core_point = {
-                    'name': point_name,
-                    'sign': sign,
-                    'sign_fr': sign_mapping.get(sign, sign),
-                    'degree': degree_in_sign,
-                    'house': house,
-                    'is_retrograde': pos.get('is_retrograde', False),
-                    'emoji': planet_emojis.get(point_name, '⭐'),
-                    'element': sign_to_element.get(sign, 'Inconnu'),
-                    'interpretations': {
-                        'in_sign': pos.get('interpretation_in_sign', ''),
-                        'in_house': pos.get('interpretation_in_house', ''),
-                        'dignity': pos.get('dignity', ''),
-                    }
-                }
-                
-                core_points.append(core_point)
-            
-            logger.info(f'[Parser] ✅ Parsé {len(core_points)} positions depuis array')
-            return core_points
+    # Gérer deux structures possibles:
+    # 1. Enveloppe { success, data: { positions: [...] } } (endpoint /positions/enhanced)
+    # 2. Direct { positions: [...] } (endpoint /charts/natal)
     
-    logger.warning('[Parser] Aucune position trouvée dans la structure')
+    positions_list = []
+    
+    if 'data' in positions_data and 'positions' in positions_data['data']:
+        # Structure avec enveloppe (ancien endpoint)
+        logger.info('[Parser] Détection structure avec enveloppe data')
+        data_content = positions_data['data']
+        positions_list = data_content['positions']
+    elif 'positions' in positions_data:
+        # Structure directe (endpoint unique /charts/natal)
+        logger.info('[Parser] Détection structure directe (endpoint unique)')
+        positions_list = positions_data['positions']
+    else:
+        logger.warning(f'[Parser] Structure inconnue, keys: {list(positions_data.keys())}')
+        return core_points
+    
+    logger.info(f'[Parser] ✅ {len(positions_list)} positions trouvées')
+    
+    # DEBUG: Afficher la structure du premier élément
+    if positions_list and len(positions_list) > 0:
+        logger.info(f'[Parser] 🔍 Premier élément: {positions_list[0]}')
+    
+    # Parser chaque position de l'array
+    for pos in positions_list:
+        if not pos or 'name' not in pos:
+            continue
+        
+        point_name = pos.get('name', 'Unknown')
+        logger.info(f'[Parser] ✅ Parsing {point_name} depuis array')
+        
+        # Extraire les données
+        sign = pos.get('sign', 'Ari')
+        house = pos.get('house', 1)
+        
+        # Calculer le degré depuis absolute_longitude (0-360°)
+        # Le degré dans le signe = absolute_longitude % 30
+        absolute_lon = pos.get('absolute_longitude', 0.0)
+        degree_in_sign = round(absolute_lon % 30, 2)
+        
+        core_point = {
+            'name': point_name,
+            'sign': sign,
+            'sign_fr': sign_mapping.get(sign, sign),
+            'degree': degree_in_sign,
+            'house': house,
+            'is_retrograde': pos.get('is_retrograde', False),
+            'emoji': planet_emojis.get(point_name, '⭐'),
+            'element': sign_to_element.get(sign, 'Inconnu'),
+            'interpretations': {
+                'in_sign': pos.get('interpretation_in_sign', ''),
+                'in_house': pos.get('interpretation_in_house', ''),
+                'dignity': pos.get('dignity', ''),
+            }
+        }
+        
+        core_points.append(core_point)
+    
+    logger.info(f'[Parser] ✅ Parsé {len(core_points)} positions')
     return core_points
 
 
 def parse_aspects(aspects_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Convertit les aspects enrichis
+    Convertit les aspects depuis /api/v3/charts/natal
+    Structure: aspects_data['aspects'] = [{point1, point2, aspect_type, orb}, ...]
     """
     aspects = []
     
-    # Gérer l'enveloppe API
-    if 'data' in aspects_data:
-        logger.info('[Parser] Détection enveloppe API pour aspects, extraction data')
-        aspects_data = aspects_data['data']
-    
-    logger.info(f'[Parser] 🔍 DEBUG aspects_data keys: {list(aspects_data.keys()) if aspects_data else "None"}')
-    
-    # Les aspects sont directement dans aspects_data['aspects'] (pas dans chart_data)
+    # Les aspects sont directement dans aspects_data['aspects']
     aspects_list = aspects_data.get('aspects', [])
     
-    logger.info(f'[Parser] 🔍 DEBUG aspects_list length: {len(aspects_list)}')
+    logger.info(f'[Parser] 🔍 Aspects trouvés: {len(aspects_list)}')
     
     # DEBUG: Afficher le premier aspect si présent
     if aspects_list and len(aspects_list) > 0:
-        logger.info(f'[Parser] 🔍 DEBUG Premier aspect: {aspects_list[0]}')
+        logger.info(f'[Parser] 🔍 Premier aspect: {aspects_list[0]}')
     
     for aspect in aspects_list:
         # Calculer la force de l'aspect basée sur l'orbe
@@ -298,7 +299,7 @@ def parse_aspects(aspects_data: Dict[str, Any]) -> List[Dict[str, Any]]:
             'aspect_type': aspect.get('aspect_type'),
             'orb': aspect.get('orb'),
             'strength': strength,
-            'interpretation': aspect.get('interpretation')
+            'interpretation': aspect.get('interpretation', '')
         })
     
     return aspects
@@ -408,37 +409,39 @@ async def generate_natal_reading(
     
     logger.info(f"🌟 Génération lecture natal pour {birth_data.get('city')}")
     
-    # Appel 1: Positions enrichies
+    # Appel UNIQUE: /api/v3/charts/natal (contient positions + aspects + house_cusps)
+    # Cet endpoint est plus simple et inclut les aspects (contrairement à /aspects/enhanced)
+    logger.info("🌟 Utilisation de l'endpoint unique /api/v3/charts/natal")
     try:
-        positions_data = await get_enhanced_positions(birth_data, language)
-        api_calls_count += 1
-    except Exception as e:
-        logger.error(f"Erreur positions enrichies: {e}")
-        # Fallback vers l'endpoint simple
-        positions_data = await call_rapidapi_endpoint(
+        chart_data = await call_rapidapi_endpoint(
             "/api/v3/charts/natal",
-            {"subject": {"name": birth_data.get('city', 'User'), "birth_data": birth_data}}
+            {
+                "subject": {
+                    "name": f"{birth_data.get('city', 'User')}",
+                    "birth_data": birth_data
+                },
+                "options": {
+                    "house_system": "P",  # Placidus
+                    "aspect_types": ["major"],  # major aspects only
+                    "orb_system": "standard"
+                }
+            }
         )
         api_calls_count += 1
-    
-    # Appel 2: Aspects enrichis
-    try:
-        aspects_data = await get_enhanced_aspects(birth_data, language)
-        api_calls_count += 1
         
-        # DEBUG: Logger la structure complète de la réponse aspects
-        if aspects_data and 'data' in aspects_data:
-            aspects_content = aspects_data['data']
-            if 'aspects' in aspects_content:
-                logger.info(f"[DEBUG] RapidAPI aspects array has {len(aspects_content['aspects'])} elements")
-                if len(aspects_content['aspects']) == 0:
-                    logger.warning(f"⚠️ RapidAPI returned 0 aspects. Full response keys: {list(aspects_data.keys())}")
-                    logger.warning(f"⚠️ Data keys: {list(aspects_content.keys())}")
-                    logger.warning(f"⚠️ Strongest aspects: {aspects_content.get('strongest_aspects', 'N/A')[:200] if aspects_content.get('strongest_aspects') else 'N/A'}")
+        # Les positions et aspects sont dans la même réponse
+        positions_data = chart_data
+        aspects_data = chart_data
+        
+        # DEBUG: Logger le nombre d'aspects trouvés
+        if chart_data and 'aspects' in chart_data:
+            logger.info(f"✅ Endpoint unique retourne {len(chart_data['aspects'])} aspects")
+        else:
+            logger.warning(f"⚠️ Aucun aspect trouvé dans la réponse de /charts/natal")
+            
     except Exception as e:
-        logger.error(f"Erreur aspects enrichis: {e}")
-        # Utiliser les aspects du premier appel
-        aspects_data = positions_data
+        logger.error(f"❌ Erreur endpoint /charts/natal: {e}")
+        raise
     
     # Appel 3: Métriques lunaires (fallback: utiliser positions_data)
     try:
@@ -459,12 +462,11 @@ async def generate_natal_reading(
         except Exception as e:
             logger.warning(f"Erreur rapport complet (non bloquant): {e}")
     
-    # Parser les données
-    logger.info(f"📊 Parsing positions_data (keys: {list(positions_data.keys())[:5]})")
+    # Parser les données depuis la réponse unique
+    logger.info(f"📊 Parsing chart_data (keys: {list(chart_data.keys())[:7]})")
     positions = parse_positions_to_core_points(positions_data)
     logger.info(f"📊 Positions parsées: {len(positions)} points")
     
-    logger.info(f"📊 Parsing aspects_data (keys: {list(aspects_data.keys())[:5]})")
     aspects = parse_aspects(aspects_data)
     logger.info(f"📊 Aspects parsés: {len(aspects)} aspects")
     
