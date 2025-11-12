@@ -59,25 +59,30 @@ async def create_natal_reading(
     if existing_reading:
         logger.info(f"✅ Lecture trouvée en cache (id={existing_reading.id})")
         
-        # Mettre à jour last_accessed_at
-        existing_reading.last_accessed_at = func.now()
+        # Préparer la réponse AVANT le commit (éviter greenlet issues)
+        response_data = {
+            'id': existing_reading.id,
+            'subject_name': request.birth_data.city,
+            'birth_data': request.birth_data,
+            'positions': existing_reading.reading['positions'],
+            'aspects': existing_reading.reading['aspects'],
+            'lunar': existing_reading.reading['lunar'],
+            'summary': existing_reading.reading['summary'],
+            'full_report_text': existing_reading.reading.get('full_report_text'),
+            'source': "cache",
+            'api_calls_count': 0,
+            'created_at': existing_reading.created_at,
+            'last_accessed_at': existing_reading.last_accessed_at
+        }
+        
+        # Mettre à jour last_accessed_at (exécution SQL directe)
+        from sqlalchemy import update
+        stmt = update(NatalReading).where(NatalReading.id == existing_reading.id).values(last_accessed_at=func.now())
+        await db.execute(stmt)
         await db.commit()
         
         # Retourner depuis le cache
-        return NatalReadingResponse(
-            id=existing_reading.id,
-            subject_name=request.birth_data.city,
-            birth_data=request.birth_data,
-            positions=existing_reading.reading['positions'],
-            aspects=existing_reading.reading['aspects'],
-            lunar=existing_reading.reading['lunar'],
-            summary=existing_reading.reading['summary'],
-            full_report_text=existing_reading.reading.get('full_report_text'),
-            source="cache",
-            api_calls_count=0,  # Aucun appel API pour lecture depuis cache
-            created_at=existing_reading.created_at,
-            last_accessed_at=existing_reading.last_accessed_at
-        )
+        return NatalReadingResponse(**response_data)
     
     # Pas en cache → générer via API
     logger.info("🌐 Pas en cache → génération via RapidAPI")
