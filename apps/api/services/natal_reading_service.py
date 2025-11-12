@@ -193,74 +193,50 @@ def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[
         'Fire': 'Feu', 'Earth': 'Terre', 'Air': 'Air', 'Water': 'Eau'
     }
     
-    # Gérer l'enveloppe API (structure: { success, data: { subject_data, chart_data } })
+    # Gérer l'enveloppe API (structure: { success, data: { positions: [...] } })
     if 'data' in positions_data:
         logger.info('[Parser] Détection enveloppe API, extraction data')
         data_content = positions_data['data']
         logger.info(f'[Parser] Keys dans data: {list(data_content.keys())}')
         
-        # Logger un aperçu de la structure
-        if 'positions' in data_content:
-            logger.info(f'[Parser] Trouvé data.positions (type: {type(data_content["positions"])})')
-        if 'planetary_positions' in data_content:
-            logger.info(f'[Parser] Trouvé data.planetary_positions')
-        if 'subject_data' in data_content:
-            logger.info(f'[Parser] Trouvé data.subject_data (keys: {list(data_content["subject_data"].keys())[:5]})')
-        
-        positions_data = data_content
-    
-    subject_data = positions_data.get('subject_data', {})
-    
-    if not subject_data:
-        logger.warning('[Parser] subject_data est vide, retour positions vides')
-        return []
-    
-    logger.info(f'[Parser] Parsing positions, subject_data keys: {list(subject_data.keys())[:10]}')
-    
-    # Points principaux à extraire
-    point_names = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 
-                   'saturn', 'uranus', 'neptune', 'pluto', 'ascendant', 
-                   'medium_coeli', 'chiron', 'mean_node']
-    
-    for point_name in point_names:
-        point_data = subject_data.get(point_name)
-        if not point_data:
-            logger.info(f'[Parser] ⚠️ {point_name} absent dans subject_data')
-            continue
-        
-        logger.info(f'[Parser] ✅ Parsing {point_name}')
+        # Les positions enrichies sont dans data['positions'] (array)
+        if 'positions' in data_content and isinstance(data_content['positions'], list):
+            logger.info(f'[Parser] ✅ Utilisation data.positions (array de {len(data_content["positions"])} éléments)')
+            positions_list = data_content['positions']
             
-        # Extraire la maison (format: "Ninth_House" → 9)
-        house_str = point_data.get('house', 'First_House')
-        if isinstance(house_str, str) and '_House' in house_str:
-            house_parts = house_str.split('_')[0]
-            house_map = {
-                'First': 1, 'Second': 2, 'Third': 3, 'Fourth': 4,
-                'Fifth': 5, 'Sixth': 6, 'Seventh': 7, 'Eighth': 8,
-                'Ninth': 9, 'Tenth': 10, 'Eleventh': 11, 'Twelfth': 12
-            }
-            house = house_map.get(house_parts, 1)
-        else:
-            house = point_data.get('house', 1)
-        
-        core_point = {
-            'name': point_data.get('name', 'Unknown'),
-            'sign': point_data.get('sign', 'Ari'),
-            'sign_fr': sign_mapping.get(point_data.get('sign', 'Ari'), point_data.get('sign', 'Inconnu')),
-            'degree': point_data.get('position', 0.0),
-            'house': house,
-            'is_retrograde': point_data.get('retrograde', False),
-            'emoji': point_data.get('emoji', '⭐'),
-            'element': element_mapping.get(point_data.get('element', 'Air'), 'Inconnu'),
-            'interpretations': {
-                'in_sign': point_data.get('interpretation_in_sign') or point_data.get('interpretation') or '',
-                'in_house': point_data.get('interpretation_in_house') or '',
-                'dignity': point_data.get('dignity') or '',
-            }
-        }
-        
-        core_points.append(core_point)
+            # Parser chaque position de l'array
+            for pos in positions_list:
+                if not pos or 'name' not in pos:
+                    continue
+                
+                point_name = pos.get('name', 'Unknown')
+                logger.info(f'[Parser] ✅ Parsing {point_name} depuis array')
+                
+                # Parser depuis l'array positions
+                house = pos.get('house', 1)
+                
+                core_point = {
+                    'name': pos.get('name', 'Unknown'),
+                    'sign': pos.get('sign', 'Ari'),
+                    'sign_fr': sign_mapping.get(pos.get('sign', 'Ari'), pos.get('sign', 'Inconnu')),
+                    'degree': pos.get('position', pos.get('degree', 0.0)),
+                    'house': house,
+                    'is_retrograde': pos.get('is_retrograde', pos.get('retrograde', False)),
+                    'emoji': pos.get('emoji', '⭐'),
+                    'element': element_mapping.get(pos.get('element', 'Air'), 'Inconnu'),
+                    'interpretations': {
+                        'in_sign': pos.get('interpretation_in_sign') or pos.get('interpretation') or '',
+                        'in_house': pos.get('interpretation_in_house') or '',
+                        'dignity': pos.get('dignity') or '',
+                    }
+                }
+                
+                core_points.append(core_point)
+            
+            logger.info(f'[Parser] ✅ Parsé {len(core_points)} positions depuis array')
+            return core_points
     
+    logger.warning('[Parser] Aucune position trouvée dans la structure')
     return core_points
 
 
