@@ -193,6 +193,11 @@ def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[
         'Fire': 'Feu', 'Earth': 'Terre', 'Air': 'Air', 'Water': 'Eau'
     }
     
+    # Gérer l'enveloppe API (structure: { success, data: { subject_data, chart_data } })
+    if 'data' in positions_data:
+        logger.info('[Parser] Détection enveloppe API, extraction data')
+        positions_data = positions_data['data']
+    
     subject_data = positions_data.get('subject_data', {})
     
     if not subject_data:
@@ -253,6 +258,11 @@ def parse_aspects(aspects_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     Convertit les aspects enrichis
     """
     aspects = []
+    
+    # Gérer l'enveloppe API
+    if 'data' in aspects_data:
+        logger.info('[Parser] Détection enveloppe API pour aspects, extraction data')
+        aspects_data = aspects_data['data']
     
     chart_data = aspects_data.get('chart_data', {})
     aspects_list = chart_data.get('aspects', [])
