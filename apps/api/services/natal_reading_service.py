@@ -203,20 +203,25 @@ def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[
         'Ascendant': '⬆️', 'Medium_Coeli': '⬆️', 'Mean_Node': '☊', 'Chiron': '⚷',
     }
     
-    # Gérer deux structures possibles:
+    # Gérer trois structures possibles:
     # 1. Enveloppe { success, data: { positions: [...] } } (endpoint /positions/enhanced)
-    # 2. Direct { positions: [...] } (endpoint /charts/natal)
+    # 2. Direct { positions: [...] } (non utilisé)
+    # 3. Chart data { chart_data: { positions: [...] } } (endpoint /charts/natal)
     
     positions_list = []
     
     if 'data' in positions_data and 'positions' in positions_data['data']:
-        # Structure avec enveloppe (ancien endpoint)
+        # Structure avec enveloppe (ancien endpoint /positions/enhanced)
         logger.info('[Parser] Détection structure avec enveloppe data')
         data_content = positions_data['data']
         positions_list = data_content['positions']
+    elif 'chart_data' in positions_data and 'positions' in positions_data['chart_data']:
+        # Structure chart_data (endpoint /charts/natal)
+        logger.info('[Parser] Détection structure chart_data (endpoint unique)')
+        positions_list = positions_data['chart_data']['positions']
     elif 'positions' in positions_data:
-        # Structure directe (endpoint unique /charts/natal)
-        logger.info('[Parser] Détection structure directe (endpoint unique)')
+        # Structure directe
+        logger.info('[Parser] Détection structure directe')
         positions_list = positions_data['positions']
     else:
         logger.warning(f'[Parser] Structure inconnue, keys: {list(positions_data.keys())}')
@@ -270,12 +275,18 @@ def parse_positions_to_core_points(positions_data: Dict[str, Any]) -> List[Dict[
 def parse_aspects(aspects_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Convertit les aspects depuis /api/v3/charts/natal
-    Structure: aspects_data['aspects'] = [{point1, point2, aspect_type, orb}, ...]
+    Structure: aspects_data['chart_data']['aspects'] = [{point1, point2, aspect_type, orb}, ...]
     """
     aspects = []
     
-    # Les aspects sont directement dans aspects_data['aspects']
-    aspects_list = aspects_data.get('aspects', [])
+    # Les aspects sont dans chart_data.aspects (endpoint /charts/natal)
+    if 'chart_data' in aspects_data and 'aspects' in aspects_data['chart_data']:
+        aspects_list = aspects_data['chart_data']['aspects']
+    elif 'aspects' in aspects_data:
+        # Fallback si structure directe
+        aspects_list = aspects_data['aspects']
+    else:
+        aspects_list = []
     
     logger.info(f'[Parser] 🔍 Aspects trouvés: {len(aspects_list)}')
     
@@ -434,7 +445,9 @@ async def generate_natal_reading(
         aspects_data = chart_data
         
         # DEBUG: Logger le nombre d'aspects trouvés
-        if chart_data and 'aspects' in chart_data:
+        if chart_data and 'chart_data' in chart_data and 'aspects' in chart_data['chart_data']:
+            logger.info(f"✅ Endpoint unique retourne {len(chart_data['chart_data']['aspects'])} aspects")
+        elif chart_data and 'aspects' in chart_data:
             logger.info(f"✅ Endpoint unique retourne {len(chart_data['aspects'])} aspects")
         else:
             logger.warning(f"⚠️ Aucun aspect trouvé dans la réponse de /charts/natal")
