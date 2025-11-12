@@ -306,6 +306,9 @@ async def call_rapidapi_natal_report(birth_data: Dict[str, Any], language: str =
         response.raise_for_status()
         data = response.json()
         logger.info(f"✅ Interprétations reçues")
+        logger.debug(f"[DEBUG] Structure réponse: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+        if isinstance(data, dict) and data:
+            logger.debug(f"[DEBUG] Premier niveau de clés: {list(data.keys())[:10]}")
         return data
         
     except httpx.HTTPStatusError as e:
