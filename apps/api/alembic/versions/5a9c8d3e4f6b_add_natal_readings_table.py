@@ -1,7 +1,7 @@
 """add natal_readings table
 
 Revision ID: 5a9c8d3e4f6b
-Revises: 
+Revises: 3f8a5b2c6d9e
 Create Date: 2025-11-12 20:30:00
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '5a9c8d3e4f6b'
-down_revision = None
+down_revision = '3f8a5b2c6d9e'  # Lien vers la migration précédente
 branch_labels = None
 depends_on = None
 

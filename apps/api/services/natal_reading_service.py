@@ -91,7 +91,7 @@ async def get_enhanced_positions(
             "house_system": "P",  # Placidus
             "language": language,
             "tradition": "psychological",
-            "detail_level": "detailed",
+            "detail_level": "full",  # Valeurs acceptées: basic, standard, full, professional
             "zodiac_type": "Tropic",
             "active_points": [
                 "Sun", "Moon", "Mercury", "Venus", "Mars",
@@ -274,6 +274,17 @@ def parse_lunar_info(lunar_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Convertit les métriques lunaires
     """
+    if not lunar_data:
+        return {
+            'phase': 'Unknown',
+            'phase_angle': None,
+            'lunar_day': None,
+            'emoji': '🌙',
+            'mansion': None,
+            'void_of_course': False,
+            'interpretation': None
+        }
+    
     subject_data = lunar_data.get('subject_data', {})
     lunar_phase = subject_data.get('lunar_phase', {})
     
@@ -367,13 +378,13 @@ async def generate_natal_reading(
         # Utiliser les aspects du premier appel
         aspects_data = positions_data
     
-    # Appel 3: Métriques lunaires
+    # Appel 3: Métriques lunaires (fallback: utiliser positions_data)
     try:
         lunar_data = await get_lunar_metrics(birth_data, language)
         api_calls_count += 1
     except Exception as e:
-        logger.error(f"Erreur métriques lunaires: {e}")
-        # Utiliser les données lunaires du premier appel
+        logger.warning(f"⚠️ Métriques lunaires non disponibles (endpoint n'existe pas), utilisation fallback: {e}")
+        # Utiliser les données lunaires du premier appel (déjà présentes)
         lunar_data = positions_data
     
     # Appel 4 (optionnel): Rapport complet
