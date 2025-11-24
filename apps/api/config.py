@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     """Configuration app via .env"""
     
     # Database
-    DATABASE_URL: str = Field(default="postgresql://user:password@localhost:5432/astroia_lunar")
+    # IMPORTANT: Pour Supabase, utiliser le rôle "postgres" (pas "user")
+    # Format: postgresql://postgres:[MOT_DE_PASSE]@[HOST]:5432/postgres
+    DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/astroia_lunar")
     DATABASE_POOL_SIZE: int = Field(default=10)
     DATABASE_MAX_OVERFLOW: int = Field(default=20)
     

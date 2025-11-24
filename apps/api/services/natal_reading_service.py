@@ -80,8 +80,41 @@ async def call_rapidapi_natal_chart(birth_data: Dict[str, Any]) -> Dict[str, Any
         return data
         
     except httpx.HTTPStatusError as e:
-        logger.error(f"❌ Erreur HTTP RapidAPI: {e.response.status_code} - {e.response.text}")
-        raise
+        status_code = e.response.status_code
+        error_text = e.response.text
+        
+        logger.error(f"❌ Erreur HTTP RapidAPI: {status_code} - {error_text}")
+        
+        # Messages d'erreur plus clairs selon le code HTTP
+        if status_code == 403:
+            error_msg = (
+                "L'API RapidAPI a refusé la requête (403). Causes possibles : "
+                "1) Quota mensuel dépassé (plan BASIC = 500 requêtes/mois max), "
+                "2) Abonnement inactif ou expiré, "
+                "3) Endpoint non disponible dans votre plan actuel. "
+                "Vérifiez votre consommation et abonnement sur https://rapidapi.com. "
+                "Si le quota est dépassé, attendez le reset mensuel ou upgradez vers PRO ($11/mo = 5000 req/mois)."
+            )
+        elif status_code == 429:
+            error_msg = (
+                "Limite de requêtes horaire dépassée (429). Plan BASIC = 1000 requêtes/heure max. "
+                "Attendez quelques minutes ou mettez à niveau vers PRO ($11/mo = 3 req/seconde) ou ULTRA ($37/mo = pas de limite). "
+                "Voir: https://rapidapi.com/procoders-development-procoders-development-default/api/best-astrology-api-natal-charts-transits-synastry/pricing"
+            )
+        elif status_code == 401:
+            error_msg = (
+                "Clé API RapidAPI invalide ou expirée. Vérifiez votre RAPIDAPI_KEY dans le fichier .env "
+                "et assurez-vous qu'elle correspond à celle de votre compte RapidAPI."
+            )
+        else:
+            error_msg = f"Erreur RapidAPI (HTTP {status_code}): {error_text[:200]}"
+        
+        # Créer une exception avec un message plus informatif
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=502,  # Bad Gateway - le problème vient de l'API externe
+            detail=error_msg
+        )
     except Exception as e:
         logger.error(f"❌ Erreur RapidAPI: {str(e)}")
         raise

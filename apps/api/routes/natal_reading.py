@@ -143,6 +143,10 @@ async def create_natal_reading(
             last_accessed_at=new_reading.last_accessed_at
         )
         
+    except HTTPException as e:
+        # Les erreurs HTTPException (comme celles de RapidAPI) sont déjà formatées correctement
+        logger.error(f"❌ Erreur génération lecture (HTTP {e.status_code}): {e.detail}")
+        raise
     except Exception as e:
         logger.error(f"❌ Erreur génération lecture: {str(e)}")
         raise HTTPException(

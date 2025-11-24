@@ -9,6 +9,15 @@ from config import settings
 # Convertir postgresql:// en postgresql+asyncpg://
 DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
+# Log pour debug (masquer le mot de passe)
+import logging
+from urllib.parse import urlparse
+logger = logging.getLogger(__name__)
+parsed = urlparse(settings.DATABASE_URL)
+logger.info(f"🔗 Database URL: postgresql://{parsed.username}:***@{parsed.hostname}:{parsed.port}{parsed.path}")
+logger.info(f"🔗 Database host: {parsed.hostname}")
+logger.info(f"🔗 Database port: {parsed.port}")
+
 # Engine async
 engine = create_async_engine(
     DATABASE_URL,
