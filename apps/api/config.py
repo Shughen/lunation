@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # Timezone
     TZ: str = Field(default="Europe/Paris")
     
+    # Supabase (pour accès direct aux tables via API REST)
+    SUPABASE_URL: str = Field(default="")
+    SUPABASE_ANON_KEY: str = Field(default="")
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

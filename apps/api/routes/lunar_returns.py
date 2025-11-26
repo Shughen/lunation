@@ -1,187 +1,218 @@
-"""Routes pour révolutions lunaires"""
+"""
+Routes pour les révolutions lunaires
+Gère la génération et la récupération des révolutions lunaires depuis Supabase
+"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel
-from typing import List
-from datetime import datetime, timedelta
+from fastapi import APIRouter, HTTPException, status
+from typing import List, Optional
+from uuid import UUID
+from datetime import datetime
+import logging
+from dateutil import parser as date_parser
 
-from database import get_db
-from models.user import User
-from models.natal_chart import NatalChart
-from models.lunar_return import LunarReturn
-from routes.auth import get_current_user
-from services.ephemeris import ephemeris_client
-from services.interpretations import generate_lunar_return_interpretation
+from schemas.lunar_return import (
+    LunarReturnGenerateRequest,
+    LunarReturnResponse,
+    UserProfileForLunarReturn
+)
+from services.lunar_return_service import (
+    calculate_lunar_return,
+    create_lunar_return,
+    list_lunar_returns,
+    get_lunar_return_by_id
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# === SCHEMAS ===
-class LunarReturnResponse(BaseModel):
-    id: int
-    month: str
-    return_date: str
-    lunar_ascendant: str
-    moon_house: int
-    moon_sign: str
-    aspects: list
-    interpretation: str
-
-
-# === ROUTES ===
-@router.post("/generate", status_code=status.HTTP_201_CREATED)
-async def generate_lunar_returns(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
+@router.post("/generate", response_model=LunarReturnResponse, status_code=status.HTTP_201_CREATED)
+async def generate_lunar_return(request: LunarReturnGenerateRequest):
     """
-    Génère les 12 révolutions lunaires de l'année en cours
-    Nécessite un thème natal calculé au préalable
+    Génère et sauvegarde une révolution lunaire pour un utilisateur
+    
+    Processus:
+    1. Récupère le profil utilisateur depuis Supabase
+    2. Calcule la date exacte de la révolution lunaire
+    3. Calcule les positions planétaires via RapidAPI
+    4. Génère les aspects et interprétations
+    5. Sauvegarde dans Supabase (table lunar_returns)
     """
-    
-    # Vérifier que le thème natal existe
-    result = await db.execute(
-        select(NatalChart).where(NatalChart.user_id == current_user.id)
-    )
-    natal_chart = result.scalar_one_or_none()
-    
-    if not natal_chart:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Thème natal manquant. Calculez-le d'abord via POST /api/natal-chart"
-        )
-    
-    if not current_user.birth_latitude or not current_user.birth_longitude:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Coordonnées de naissance manquantes"
-        )
-    
-    # Extraire position natale de la Lune
-    moon_data = natal_chart.planets.get("Moon", {})
-    natal_moon_degree = moon_data.get("degree", 0)
-    natal_moon_sign = natal_chart.moon_sign
-    
-    # Générer les 12 mois de l'année en cours
-    current_year = datetime.now().year
-    months = [f"{current_year}-{str(m).zfill(2)}" for m in range(1, 13)]
-    
-    generated_count = 0
-    
-    for month in months:
-        # Vérifier si déjà calculé
-        result = await db.execute(
-            select(LunarReturn).where(
-                LunarReturn.user_id == current_user.id,
-                LunarReturn.month == month
-            )
-        )
-        existing = result.scalar_one_or_none()
+    try:
+        logger.info(f"🌙 Génération révolution lunaire cycle {request.cycle_number} pour user {request.user_id}")
         
-        if existing:
-            continue  # Skip si déjà calculé
+        # Récupérer le profil utilisateur depuis Supabase
+        from lib.supabase_client import get_supabase_client
+        supabase = get_supabase_client()
         
-        # Calculer via Ephemeris API
+        logger.info(f"🔍 Récupération profil utilisateur {request.user_id} depuis Supabase...")
+        
         try:
-            raw_data = await ephemeris_client.calculate_lunar_return(
-                natal_moon_degree=natal_moon_degree,
-                natal_moon_sign=natal_moon_sign,
-                target_month=month,
-                birth_latitude=float(current_user.birth_latitude),
-                birth_longitude=float(current_user.birth_longitude),
-                timezone=current_user.birth_timezone
-            )
+            profile_response = supabase.table("profiles")\
+                .select("*")\
+                .eq("id", str(request.user_id))\
+                .single()\
+                .execute()
         except Exception as e:
-            # Log l'erreur mais continue pour les autres mois
-            print(f"❌ Erreur calcul révolution lunaire {month}: {e}")
-            continue
+            logger.error(f"❌ Erreur lors de la récupération du profil: {type(e).__name__}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erreur lors de la récupération du profil: {str(e)}"
+            )
         
-        # Parser les données
-        lunar_ascendant = raw_data.get("ascendant", {}).get("sign", "Unknown")
-        moon_house = raw_data.get("moon", {}).get("house", 1)
-        moon_sign = raw_data.get("moon", {}).get("sign", natal_moon_sign)
-        aspects = raw_data.get("aspects", [])
-        return_date = raw_data.get("return_datetime", f"{month}-15T12:00:00")
+        if not profile_response.data:
+            logger.warning(f"⚠️ Profil {request.user_id} non trouvé dans Supabase")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profil utilisateur {request.user_id} non trouvé"
+            )
         
-        # Générer l'interprétation
-        interpretation = generate_lunar_return_interpretation(
-            lunar_ascendant=lunar_ascendant,
-            moon_house=moon_house,
-            aspects=aspects
+        profile_data = profile_response.data
+        logger.info(f"✅ Profil trouvé: {profile_data.get('birth_place', 'N/A')}")
+        
+        # Vérifier que les données nécessaires sont présentes
+        if not profile_data.get("birth_date"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Date de naissance manquante dans le profil"
+            )
+        
+        if not profile_data.get("birth_place"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lieu de naissance manquant dans le profil"
+            )
+        
+        # Construire le profil pour le calcul
+        # Parser birth_date (format TIMESTAMP ou DATE)
+        birth_date_str = profile_data["birth_date"]
+        if isinstance(birth_date_str, str):
+            # Nettoyer le format de date
+            birth_date_str = birth_date_str.replace("Z", "+00:00")
+            try:
+                birth_date = datetime.fromisoformat(birth_date_str)
+            except ValueError:
+                # Essayer un autre format
+                birth_date = date_parser.parse(birth_date_str)
+        else:
+            birth_date = birth_date_str
+        
+        # Parser birth_time (format TIME, pas DATETIME)
+        birth_time = None
+        if profile_data.get("birth_time"):
+            birth_time_str = profile_data["birth_time"]
+            try:
+                # birth_time est un TIME (HH:MM:SS), pas un DATETIME
+                if isinstance(birth_time_str, str):
+                    # Extraire les heures et minutes du TIME
+                    parts = birth_time_str.split(":")
+                    hour = int(parts[0]) if len(parts) > 0 else 0
+                    minute = int(parts[1]) if len(parts) > 1 else 0
+                    # Créer un datetime avec la date de naissance + heure
+                    birth_time = birth_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                else:
+                    birth_time = birth_time_str
+            except Exception as e:
+                logger.warning(f"⚠️ Impossible de parser birth_time: {birth_time_str}, erreur: {e}")
+        
+        # Récupérer latitude/longitude depuis le cache local ou Supabase
+        # Si elles ne sont pas dans Supabase, utiliser des valeurs par défaut ou chercher depuis birth_place
+        latitude = profile_data.get("latitude")
+        longitude = profile_data.get("longitude")
+        
+        # Si latitude/longitude manquantes, utiliser des valeurs par défaut pour Paris
+        if latitude is None or longitude is None:
+            logger.warning(f"⚠️ Latitude/Longitude manquantes pour user {request.user_id}, utilisation de Paris par défaut")
+            latitude = latitude or 48.8566
+            longitude = longitude or 2.3522
+        
+        user_profile = UserProfileForLunarReturn(
+            birth_date=birth_date,
+            birth_time=birth_time,
+            birth_place=profile_data["birth_place"],
+            latitude=float(latitude),
+            longitude=float(longitude),
+            timezone=profile_data.get("timezone", "Europe/Paris")
         )
         
-        # Créer l'entrée
-        lunar_return = LunarReturn(
-            user_id=current_user.id,
-            month=month,
-            return_date=return_date,
-            lunar_ascendant=lunar_ascendant,
-            moon_house=moon_house,
-            moon_sign=moon_sign,
-            aspects=aspects,
-            planets=raw_data.get("planets", {}),
-            houses=raw_data.get("houses", {}),
-            interpretation=interpretation,
-            raw_data=raw_data
-        )
+        logger.info(f"📋 Profil utilisateur construit: {user_profile.birth_place}, lat={user_profile.latitude}, lon={user_profile.longitude}")
         
-        db.add(lunar_return)
-        generated_count += 1
-    
-    await db.commit()
-    
-    return {
-        "message": f"{generated_count} révolution(s) lunaire(s) générée(s)",
-        "year": current_year
-    }
-
-
-@router.get("/", response_model=List[LunarReturnResponse])
-async def get_all_lunar_returns(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Récupère toutes les révolutions lunaires de l'utilisateur"""
-    
-    result = await db.execute(
-        select(LunarReturn)
-        .where(LunarReturn.user_id == current_user.id)
-        .order_by(LunarReturn.month)
-    )
-    returns = result.scalars().all()
-    
-    if not returns:
+        # Calculer la révolution
+        computed_data = await calculate_lunar_return(user_profile, request.cycle_number)
+        
+        # Sauvegarder dans Supabase
+        created = await create_lunar_return(request.user_id, computed_data)
+        
+        return LunarReturnResponse(**created)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur génération révolution lunaire: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune révolution lunaire calculée. Utilisez POST /api/lunar-returns/generate"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération de la révolution lunaire: {str(e)}"
         )
-    
-    return returns
 
 
-@router.get("/{month}", response_model=LunarReturnResponse)
-async def get_lunar_return_by_month(
-    month: str,  # Format: YYYY-MM
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+@router.get("", response_model=List[LunarReturnResponse])
+async def get_lunar_returns(
+    user_id: UUID,
+    limit: int = 50
 ):
-    """Récupère une révolution lunaire spécifique par mois"""
+    """
+    Liste les révolutions lunaires d'un utilisateur
     
-    result = await db.execute(
-        select(LunarReturn).where(
-            LunarReturn.user_id == current_user.id,
-            LunarReturn.month == month
-        )
-    )
-    lunar_return = result.scalar_one_or_none()
-    
-    if not lunar_return:
+    Args:
+        user_id: ID de l'utilisateur
+        limit: Nombre maximum de résultats (défaut: 50)
+    """
+    try:
+        logger.info(f"📋 Liste révolutions lunaires pour user {user_id}")
+        
+        lunar_returns = await list_lunar_returns(user_id, limit)
+        
+        # Convertir les résultats en LunarReturnResponse
+        return [
+            LunarReturnResponse(**lr)
+            for lr in lunar_returns
+        ]
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur liste révolutions: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Révolution lunaire pour {month} non trouvée"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des révolutions: {str(e)}"
         )
+
+
+@router.get("/{lunar_return_id}", response_model=LunarReturnResponse)
+async def get_lunar_return(lunar_return_id: UUID):
+    """
+    Récupère une révolution lunaire par son ID
     
-    return lunar_return
+    Args:
+        lunar_return_id: ID de la révolution lunaire
+    """
+    try:
+        logger.info(f"🔍 Récupération révolution lunaire {lunar_return_id}")
+        
+        lunar_return = await get_lunar_return_by_id(lunar_return_id)
+        
+        if not lunar_return:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Révolution lunaire non trouvée"
+            )
+        
+        return LunarReturnResponse(**lunar_return)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération révolution: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération de la révolution: {str(e)}"
+        )
 
