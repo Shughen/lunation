@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { setWelcomeSeen } = useOnboardingStore();
 
   React.useEffect(() => {
     console.log('[WELCOME] ✅ Composant Welcome monté et affiché à l\'écran');
@@ -23,11 +24,11 @@ export default function WelcomeScreen() {
 
   const handleContinue = async () => {
     console.log('[WELCOME] Bouton "Continuer" cliqué');
-    
-    // Marquer le welcome comme vu
-    await AsyncStorage.setItem('hasSeenWelcomeScreen', 'true');
-    console.log('[WELCOME] hasSeenWelcomeScreen défini à "true"');
-    
+
+    // Marquer le welcome comme vu via le store
+    await setWelcomeSeen();
+    console.log('[WELCOME] hasSeenWelcomeScreen défini à true via useOnboardingStore');
+
     // Rediriger vers l'index pour que les guards prennent le relais
     console.log('[WELCOME] Redirection vers /');
     router.replace('/');
