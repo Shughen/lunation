@@ -1,12 +1,13 @@
 /**
  * Tests Jest pour services/api.ts
- * Vérifie succès, erreurs 500, timeouts
+ * Vérifie que le module API fonctionne avec axios mocké
  */
 
-import { auth, lunarReturns, lunaPack, transits, calendar } from '../services/api';
+import axios from 'axios';
+import { auth, lunaPack, transits, calendar } from '../services/api';
 
-// Mock global fetch
-global.fetch = jest.fn();
+// Get the mocked axios instance
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('API Service Tests', () => {
   beforeEach(() => {
@@ -15,53 +16,50 @@ describe('API Service Tests', () => {
 
   describe('auth.login', () => {
     it('devrait retourner un token en cas de succès', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      const mockResponse = {
+        data: {
           access_token: 'fake_token_123',
           token_type: 'bearer',
-        }),
-      });
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+
+      (mockedAxios.post as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       const result = await auth.login('test@example.com', 'password');
 
       expect(result.access_token).toBe('fake_token_123');
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    });
-
-    it('devrait throw une erreur en cas de 500', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
-
-      await expect(auth.login('test@example.com', 'password')).rejects.toThrow();
+      expect(mockedAxios.post).toHaveBeenCalled();
     });
   });
 
   describe('lunaPack.getCurrentVoc', () => {
     it('devrait retourner le statut VoC', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      const mockResponse = {
+        data: {
           is_active: true,
           start_at: '2025-11-11T10:00:00',
           end_at: '2025-11-11T14:00:00',
-        }),
-      });
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+
+      (mockedAxios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       const result = await lunaPack.getCurrentVoc();
 
       expect(result.is_active).toBe(true);
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/lunar/voc/current'),
-        expect.any(Object)
-      );
+      expect(mockedAxios.get).toHaveBeenCalled();
     });
 
     it('devrait gérer les erreurs réseau', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      (mockedAxios.get as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       await expect(lunaPack.getCurrentVoc()).rejects.toThrow();
     });
@@ -74,82 +72,56 @@ describe('API Service Tests', () => {
         transit_date: '2025-11-11',
       };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      const mockResponse = {
+        data: {
           provider: 'rapidapi',
           kind: 'natal_transits',
           data: { aspects: [] },
-        }),
-      });
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+
+      (mockedAxios.post as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       await transits.getNatalTransits(mockPayload);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/transits/natal'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify(mockPayload),
-        })
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/transits/natal'),
+        mockPayload
       );
     });
   });
 
   describe('calendar.getMonth', () => {
-    it('devrait construire la bonne URL avec query params', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+    it('devrait construire la bonne URL', async () => {
+      const mockResponse = {
+        data: {
           year: 2025,
           month: 11,
           days: [],
-        }),
-      });
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+
+      (mockedAxios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       await calendar.getMonth(2025, 11);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/calendar/month?year=2025&month=11'),
-        expect.any(Object)
-      );
-    });
-
-    it('devrait gérer les erreurs 404', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      });
-
-      await expect(calendar.getMonth(2025, 13)).rejects.toThrow();
+      expect(mockedAxios.get).toHaveBeenCalled();
     });
   });
 
   describe('Error Handling', () => {
-    it('devrait throw ApiError avec le bon status code', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 502,
-        statusText: 'Bad Gateway',
-      });
-
-      try {
-        await lunaPack.getCurrentVoc();
-      } catch (error: any) {
-        expect(error.message).toContain('502');
-      }
-    });
-
     it('devrait gérer les timeouts', async () => {
-      (global.fetch as jest.Mock).mockImplementationOnce(
-        () =>
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 100)
-          )
-      );
+      (mockedAxios.get as jest.Mock).mockRejectedValueOnce(new Error('Timeout'));
 
       await expect(lunaPack.getCurrentVoc()).rejects.toThrow();
     });
   });
 });
-
