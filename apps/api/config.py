@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # Timezone
     TZ: str = Field(default="Europe/Paris")
     
+    # Mode DEV Mock (pour tester sans clé API)
+    DEV_MOCK_EPHEMERIS: bool = Field(default=False, description="Mode mock DEV : génère des données fake si clé API manquante")
+    DEV_AUTH_BYPASS: bool = Field(default=False, description="Mode DEV: bypass JWT avec header X-Dev-User-Id (uniquement en development)")
+    
     # Supabase
     supabase_url: Optional[str] = Field(default=None, validation_alias="SUPABASE_URL")
     supabase_anon_key: Optional[str] = Field(default=None, validation_alias="SUPABASE_ANON_KEY")

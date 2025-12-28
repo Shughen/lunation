@@ -5,42 +5,114 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+// Détection device physique vs simulateur
+const isPhysicalDevice = (): boolean => {
+  // Expo Go sur device physique : deviceName est défini et n'est pas "Simulator"
+  const deviceName = Constants.deviceName;
+  if (deviceName) {
+    const isSimulator = deviceName.toLowerCase().includes('simulator') || 
+                       deviceName.toLowerCase().includes('emulator');
+    return !isSimulator;
+  }
+  // Si deviceName n'est pas disponible, on assume device physique si pas web
+  return Platform.OS !== 'web';
+};
+
+// Récupération de l'IP LAN depuis Expo debugger (si disponible)
+const getLanIPFromExpo = (): string | null => {
+  try {
+    // Expo peut exposer l'IP du debugger via Constants
+    const debuggerHost = Constants.expoConfig?.extra?.debuggerHost;
+    if (debuggerHost) {
+      // Extraire l'IP depuis debuggerHost (format: "192.168.0.150:8081")
+      const match = debuggerHost.match(/^(\d+\.\d+\.\d+\.\d+)/);
+      if (match) {
+        return match[1];
+      }
+    }
+  } catch (e) {
+    // Ignorer les erreurs
+  }
+  return null;
+};
 
 // Configuration BaseURL avec fallbacks selon la plateforme
 const getBaseURL = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  const isPhysical = isPhysicalDevice();
+  const lanIP = getLanIPFromExpo();
+  
   // Priorité absolue : EXPO_PUBLIC_API_URL si défini
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) {
+    // Vérifier si l'URL contient 127.0.0.1 ou localhost sur un device physique
+    const isLocalhost = envUrl.includes('127.0.0.1') || envUrl.includes('localhost');
+    
+    if (isPhysical && isLocalhost) {
+      // Sur device physique avec localhost → essayer de remplacer par IP LAN
+      if (lanIP) {
+        const correctedUrl = envUrl.replace(/127\.0\.0\.1|localhost/, lanIP);
+        console.warn(
+          `⚠️ EXPO_PUBLIC_API_URL contient localhost sur device physique.\n` +
+          `Correction automatique: ${envUrl} → ${correctedUrl}\n` +
+          `Si cela ne fonctionne pas, définissez EXPO_PUBLIC_API_URL avec votre IP LAN (ex: http://192.168.0.150:8000)`
+        );
+        return correctedUrl;
+      } else {
+        console.error(
+          `❌ ACTION REQUIRED: EXPO_PUBLIC_API_URL=${envUrl} contient localhost mais vous êtes sur un device physique.\n` +
+          `L'API ne sera pas accessible. Définissez EXPO_PUBLIC_API_URL avec votre IP LAN:\n` +
+          `  EXPO_PUBLIC_API_URL=http://192.168.0.150:8000\n` +
+          `(Remplacez 192.168.0.150 par l'IP de votre Mac sur le réseau local)`
+        );
+      }
+    }
+    
+    return envUrl;
   }
   
   // Fallback pour simulateurs/web uniquement
-  const isWeb = Platform.OS === 'web';
-  const isSimulator = Platform.OS === 'ios' || Platform.OS === 'android';
-  
-  if (isWeb) {
-    // Web : localhost fonctionne
+  if (Platform.OS === 'web') {
     return 'http://localhost:8000';
+  }
+  
+  // Sur device physique sans EXPO_PUBLIC_API_URL, essayer IP LAN détectée
+  if (isPhysical && lanIP) {
+    const fallbackUrl = `http://${lanIP}:8000`;
+    console.warn(
+      `⚠️ EXPO_PUBLIC_API_URL non défini sur device physique.\n` +
+      `Utilisation de l'IP LAN détectée: ${fallbackUrl}\n` +
+      `Si cela ne fonctionne pas, définissez EXPO_PUBLIC_API_URL explicitement.`
+    );
+    return fallbackUrl;
   }
   
   if (Platform.OS === 'ios') {
     // iOS Simulator : localhost fonctionne
     // Device physique : nécessite EXPO_PUBLIC_API_URL avec IP locale
-    console.warn(
-      '⚠️ EXPO_PUBLIC_API_URL non défini. ' +
-      'Sur device physique iOS, utilisez l\'IP locale de votre Mac (ex: http://192.168.0.150:8000). ' +
-      'Fallback localhost utilisé (ne fonctionnera pas sur device physique).'
-    );
+    if (isPhysical) {
+      console.error(
+        `❌ ACTION REQUIRED: EXPO_PUBLIC_API_URL non défini sur device physique iOS.\n` +
+        `Définissez EXPO_PUBLIC_API_URL avec votre IP LAN:\n` +
+        `  EXPO_PUBLIC_API_URL=http://192.168.0.150:8000\n` +
+        `(Remplacez 192.168.0.150 par l'IP de votre Mac sur le réseau local)`
+      );
+    }
     return 'http://127.0.0.1:8000';
   }
   
   if (Platform.OS === 'android') {
     // Android Emulator : 10.0.2.2 fonctionne
     // Device physique : nécessite EXPO_PUBLIC_API_URL avec IP locale
-    console.warn(
-      '⚠️ EXPO_PUBLIC_API_URL non défini. ' +
-      'Sur device physique Android, utilisez l\'IP locale de votre machine (ex: http://192.168.0.150:8000). ' +
-      'Fallback 10.0.2.2 utilisé (ne fonctionnera pas sur device physique).'
-    );
+    if (isPhysical) {
+      console.error(
+        `❌ ACTION REQUIRED: EXPO_PUBLIC_API_URL non défini sur device physique Android.\n` +
+        `Définissez EXPO_PUBLIC_API_URL avec votre IP LAN:\n` +
+        `  EXPO_PUBLIC_API_URL=http://192.168.0.150:8000\n` +
+        `(Remplacez 192.168.0.150 par l'IP de votre Mac sur le réseau local)`
+      );
+    }
     return 'http://10.0.2.2:8000';
   }
   
@@ -52,6 +124,7 @@ const API_URL = getBaseURL();
 
 // Log de la baseURL choisie au démarrage (utile pour debug réseau)
 console.log(`🔗 API BaseURL: ${API_URL}`);
+console.log(`📱 Platform: ${Platform.OS}, Device: ${Constants.deviceName || 'unknown'}, IsPhysical: ${isPhysicalDevice()}`);
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -63,7 +136,29 @@ const apiClient = axios.create({
 
 // Mode DEV_AUTH_BYPASS: détection et configuration
 const DEV_AUTH_BYPASS = process.env.EXPO_PUBLIC_DEV_AUTH_BYPASS === 'true';
-const DEV_USER_ID = process.env.EXPO_PUBLIC_DEV_USER_ID || '1';
+// EXPO_PUBLIC_DEV_USER_ID doit être un UUID string (ex: "550e8400-e29b-41d4-a716-446655440000")
+// Si non défini, on utilise un UUID par défaut pour les tests
+const DEV_USER_ID_RAW = process.env.EXPO_PUBLIC_DEV_USER_ID || '550e8400-e29b-41d4-a716-446655440000';
+
+// Validation UUID en dev (guard)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidUUID = (str: string): boolean => {
+  return UUID_REGEX.test(str);
+};
+
+const DEV_USER_ID = (() => {
+  if (DEV_AUTH_BYPASS && !isValidUUID(DEV_USER_ID_RAW)) {
+    console.error(
+      `\n❌ ACTION REQUIRED: EXPO_PUBLIC_DEV_USER_ID n'est pas un UUID valide: "${DEV_USER_ID_RAW}"\n` +
+      `Format attendu: "550e8400-e29b-41d4-a716-446655440000"\n` +
+      `\nCorrigez votre fichier .env:\n` +
+      `  EXPO_PUBLIC_DEV_USER_ID=550e8400-e29b-41d4-a716-446655440000\n` +
+      `\nUtilisation d'un UUID par défaut pour éviter les erreurs (cette session uniquement).\n`
+    );
+    return '550e8400-e29b-41d4-a716-446655440000';
+  }
+  return DEV_USER_ID_RAW;
+})();
 
 // Intercepteur pour ajouter le token ou le header DEV_AUTH_BYPASS
 apiClient.interceptors.request.use(
@@ -86,6 +181,48 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Intercepteur de réponse pour logger les erreurs
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Extraire les informations d'erreur
+    const isAxiosError = error.isAxiosError || false;
+    const errorCode = error.code || null;
+    const errorMessage = error.message || '';
+    const status = error.response?.status || null;
+    const fullUrl = error.config ? `${error.config.baseURL || API_URL}${error.config.url || ''}` : 'unknown';
+    
+    // Diagnostic amélioré pour Network Error
+    if (errorCode === 'ERR_NETWORK' || errorMessage === 'Network Error') {
+      const isPhysical = isPhysicalDevice();
+      const baseUrl = error.config?.baseURL || API_URL;
+      const hostFromUrl = baseUrl.replace(/^https?:\/\//, '').split(':')[0];
+      
+      console.error(
+        `\n❌ ERREUR RÉSEAU: Impossible de joindre l'API\n` +
+        `URL tentée: ${fullUrl}\n` +
+        `BaseURL: ${baseUrl}\n` +
+        `Platform: ${Platform.OS}, Device: ${Constants.deviceName || 'unknown'}, IsPhysical: ${isPhysical}\n` +
+        `\nCauses probables:\n` +
+        `1. L'API n'est pas démarrée ou n'écoute pas sur ${baseUrl}\n` +
+        `2. ${isPhysical ? `Sur device physique, l'API doit écouter sur 0.0.0.0 (pas seulement 127.0.0.1)` : 'Firewall bloque la connexion'}\n` +
+        `3. L'API doit être démarrée avec: uvicorn main:app --reload --host 0.0.0.0 --port 8000\n` +
+        `   OU utiliser: cd apps/api && ./start_api.sh\n` +
+        `\nVérifiez:\n` +
+        `- API démarrée avec --host 0.0.0.0: cd apps/api && uvicorn main:app --reload --host 0.0.0.0 --port 8000\n` +
+        `- Test depuis Mac sur IP LAN: curl http://${hostFromUrl}:8000/health\n` +
+        `- Test depuis Mac sur localhost: curl http://127.0.0.1:8000/health\n` +
+        `- EXPO_PUBLIC_API_URL dans .env: ${process.env.EXPO_PUBLIC_API_URL || 'NON DÉFINI'}\n` +
+        `- Si localhost fonctionne mais pas IP LAN → API n'écoute pas sur 0.0.0.0\n`
+      );
+    }
+    
+    return Promise.reject(error);
+  }
 );
 
 // Export pour vérifier si le mode bypass est actif
@@ -308,15 +445,23 @@ export const calendar = {
 export const transits = {
   /**
    * Récupère la vue d'ensemble des transits pour un utilisateur et un mois
-   * @param userId ID de l'utilisateur
+   * @param userId ID de l'utilisateur (UUID string)
    * @param month Mois au format YYYY-MM (ex: "2025-01")
    * @param token Token d'authentification (optionnel, sera ajouté automatiquement par l'intercepteur)
    */
-  getOverview: async (userId: number, month: string, token?: string) => {
+  getOverview: async (userId: string, month: string, token?: string) => {
     // Le token est géré automatiquement par l'intercepteur axios
     // On peut le passer explicitement si nécessaire, sinon l'intercepteur le récupère d'AsyncStorage
-    const response = await apiClient.get(`/api/transits/overview/${userId}/${month}`);
-    return response.data;
+    try {
+      const response = await apiClient.get(`/api/transits/overview/${userId}/${month}`);
+      return response.data;
+    } catch (error: any) {
+      // 404 = pas de transits disponibles (cas normal, pas une erreur)
+      if (error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   /**
