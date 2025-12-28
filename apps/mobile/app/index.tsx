@@ -15,14 +15,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../stores/useAuthStore';
-import { lunarReturns, LunarReturn, isDevAuthBypassActive, getDevUserId, natalChart } from '../services/api';
+import { useOnboardingStore } from '../stores/useOnboardingStore';
+import { lunarReturns, LunarReturn, isDevAuthBypassActive, getDevUserId } from '../services/api';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const onboardingStore = useOnboardingStore();
   const [nextLunarReturn, setNextLunarReturn] = useState<LunarReturn | null>(null);
   const [loadingNext, setLoadingNext] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -33,7 +34,7 @@ export default function HomeScreen() {
   // Guards de routing : vérifier auth, onboarding et profil complet
   useEffect(() => {
     console.log('[INDEX] 🔄 checkRouting() appelé');
-    
+
     const checkRouting = async () => {
       // Éviter les appels multiples
       if (hasCheckedRoutingRef.current) {
@@ -44,7 +45,10 @@ export default function HomeScreen() {
       try {
         console.log('[INDEX] 📍 Début checkRouting');
         console.log('[INDEX] isAuthenticated =', isAuthenticated);
-        
+
+        // Hydrater l'état onboarding depuis AsyncStorage
+        await onboardingStore.hydrate();
+
         // En mode DEV_AUTH_BYPASS, log clair et skip uniquement auth (pas welcome)
         const isBypassActive = isDevAuthBypassActive();
         console.log('[INDEX] isBypassActive =', isBypassActive);
@@ -61,12 +65,11 @@ export default function HomeScreen() {
         }
         console.log('[INDEX] ✅ Auth OK (bypassé ou authentifié)');
 
-        // B) Ensuite vérifier hasSeenWelcomeScreen (après auth)
+        // B) Vérifier hasSeenWelcomeScreen
         console.log('[INDEX] 📍 Étape B: Vérification hasSeenWelcomeScreen');
-        const hasSeenWelcomeScreen = await AsyncStorage.getItem('hasSeenWelcomeScreen');
-        console.log('[INDEX] hasSeenWelcomeScreen lu depuis AsyncStorage =', hasSeenWelcomeScreen, '(type:', typeof hasSeenWelcomeScreen, ')');
+        console.log('[INDEX] hasSeenWelcomeScreen =', onboardingStore.hasSeenWelcomeScreen);
 
-        if (hasSeenWelcomeScreen !== 'true') {
+        if (!onboardingStore.hasSeenWelcomeScreen) {
           console.log('[INDEX] ✅ Welcome screen non vu → redirection vers /welcome');
           router.replace('/welcome');
           return;
@@ -82,32 +85,44 @@ export default function HomeScreen() {
           return;
         }
 
-        // C) Ensuite logique existante: onboarding_completed
-        const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
-        console.log('[INDEX] onboarding_completed =', onboardingCompleted);
+        // C) Vérifier profil setup (nom + date de naissance)
+        console.log('[INDEX] 📍 Étape C: Vérification profil');
+        console.log('[INDEX] hasCompletedProfile =', onboardingStore.hasCompletedProfile);
+        if (!onboardingStore.hasCompletedProfile) {
+          console.log('[INDEX] ✅ Profil incomplet → redirection vers /onboarding/profile-setup');
+          router.replace('/onboarding/profile-setup');
+          return;
+        }
 
-        if (onboardingCompleted !== 'true') {
-          console.log('[INDEX] Onboarding non terminé → redirection vers /onboarding');
+        // D) Vérifier consentement RGPD
+        console.log('[INDEX] 📍 Étape D: Vérification consentement');
+        console.log('[INDEX] hasAcceptedConsent =', onboardingStore.hasAcceptedConsent);
+        if (!onboardingStore.hasAcceptedConsent) {
+          console.log('[INDEX] ✅ Consentement non accepté → redirection vers /onboarding/consent');
+          router.replace('/onboarding/consent');
+          return;
+        }
+
+        // E) Vérifier disclaimer médical
+        console.log('[INDEX] 📍 Étape E: Vérification disclaimer');
+        console.log('[INDEX] hasSeenDisclaimer =', onboardingStore.hasSeenDisclaimer);
+        if (!onboardingStore.hasSeenDisclaimer) {
+          console.log('[INDEX] ✅ Disclaimer non vu → redirection vers /onboarding/disclaimer');
+          router.replace('/onboarding/disclaimer');
+          return;
+        }
+
+        // F) Vérifier onboarding complet (slides)
+        console.log('[INDEX] 📍 Étape F: Vérification onboarding slides');
+        console.log('[INDEX] hasCompletedOnboarding =', onboardingStore.hasCompletedOnboarding);
+        if (!onboardingStore.hasCompletedOnboarding) {
+          console.log('[INDEX] ✅ Onboarding slides non terminés → redirection vers /onboarding');
           router.replace('/onboarding');
           return;
         }
 
-        // D) Vérifier profil complet (thème natal existant)
-        try {
-          await natalChart.get();
-          console.log('[INDEX] Profil complet (thème natal existant)');
-        } catch (error: any) {
-          // 404 = pas de thème natal, profil incomplet
-          if (error.response?.status === 404) {
-            console.log('[INDEX] Profil incomplet (pas de thème natal) → redirection vers /onboarding');
-            router.replace('/onboarding');
-            return;
-          }
-          // Autre erreur : continuer quand même
-          console.warn('[INDEX] Erreur vérification profil:', error);
-        }
-
         // Tout est OK, afficher le contenu
+        console.log('[INDEX] ✅ Tous les guards passés, affichage Home');
         hasCheckedRoutingRef.current = true;
         setIsCheckingRouting(false);
       } catch (error) {
@@ -120,7 +135,7 @@ export default function HomeScreen() {
     };
 
     checkRouting();
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, onboardingStore]);
 
   useEffect(() => {
     // En mode DEV_AUTH_BYPASS, charger même sans authentification
