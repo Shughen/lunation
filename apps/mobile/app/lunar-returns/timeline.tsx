@@ -19,6 +19,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { lunarReturns, LunarReturn } from '../../services/api';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
+import { formatDate } from '../../utils/date';
+import { formatAspects, parseInterpretation } from '../../utils/astrology-format';
 
 type BadgeType = 'past' | 'today' | 'upcoming';
 
@@ -101,17 +103,6 @@ export default function LunarReturnsTimelineScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const getBadgeLabel = (badgeType: BadgeType) => {
     switch (badgeType) {
       case 'past':
@@ -132,86 +123,6 @@ export default function LunarReturnsTimelineScreen() {
       case 'upcoming':
         return colors.success;
     }
-  };
-
-  // Formate les aspects en liste lisible
-  const formatAspects = (aspects?: Array<any>): string[] => {
-    if (!aspects || aspects.length === 0) {
-      return [];
-    }
-    return aspects.map((aspect) => {
-      const planet1 = aspect.planet1 || aspect.planet_1 || 'Planet1';
-      const planet2 = aspect.planet2 || aspect.planet_2 || 'Planet2';
-      const type = aspect.type || aspect.aspect_type || 'aspect';
-      const orb = aspect.orb !== undefined ? aspect.orb : null;
-      
-      let aspectText = `${planet1} ${type} ${planet2}`;
-      if (orb !== null) {
-        aspectText += `, orb ${orb.toFixed(1)}°`;
-      }
-      return aspectText;
-    });
-  };
-
-  // Formate l'interprétation : split par \n\n et support basique du **gras**
-  const formatInterpretation = (text?: string): React.ReactNode[] => {
-    if (!text) {
-      return [];
-    }
-    
-    // Split par double saut de ligne
-    const paragraphs = text.split('\n\n').filter(p => p.trim().length > 0);
-    
-    return paragraphs.map((paragraph, index) => {
-      // Support très simple du **gras** : remplace **texte** par du texte en gras
-      const parts: React.ReactNode[] = [];
-      const regex = /\*\*(.*?)\*\*/g;
-      let lastIndex = 0;
-      let match;
-      let keyCounter = 0;
-      
-      while ((match = regex.exec(paragraph)) !== null) {
-        // Ajouter le texte avant le match
-        if (match.index > lastIndex) {
-          parts.push(
-            <Text key={`text-${keyCounter++}`} style={styles.interpretationText}>
-              {paragraph.substring(lastIndex, match.index)}
-            </Text>
-          );
-        }
-        // Ajouter le texte en gras
-        parts.push(
-          <Text key={`bold-${keyCounter++}`} style={[styles.interpretationText, styles.interpretationBold]}>
-            {match[1]}
-          </Text>
-        );
-        lastIndex = match.index + match[0].length;
-      }
-      
-      // Ajouter le reste du texte
-      if (lastIndex < paragraph.length) {
-        parts.push(
-          <Text key={`text-${keyCounter++}`} style={styles.interpretationText}>
-            {paragraph.substring(lastIndex)}
-          </Text>
-        );
-      }
-      
-      // Si aucun match, utiliser le texte tel quel
-      if (parts.length === 0) {
-        parts.push(
-          <Text key={`text-${keyCounter++}`} style={styles.interpretationText}>
-            {paragraph}
-          </Text>
-        );
-      }
-      
-      return (
-        <Text key={`para-${index}`} style={styles.interpretationParagraph}>
-          {parts}
-        </Text>
-      );
-    });
   };
 
   // Récupère le badgeType pour l'item sélectionné
@@ -370,7 +281,21 @@ export default function LunarReturnsTimelineScreen() {
                     <View style={styles.detailSection}>
                       <Text style={styles.detailSectionTitle}>Interprétation</Text>
                       <View style={styles.interpretationContainer}>
-                        {formatInterpretation(selectedItem.interpretation)}
+                        {parseInterpretation(selectedItem.interpretation).map((para) => (
+                          <Text key={`para-${para.index}`} style={styles.interpretationParagraph}>
+                            {para.parts.map((part) => (
+                              <Text
+                                key={part.key}
+                                style={[
+                                  styles.interpretationText,
+                                  part.type === 'bold' && styles.interpretationBold,
+                                ]}
+                              >
+                                {part.content}
+                              </Text>
+                            ))}
+                          </Text>
+                        ))}
                       </View>
                     </View>
                   )}

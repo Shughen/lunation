@@ -19,6 +19,8 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { lunarReturns, LunarReturn, isDevAuthBypassActive, getDevUserId } from '../services/api';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
+import { formatDate, getDaysUntil } from '../utils/date';
+import { formatAspects, parseInterpretation } from '../utils/astrology-format';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -186,99 +188,6 @@ export default function HomeScreen() {
     } else {
       Alert.alert('Erreur', error.response?.data?.detail || error.message || 'Une erreur est survenue');
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getDaysUntil = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = date.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  // Formate les aspects en liste lisible
-  const formatAspects = (aspects?: Array<any>): string[] => {
-    if (!aspects || aspects.length === 0) {
-      return [];
-    }
-    return aspects.map((aspect) => {
-      const planet1 = aspect.planet1 || aspect.planet_1 || 'Planet1';
-      const planet2 = aspect.planet2 || aspect.planet_2 || 'Planet2';
-      const type = aspect.type || aspect.aspect_type || 'aspect';
-      const orb = aspect.orb !== undefined ? aspect.orb : null;
-      
-      let aspectText = `${planet1} ${type} ${planet2}`;
-      if (orb !== null) {
-        aspectText += `, orb ${orb.toFixed(1)}°`;
-      }
-      return aspectText;
-    });
-  };
-
-  // Formate l'interprétation : split par \n\n et support basique du **gras**
-  const formatInterpretation = (text?: string): React.ReactNode[] => {
-    if (!text) {
-      return [];
-    }
-    
-    const paragraphs = text.split('\n\n').filter(p => p.trim().length > 0);
-    
-    return paragraphs.map((paragraph, index) => {
-      const parts: React.ReactNode[] = [];
-      const regex = /\*\*(.*?)\*\*/g;
-      let lastIndex = 0;
-      let match;
-      let keyCounter = 0;
-      
-      while ((match = regex.exec(paragraph)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push(
-            <Text key={`text-${keyCounter++}`} style={detailStyles.interpretationText}>
-              {paragraph.substring(lastIndex, match.index)}
-            </Text>
-          );
-        }
-        parts.push(
-          <Text key={`bold-${keyCounter++}`} style={[detailStyles.interpretationText, detailStyles.interpretationBold]}>
-            {match[1]}
-          </Text>
-        );
-        lastIndex = match.index + match[0].length;
-      }
-      
-      if (lastIndex < paragraph.length) {
-        parts.push(
-          <Text key={`text-${keyCounter++}`} style={detailStyles.interpretationText}>
-            {paragraph.substring(lastIndex)}
-          </Text>
-        );
-      }
-      
-      if (parts.length === 0) {
-        parts.push(
-          <Text key={`text-${keyCounter++}`} style={detailStyles.interpretationText}>
-            {paragraph}
-          </Text>
-        );
-      }
-      
-      return (
-        <Text key={`para-${index}`} style={detailStyles.interpretationParagraph}>
-          {parts}
-        </Text>
-      );
-    });
   };
 
   // Afficher un loader pendant la vérification du routing
@@ -513,7 +422,21 @@ export default function HomeScreen() {
                     <View style={detailStyles.detailSection}>
                       <Text style={detailStyles.detailSectionTitle}>Interprétation</Text>
                       <View style={detailStyles.interpretationContainer}>
-                        {formatInterpretation(nextLunarReturn.interpretation)}
+                        {parseInterpretation(nextLunarReturn.interpretation).map((para) => (
+                          <Text key={`para-${para.index}`} style={detailStyles.interpretationParagraph}>
+                            {para.parts.map((part) => (
+                              <Text
+                                key={part.key}
+                                style={[
+                                  detailStyles.interpretationText,
+                                  part.type === 'bold' && detailStyles.interpretationBold,
+                                ]}
+                              >
+                                {part.content}
+                              </Text>
+                            ))}
+                          </Text>
+                        ))}
                       </View>
                     </View>
                   )}
