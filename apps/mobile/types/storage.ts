@@ -10,6 +10,9 @@ export const STORAGE_KEYS = {
   // Onboarding
   HAS_SEEN_WELCOME_SCREEN: 'hasSeenWelcomeScreen',
   ONBOARDING_COMPLETED: 'onboarding_completed',
+  ONBOARDING_PROFILE: 'onboarding_profile',
+  ONBOARDING_CONSENT: 'onboarding_consent',
+  ONBOARDING_DISCLAIMER: 'onboarding_disclaimer',
 
   // Profile
   BIRTH_DATE: 'birth_date',
