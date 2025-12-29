@@ -130,7 +130,7 @@ export default function NatalChartResultScreen() {
                   <Text style={styles.statEmoji}>
                     {ZODIAC_EMOJI[chart.sun_sign || ''] || '☀️'}
                   </Text>
-                  <Text style={styles.statValue}>
+                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                     {tSign(chart.sun_sign) || 'N/A'}
                   </Text>
                   <Text style={styles.tapHint}>Tap pour interpréter</Text>
@@ -145,7 +145,7 @@ export default function NatalChartResultScreen() {
                   <Text style={styles.statEmoji}>
                     {ZODIAC_EMOJI[chart.moon_sign || ''] || '🌙'}
                   </Text>
-                  <Text style={styles.statValue}>
+                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                     {tSign(chart.moon_sign) || 'N/A'}
                   </Text>
                   <Text style={styles.tapHint}>Tap pour interpréter</Text>
@@ -157,8 +157,8 @@ export default function NatalChartResultScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.statLabel}>Ascendant</Text>
-                  <Text style={styles.statEmoji}>⬆️</Text>
-                  <Text style={styles.statValue}>
+                  <Text style={styles.statEmoji}>AS</Text>
+                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                     {tSign(chart.ascendant) || 'N/A'}
                   </Text>
                   <Text style={styles.tapHint}>Tap pour interpréter</Text>
@@ -170,6 +170,7 @@ export default function NatalChartResultScreen() {
             {chart.planets && typeof chart.planets === 'object' && Object.keys(chart.planets).length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>🪐 Positions Planétaires</Text>
+                <Text style={styles.sectionHint}>Touchez une planète pour lire son interprétation</Text>
                 {(() => {
                   // Ordre spécifique : Soleil, Lune, Ascendant, Milieu du Ciel, puis les autres
                   // Ordre spécifique : Soleil, Lune, Ascendant, Milieu du Ciel (en 4ème), puis les autres
@@ -283,19 +284,22 @@ export default function NatalChartResultScreen() {
                     return (
                       <TouchableOpacity
                         key={index}
-                        style={styles.planetRow}
+                        style={[styles.planetRow, subject && styles.planetRowPressable]}
                         onPress={() => subject && handlePlacementClick(subject)}
                         disabled={!subject}
                         activeOpacity={subject ? 0.7 : 1}
                       >
-                        <Text style={styles.planetName}>
-                          {displayName}
-                        </Text>
-                        <Text style={styles.planetInfo}>
-                          {planetData.sign ? `${ZODIAC_EMOJI[planetData.sign] || ''} ${tSign(planetData.sign)}` : 'N/A'}
-                          {planetData.degree !== undefined && ` • ${formatDegree(planetData.degree)}`}
-                          {planetData.house !== undefined && planetData.house > 0 && ` • Maison ${planetData.house}`}
-                        </Text>
+                        <View style={styles.planetContent}>
+                          <Text style={styles.planetName}>
+                            {displayName}
+                          </Text>
+                          <Text style={styles.planetInfo}>
+                            {planetData.sign ? `${ZODIAC_EMOJI[planetData.sign] || ''} ${tSign(planetData.sign)}` : 'N/A'}
+                            {planetData.degree !== undefined && ` • ${formatDegree(planetData.degree)}`}
+                            {planetData.house !== undefined && planetData.house > 0 && ` • Maison ${planetData.house}`}
+                          </Text>
+                        </View>
+                        {subject && <Text style={styles.chevron}>›</Text>}
                       </TouchableOpacity>
                     );
                   });
@@ -451,6 +455,8 @@ const styles = StyleSheet.create({
   statEmoji: {
     fontSize: 32,
     marginBottom: spacing.xs,
+    fontWeight: '600',
+    letterSpacing: -1,
   },
   statValue: {
     ...fonts.h3,
@@ -466,12 +472,28 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...fonts.h3,
     color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  sectionHint: {
+    ...fonts.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontStyle: 'italic',
     marginBottom: spacing.md,
   },
   planetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  planetRowPressable: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  planetContent: {
+    flex: 1,
   },
   planetName: {
     ...fonts.body,
@@ -482,6 +504,12 @@ const styles = StyleSheet.create({
   planetInfo: {
     ...fonts.bodySmall,
     color: colors.textMuted,
+  },
+  chevron: {
+    ...fonts.h2,
+    color: colors.accent,
+    opacity: 0.5,
+    marginLeft: spacing.sm,
   },
   houseRow: {
     flexDirection: 'row',
