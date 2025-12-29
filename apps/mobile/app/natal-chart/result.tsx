@@ -111,22 +111,78 @@ export default function NatalChartResultScreen() {
               </View>
             )}
 
-            {/* Planètes */}
+            {/* Planètes - Ordre spécifique */}
             {chart.planets && typeof chart.planets === 'object' && Object.keys(chart.planets).length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>🪐 Positions Planétaires</Text>
-                {Object.entries(chart.planets).map(([planetName, planetData]: [string, any], index: number) => (
-                  <View key={index} style={styles.planetRow}>
-                    <Text style={styles.planetName}>
-                      {tPlanet(planetName)}
-                    </Text>
-                    <Text style={styles.planetInfo}>
-                      {planetData.sign ? `${ZODIAC_EMOJI[planetData.sign] || ''} ${tSign(planetData.sign)}` : 'N/A'}
-                      {planetData.degree !== undefined && ` • ${formatDegree(planetData.degree)}`}
-                      {planetData.house !== undefined && ` • Maison ${planetData.house}`}
-                    </Text>
-                  </View>
-                ))}
+                {(() => {
+                  // Ordre spécifique : Soleil, Lune, Ascendant, Milieu du Ciel, puis les autres
+                  const orderedKeys = [
+                    'sun', 'soleil',
+                    'moon', 'lune',
+                    'ascendant',
+                    'medium_coeli', 'milieu_du_ciel', 'mc',
+                    // Planètes classiques
+                    'mercury', 'mercure',
+                    'venus', 'vénus',
+                    'mars',
+                    'jupiter',
+                    'saturn', 'saturne',
+                    // Planètes extérieures
+                    'uranus',
+                    'neptune',
+                    'pluto', 'pluton',
+                    // Points astrologiques
+                    'mean_node', 'true_node', 'north_node', 'noeud_nord',
+                    'south_node', 'noeud_sud',
+                    'lilith', 'black_moon_lilith',
+                    'chiron',
+                  ];
+                  
+                  // Créer une liste ordonnée
+                  const orderedPlanets: Array<[string, any]> = [];
+                  const remainingPlanets: Array<[string, any]> = [];
+                  
+                  // D'abord, ajouter dans l'ordre spécifique
+                  for (const key of orderedKeys) {
+                    const entry = Object.entries(chart.planets).find(([name]) => 
+                      name.toLowerCase() === key.toLowerCase()
+                    );
+                    if (entry) {
+                      orderedPlanets.push(entry);
+                    }
+                  }
+                  
+                  // Ensuite, ajouter les autres (non encore ajoutés)
+                  for (const entry of Object.entries(chart.planets)) {
+                    if (!orderedPlanets.find(([name]) => name === entry[0])) {
+                      remainingPlanets.push(entry);
+                    }
+                  }
+                  
+                  // Fusionner
+                  const allPlanets = [...orderedPlanets, ...remainingPlanets];
+                  
+                  return allPlanets.map(([planetName, planetData]: [string, any], index: number) => {
+                    // Traduire "medium_coeli" en "Milieu du Ciel"
+                    const displayName = planetName.toLowerCase() === 'medium_coeli' 
+                      ? 'Milieu du Ciel' 
+                      : tPlanet(planetName);
+                    
+                    return (
+                      <View key={index} style={styles.planetRow}>
+                        <Text style={styles.planetName}>
+                          {displayName}
+                        </Text>
+                        <Text style={styles.planetInfo}>
+                          {planetData.sign ? `${ZODIAC_EMOJI[planetData.sign] || ''} ${tSign(planetData.sign)}` : 'N/A'}
+                          {planetData.degree !== undefined && ` • ${formatDegree(planetData.degree)}`}
+                          {planetData.house !== undefined && ` • Maison ${planetData.house}`}
+                        </Text>
+                      </View>
+                    );
+                  });
+                })()}
               </View>
             )}
 

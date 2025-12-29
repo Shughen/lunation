@@ -21,16 +21,17 @@ except ImportError:
     logger.warning("⚠️ Swiss Ephemeris non disponible - calculs complémentaires désactivés")
 
 # Constantes Swiss Ephemeris pour les planètes/points
-# Constantes Swiss Ephemeris (sans préfixe SE_)
+# Constantes Swiss Ephemeris
 PLANET_CODES = {
     "uranus": swe.URANUS if SWISS_EPHEMERIS_AVAILABLE else None,
     "neptune": swe.NEPTUNE if SWISS_EPHEMERIS_AVAILABLE else None,
     "pluto": swe.PLUTO if SWISS_EPHEMERIS_AVAILABLE else None,
-    "mean_node": swe.TRUE_NODE if SWISS_EPHEMERIS_AVAILABLE else None,  # Nœud Nord moyen
+    "mean_node": swe.MEAN_NODE if SWISS_EPHEMERIS_AVAILABLE else None,  # Nœud Nord moyen
     "true_node": swe.TRUE_NODE if SWISS_EPHEMERIS_AVAILABLE else None,  # Nœud Nord vrai
     "south_node": None,  # Calculé comme opposé du Nœud Nord
     "chiron": swe.CHIRON if SWISS_EPHEMERIS_AVAILABLE else None,
-    "lilith": swe.TRUE_LILITH if SWISS_EPHEMERIS_AVAILABLE else None,  # Lilith vraie (Lune Noire)
+    # Lilith n'a pas de constante directe, on la calculera depuis l'apogée lunaire
+    "lilith": None,  # Sera calculé séparément
 }
 
 ZODIAC_SIGNS = [
@@ -170,6 +171,24 @@ def calculate_complementary_positions(
             "is_retrograde": False
         })
     
+    # Calculer Lilith (Lune Noire) = Apogée moyenne de la Lune
+    try:
+        result = swe.calc_ut(jd, swe.MEAN_APOG, swe.FLG_SWIEPH)
+        if result is not None and len(result) >= 2:
+            lilith_longitude = result[0][0]
+            zodiac = longitude_to_zodiac(lilith_longitude)
+            positions.append({
+                "name": "lilith",
+                "sign": zodiac["sign"],
+                "sign_abbr": zodiac["sign_abbr"],
+                "degree": zodiac["degree"],
+                "longitude": zodiac["longitude"],
+                "house": 0,  # À calculer séparément si nécessaire
+                "is_retrograde": False
+            })
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur calcul Lilith: {e}")
+    
     logger.info(f"✅ {len(positions)} positions complémentaires calculées")
     return positions
 
@@ -197,15 +216,15 @@ def merge_complementary_positions(
     for comp_pos in complementary_positions:
         name_lower = comp_pos.get("name", "").lower()
         if name_lower not in rapidapi_dict:
-            # Convertir au format RapidAPI
-            merged.append({
-                "name": comp_pos["name"].title(),  # "uranus" -> "Uranus"
-                "sign": comp_pos["sign_abbr"],  # Format abrégé comme RapidAPI
-                "degree": comp_pos["degree"],
-                "absolute_longitude": comp_pos["longitude"],
-                "house": comp_pos.get("house", 0),
-                "is_retrograde": comp_pos.get("is_retrograde", False)
-            })
+                # Convertir au format RapidAPI (garder le nom en lowercase pour cohérence avec RapidAPI)
+                merged.append({
+                    "name": comp_pos["name"],  # "uranus" reste "uranus" (comme RapidAPI)
+                    "sign": comp_pos["sign_abbr"],  # Format abrégé comme RapidAPI
+                    "degree": comp_pos["degree"],
+                    "absolute_longitude": comp_pos["longitude"],
+                    "house": comp_pos.get("house", 0),
+                    "is_retrograde": comp_pos.get("is_retrograde", False)
+                })
     
     return merged
 
