@@ -119,11 +119,22 @@ async def calculate_natal_chart(
                 tzinfo=dt_timezone.utc
             )
             
-            # Calculer positions complémentaires
+            # Extraire les cuspides des maisons depuis chart_data pour calculer les maisons des positions complémentaires
+            house_cusps = []
+            houses_list = chart_data.get("house_cusps", [])
+            if isinstance(houses_list, list):
+                for cusp in houses_list[:12]:  # Prendre les 12 premières maisons
+                    if isinstance(cusp, dict):
+                        house_cusps.append(cusp.get("absolute_longitude", cusp.get("degree", 0.0)))
+                    elif isinstance(cusp, (int, float)):
+                        house_cusps.append(float(cusp))
+            
+            # Calculer positions complémentaires avec les cuspides pour déterminer les maisons
             complementary_positions = calculate_complementary_positions(
                 birth_datetime,
                 data.latitude,
-                data.longitude
+                data.longitude,
+                house_cusps if house_cusps else None
             )
             
             # Fusionner avec les positions RapidAPI
@@ -191,22 +202,36 @@ async def calculate_natal_chart(
                     "sign": sign_full,
                     "degree": pos.get("degree", 0.0)
                 }
-                # AUSSI ajouter dans planets_dict pour affichage complet
-                planets_dict["ascendant"] = {
+                # AUSSI ajouter dans planets_dict pour affichage complet (avec capitalisation)
+                planets_dict["Ascendant"] = {  # Capitalisé pour affichage
                     "sign": sign_full,
                     "degree": pos.get("degree", 0.0),
                     "house": 1  # Ascendant = cuspide maison 1
                 }
             elif name == "medium_coeli":
-                # Ajouter Medium Coeli (MC) dans planets_dict
-                planets_dict["medium_coeli"] = {
+                # Ajouter Medium Coeli (MC) dans planets_dict avec nom français
+                planets_dict["Milieu du Ciel"] = {  # Nom français pour affichage
                     "sign": sign_full,
                     "degree": pos.get("degree", 0.0),
                     "house": 10  # MC = cuspide maison 10
                 }
             else:
                 # Ajouter toutes les autres planètes et points (Mercure, Vénus, Mars, Jupiter, Saturne, Uranus, Neptune, Pluton, Nœuds, Lilith, Chiron, etc.)
-                planets_dict[name] = {
+                # Traduire mean_node/true_node en "Nœud Nord" pour affichage
+                display_name = name
+                if name in ["mean_node", "true_node"]:
+                    # Si on a déjà mean_node, skip true_node (éviter doublon)
+                    if name == "true_node" and "mean_node" in planets_dict:
+                        continue
+                    # Si on a true_node mais pas mean_node, utiliser true_node
+                    if name == "mean_node" and "true_node" in planets_dict:
+                        # Remplacer true_node par mean_node
+                        planets_dict.pop("true_node", None)
+                    display_name = "Nœud Nord"
+                elif name == "south_node":
+                    display_name = "Nœud Sud"
+                
+                planets_dict[display_name] = {
                     "sign": sign_full,
                     "degree": pos.get("degree", 0.0),
                     "house": pos.get("house", 0)

@@ -122,7 +122,7 @@ export default function NatalChartResultScreen() {
                     'moon', 'lune',
                     'ascendant',
                     'medium_coeli', 'milieu_du_ciel', 'mc',
-                    // Planètes classiques
+                    // Planètes classiques (ordre traditionnel)
                     'mercury', 'mercure',
                     'venus', 'vénus',
                     'mars',
@@ -135,28 +135,54 @@ export default function NatalChartResultScreen() {
                     // Points astrologiques
                     'mean_node', 'true_node', 'north_node', 'noeud_nord',
                     'south_node', 'noeud_sud',
-                    'lilith', 'black_moon_lilith',
+                    'lilith', 'black_moon_lilith', 'blackmoonlilith',
                     'chiron',
                   ];
                   
                   // Créer une liste ordonnée
                   const orderedPlanets: Array<[string, any]> = [];
                   const remainingPlanets: Array<[string, any]> = [];
+                  const addedNames = new Set<string>();
                   
                   // D'abord, ajouter dans l'ordre spécifique
                   for (const key of orderedKeys) {
-                    const entry = Object.entries(chart.planets).find(([name]) => 
-                      name.toLowerCase() === key.toLowerCase()
-                    );
+                    const entry = Object.entries(chart.planets).find(([name]) => {
+                      const nameLower = name.toLowerCase();
+                      // Pour les nœuds, prioriser mean_node et éviter les doublons
+                      if ((key === 'mean_node' || key === 'true_node' || key === 'north_node' || key === 'noeud_nord') && 
+                          (nameLower === 'mean_node' || nameLower === 'true_node' || nameLower === 'nœud nord')) {
+                        // Si on a déjà ajouté un nœud, skip
+                        if (addedNames.has('mean_node') || addedNames.has('true_node') || addedNames.has('nœud nord')) {
+                          return false;
+                        }
+                        // Prioriser mean_node
+                        return nameLower === 'mean_node';
+                      }
+                      return nameLower === key.toLowerCase();
+                    });
                     if (entry) {
-                      orderedPlanets.push(entry);
+                      const nameLower = entry[0].toLowerCase();
+                      // Éviter les doublons
+                      if (!addedNames.has(nameLower)) {
+                        orderedPlanets.push(entry);
+                        addedNames.add(nameLower);
+                      }
                     }
                   }
                   
                   // Ensuite, ajouter les autres (non encore ajoutés)
                   for (const entry of Object.entries(chart.planets)) {
-                    if (!orderedPlanets.find(([name]) => name === entry[0])) {
+                    const nameLower = entry[0].toLowerCase();
+                    // Éviter mean_node/true_node si déjà ajouté
+                    if (nameLower === 'true_node' && addedNames.has('mean_node')) {
+                      continue;  // Skip true_node si mean_node déjà présent
+                    }
+                    if (nameLower === 'mean_node' && addedNames.has('true_node')) {
+                      continue;  // Skip mean_node si true_node déjà présent (ne devrait pas arriver)
+                    }
+                    if (!addedNames.has(nameLower)) {
                       remainingPlanets.push(entry);
+                      addedNames.add(nameLower);
                     }
                   }
                   
@@ -164,10 +190,19 @@ export default function NatalChartResultScreen() {
                   const allPlanets = [...orderedPlanets, ...remainingPlanets];
                   
                   return allPlanets.map(([planetName, planetData]: [string, any], index: number) => {
-                    // Traduire "medium_coeli" en "Milieu du Ciel"
-                    const displayName = planetName.toLowerCase() === 'medium_coeli' 
-                      ? 'Milieu du Ciel' 
-                      : tPlanet(planetName);
+                    // Traduire les noms pour affichage
+                    let displayName: string;
+                    const nameLower = planetName.toLowerCase();
+                    
+                    if (nameLower === 'medium_coeli' || nameLower === 'milieu du ciel' || nameLower === 'mc') {
+                      displayName = 'Milieu du Ciel';
+                    } else if (nameLower === 'ascendant') {
+                      displayName = 'Ascendant';  // Capitalisation
+                    } else if (nameLower === 'mean_node' || nameLower === 'true_node' || nameLower === 'nœud nord') {
+                      displayName = 'Nœud Nord';  // Unifier mean_node et true_node
+                    } else {
+                      displayName = tPlanet(planetName);
+                    }
                     
                     return (
                       <View key={index} style={styles.planetRow}>
@@ -177,7 +212,7 @@ export default function NatalChartResultScreen() {
                         <Text style={styles.planetInfo}>
                           {planetData.sign ? `${ZODIAC_EMOJI[planetData.sign] || ''} ${tSign(planetData.sign)}` : 'N/A'}
                           {planetData.degree !== undefined && ` • ${formatDegree(planetData.degree)}`}
-                          {planetData.house !== undefined && ` • Maison ${planetData.house}`}
+                          {planetData.house !== undefined && planetData.house > 0 && ` • Maison ${planetData.house}`}
                         </Text>
                       </View>
                     );
@@ -218,13 +253,32 @@ export default function NatalChartResultScreen() {
             {chart.aspects && Array.isArray(chart.aspects) && chart.aspects.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>✨ Aspects Majeurs</Text>
-                {chart.aspects.slice(0, 10).map((aspect: any, index: number) => (
-                  <View key={index} style={styles.aspectRow}>
-                    <Text style={styles.aspectText}>
-                      {formatAspectFR(aspect)}
-                    </Text>
-                  </View>
-                ))}
+                {chart.aspects.slice(0, 10).map((aspect: any, index: number) => {
+                  const aspectText = formatAspectFR(aspect);
+                  const orb = aspect.orb !== undefined && aspect.orb !== null ? Math.abs(aspect.orb) : null;
+                  
+                  return (
+                    <View key={index} style={styles.aspectRow}>
+                      <View style={styles.aspectContent}>
+                        <Text style={styles.aspectText}>
+                          {aspectText.replace(/ \(orbe [^)]+\)/, '')}  {/* Enlever l'orbe du texte principal */}
+                        </Text>
+                        {orb !== null && (
+                          <Text style={styles.aspectOrb}>
+                            Orbe: {orb.toFixed(1).replace('.', ',')}°  {/* Distance à l'aspect exact */}
+                            {' '}
+                            <Text style={styles.aspectOrbHint}>
+                              ({orb <= 1 ? 'exact' : orb <= 3 ? 'serré' : orb <= 6 ? 'moyen' : 'large'})
+                            </Text>
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+                <Text style={styles.aspectExplanation}>
+                  L'orbe indique la distance en degrés à l'aspect exact. Plus l'orbe est petit, plus l'aspect est puissant.
+                </Text>
               </View>
             )}
 
@@ -348,19 +402,28 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   aspectRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
+  aspectContent: {
+    flexDirection: 'column',
+  },
   aspectText: {
     ...fonts.body,
     color: colors.text,
+    marginBottom: spacing.xs,
   },
   aspectOrb: {
     ...fonts.bodySmall,
     color: colors.textMuted,
+    fontSize: 12,
+  },
+  aspectOrbHint: {
+    ...fonts.bodySmall,
+    color: colors.accent,
+    fontSize: 11,
+    fontStyle: 'italic',
   },
   buttonSecondary: {
     backgroundColor: colors.cardBg,

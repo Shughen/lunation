@@ -78,10 +78,50 @@ def longitude_to_zodiac(longitude: float) -> Dict[str, Any]:
     }
 
 
+def calculate_house_from_longitude(
+    planet_longitude: float,
+    house_cusps: List[float]
+) -> int:
+    """
+    Détermine dans quelle maison (1-12) se trouve une planète selon sa longitude écliptique
+    
+    Args:
+        planet_longitude: Longitude écliptique de la planète (0-360)
+        house_cusps: Liste des 12 cuspides des maisons (longitudes absolues)
+        
+    Returns:
+        Numéro de la maison (1-12)
+    """
+    if not house_cusps or len(house_cusps) < 12:
+        return 0
+    
+    # Normaliser la longitude
+    planet_longitude = planet_longitude % 360
+    
+    # Trouver la maison : la planète est dans la maison dont la cuspide est juste avant sa longitude
+    for i in range(12):
+        cusp_current = house_cusps[i] % 360
+        cusp_next = house_cusps[(i + 1) % 12] % 360
+        
+        # Gérer le cas où on traverse le 0° (Bélier)
+        if cusp_next < cusp_current:
+            # On traverse le 0°
+            if planet_longitude >= cusp_current or planet_longitude < cusp_next:
+                return i + 1
+        else:
+            # Cas normal
+            if cusp_current <= planet_longitude < cusp_next:
+                return i + 1
+    
+    # Fallback : maison 1
+    return 1
+
+
 def calculate_complementary_positions(
     birth_datetime: datetime,
     latitude: float,
-    longitude: float
+    longitude: float,
+    house_cusps: Optional[List[float]] = None
 ) -> List[Dict[str, Any]]:
     """
     Calcule les positions complémentaires manquantes (Uranus, Neptune, Pluton, Nœuds, Lilith, Chiron)
@@ -142,13 +182,18 @@ def calculate_complementary_positions(
             # Détecter rétrogradation (vitesse négative)
             is_retrograde = speed_long < 0
             
+            # Calculer la maison si les cuspides sont disponibles
+            house = 0
+            if house_cusps:
+                house = calculate_house_from_longitude(zodiac["longitude"], house_cusps)
+            
             positions.append({
                 "name": name,
                 "sign": zodiac["sign"],
                 "sign_abbr": zodiac["sign_abbr"],
                 "degree": zodiac["degree"],
                 "longitude": zodiac["longitude"],
-                "house": 0,  # À calculer avec le système de maisons si nécessaire
+                "house": house,
                 "is_retrograde": is_retrograde
             })
             
@@ -161,13 +206,18 @@ def calculate_complementary_positions(
     if north_node:
         south_longitude = (north_node["longitude"] + 180) % 360
         zodiac = longitude_to_zodiac(south_longitude)
+        # Calculer la maison pour le Nœud Sud
+        house = 0
+        if house_cusps:
+            house = calculate_house_from_longitude(zodiac["longitude"], house_cusps)
+        
         positions.append({
             "name": "south_node",
             "sign": zodiac["sign"],
             "sign_abbr": zodiac["sign_abbr"],
             "degree": zodiac["degree"],
             "longitude": zodiac["longitude"],
-            "house": 0,  # À calculer séparément si nécessaire
+            "house": house,
             "is_retrograde": False
         })
     
@@ -177,13 +227,19 @@ def calculate_complementary_positions(
         if result is not None and len(result) >= 2:
             lilith_longitude = result[0][0]
             zodiac = longitude_to_zodiac(lilith_longitude)
+            
+            # Calculer la maison pour Lilith
+            house = 0
+            if house_cusps:
+                house = calculate_house_from_longitude(zodiac["longitude"], house_cusps)
+            
             positions.append({
                 "name": "lilith",
                 "sign": zodiac["sign"],
                 "sign_abbr": zodiac["sign_abbr"],
                 "degree": zodiac["degree"],
                 "longitude": zodiac["longitude"],
-                "house": 0,  # À calculer séparément si nécessaire
+                "house": house,
                 "is_retrograde": False
             })
     except Exception as e:
@@ -213,12 +269,32 @@ def merge_complementary_positions(
     # Ajouter les positions complémentaires qui ne sont pas déjà présentes
     merged = list(rapidapi_positions)
     
+    # Éviter les doublons mean_node/true_node (garder seulement mean_node)
+    has_north_node = any(
+        pos.get("name", "").lower() in ["mean_node", "true_node", "nœud nord", "north_node"]
+        for pos in merged
+    )
+    
     for comp_pos in complementary_positions:
         name_lower = comp_pos.get("name", "").lower()
+        
+        # Si c'est un nœud et qu'on en a déjà un, skip
+        if name_lower in ["mean_node", "true_node"] and has_north_node:
+            continue
+        
         if name_lower not in rapidapi_dict:
-                # Convertir au format RapidAPI (garder le nom en lowercase pour cohérence avec RapidAPI)
+                # Convertir au format RapidAPI avec noms traduits pour affichage
+                name = comp_pos["name"]
+                # Traduire les noms pour affichage
+                if name == "mean_node" or name == "true_node":
+                    display_name = "Nœud Nord"  # Unifier mean_node et true_node en "Nœud Nord"
+                elif name == "south_node":
+                    display_name = "Nœud Sud"
+                else:
+                    display_name = name  # Garder le nom original pour les autres
+                
                 merged.append({
-                    "name": comp_pos["name"],  # "uranus" reste "uranus" (comme RapidAPI)
+                    "name": display_name,  # Nom traduit pour affichage
                     "sign": comp_pos["sign_abbr"],  # Format abrégé comme RapidAPI
                     "degree": comp_pos["degree"],
                     "absolute_longitude": comp_pos["longitude"],
