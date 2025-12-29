@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { tPlanet, tAspect, formatOrb } from '../../i18n/astro.format';
 
 export default function TransitsDetails() {
   const router = useRouter();
@@ -36,31 +38,32 @@ export default function TransitsDetails() {
 
   return (
     <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backText}>← Retour</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backText}>← Retour</Text>
+          </TouchableOpacity>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.aspectBadge}>
-            {aspectDetails.aspect === 'trine' ? '▲' : '●'}
-          </Text>
-          <Text style={styles.title}>
-            {aspectDetails.transit_planet} {aspectDetails.aspect}{' '}
-            {aspectDetails.natal_planet}
-          </Text>
-        </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.aspectBadge}>
+              {aspectDetails.aspect === 'trine' ? '▲' : '●'}
+            </Text>
+            <Text style={styles.title}>
+              {tPlanet(aspectDetails.transit_planet)} {tAspect(aspectDetails.aspect)}{' '}
+              {tPlanet(aspectDetails.natal_planet)}
+            </Text>
+          </View>
 
-        {/* Orb */}
-        <View style={styles.orbContainer}>
-          <Text style={styles.orbLabel}>Orbe :</Text>
-          <Text style={styles.orbValue}>{aspectDetails.orb}°</Text>
-        </View>
+          {/* Orb */}
+          <View style={styles.orbContainer}>
+            <Text style={styles.orbLabel}>Orbe :</Text>
+            <Text style={styles.orbValue}>{formatOrb(aspectDetails.orb)}</Text>
+          </View>
 
         {/* Interpretation */}
         <View style={styles.section}>
@@ -110,14 +113,18 @@ export default function TransitsDetails() {
               <Text style={styles.recText}>{rec}</Text>
             </View>
           ))}
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  safeArea: {
     flex: 1,
   },
   scrollContent: {

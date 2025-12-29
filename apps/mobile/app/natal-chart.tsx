@@ -24,6 +24,7 @@ import { natalChart } from '../services/api';
 import { geocodePlace } from '../services/geocoding';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { tSign, tPlanet, formatAspectFR, formatDegree } from '../i18n/astro.format';
 
 // Mapping français des signes
 const ZODIAC_SIGNS_FR: Record<string, { emoji: string; name: string }> = {
@@ -281,11 +282,7 @@ export default function NatalChartScreen() {
                 {chart.aspects.slice(0, 10).map((aspect: any, index: number) => (
                   <View key={index} style={styles.aspectRow}>
                     <Text style={styles.aspectText}>
-                      {aspect.planet1 || aspect.from_planet || 'Planet1'} {getAspectSymbol(aspect.type || aspect.aspect_type || '')} {aspect.planet2 || aspect.to_planet || 'Planet2'}
-                    </Text>
-                    <Text style={styles.aspectOrb}>
-                      {aspect.orb !== undefined ? `Orb: ${aspect.orb.toFixed(1)}°` : ''}
-                      {aspect.angle !== undefined && ` • Angle: ${aspect.angle.toFixed(1)}°`}
+                      {formatAspectFR(aspect)}
                     </Text>
                   </View>
                 ))}

@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { transits } from '../../services/api';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { isDevAuthBypassActive, getDevUserId } from '../../services/api';
+import { tPlanet, tAspect, formatOrb } from '../../i18n/astro.format';
 
 const ASPECT_BADGES: Record<string, { emoji: string; color: string }> = {
   trine: { emoji: '▲', color: '#4ade80' },
@@ -99,8 +101,10 @@ export default function TransitsOverview() {
   if (loading) {
     return (
       <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-        <ActivityIndicator size="large" color="#b794f6" />
-        <Text style={styles.loadingText}>Chargement des transits...</Text>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <ActivityIndicator size="large" color="#b794f6" />
+          <Text style={styles.loadingText}>Chargement des transits...</Text>
+        </SafeAreaView>
       </LinearGradient>
     );
   }
@@ -108,13 +112,15 @@ export default function TransitsOverview() {
   if (error) {
     return (
       <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorEmoji}>⚠️</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadTransits}>
-            <Text style={styles.retryText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorEmoji}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadTransits}>
+              <Text style={styles.retryText}>Réessayer</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </LinearGradient>
     );
   }
@@ -124,25 +130,27 @@ export default function TransitsOverview() {
   if (!transitsData) {
     return (
       <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>🔄 Transits du Mois</Text>
-            <Text style={styles.subtitle}>
-              Influences planétaires actuelles
-            </Text>
-          </View>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🌌</Text>
-            <Text style={styles.emptyText}>
-              Aucun transit disponible pour ce mois
-            </Text>
-            <Text style={styles.emptySubtext}>
-              {isDevAuthBypassActive() 
-                ? "Les transits seront calculés automatiquement lors de votre prochaine visite"
-                : "Les transits seront disponibles une fois votre thème natal calculé"}
-            </Text>
-          </View>
-        </ScrollView>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.header}>
+              <Text style={styles.title}>🔄 Transits du Mois</Text>
+              <Text style={styles.subtitle}>
+                Influences planétaires actuelles
+              </Text>
+            </View>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🌌</Text>
+              <Text style={styles.emptyText}>
+                Aucun transit disponible pour ce mois
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {isDevAuthBypassActive()
+                  ? "Les transits seront calculés automatiquement lors de votre prochaine visite"
+                  : "Les transits seront disponibles une fois votre thème natal calculé"}
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </LinearGradient>
     );
   }
@@ -154,14 +162,15 @@ export default function TransitsOverview() {
 
   return (
     <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>🔄 Transits du Mois</Text>
-          <Text style={styles.subtitle}>
-            Influences planétaires actuelles
-          </Text>
-        </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>🔄 Transits du Mois</Text>
+            <Text style={styles.subtitle}>
+              Influences planétaires actuelles
+            </Text>
+          </View>
 
         {/* Energy Level Badge */}
         <View style={styles.energyContainer}>
@@ -233,10 +242,10 @@ export default function TransitsOverview() {
                       {aspectInfo.emoji}
                     </Text>
                     <Text style={styles.aspectTitle}>
-                      {aspect.transit_planet} {aspect.aspect} {aspect.natal_planet}
+                      {tPlanet(aspect.transit_planet)} {tAspect(aspect.aspect)} {tPlanet(aspect.natal_planet)}
                     </Text>
                   </View>
-                  <Text style={styles.aspectOrb}>Orbe: {aspect.orb.toFixed(1)}°</Text>
+                  <Text style={styles.aspectOrb}>Orbe: {formatOrb(aspect.orb)}</Text>
                   {aspect.interpretation && (
                     <Text style={styles.aspectInterpretation}>
                       {aspect.interpretation}
@@ -257,13 +266,17 @@ export default function TransitsOverview() {
             </Text>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  safeArea: {
     flex: 1,
   },
   scrollContent: {
