@@ -12,7 +12,10 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 # Version du prompt (utilisé pour le cache)
-PROMPT_VERSION = 2
+# v2 = prompt Astroia moderne avec micro-rituel, aspects orb <=3°
+# v3 = prompt senior astrologer, aspects majeurs orb <=6°, sans micro-rituel
+# Configurable via .env: NATAL_INTERPRETATION_VERSION=3
+PROMPT_VERSION = settings.NATAL_INTERPRETATION_VERSION
 
 # Mapping emoji par sujet
 SUBJECT_EMOJI = {
@@ -81,29 +84,51 @@ def find_relevant_aspect(subject: str, chart_payload: ChartPayload) -> Optional[
     Returns:
         Description de l'aspect ou None
     """
-    if not chart_payload.aspects or len(chart_payload.aspects) == 0:
+    # Gérer le cas où aspects est None ou pas une liste
+    if not chart_payload.aspects:
+        return None
+    if not isinstance(chart_payload.aspects, list):
+        return None
+    if len(chart_payload.aspects) == 0:
         return None
 
+    # Normaliser le sujet pour la comparaison
+    subject_normalized = subject.lower().replace(' ', '_')
+    
     # Chercher le premier aspect valide impliquant le sujet
     for aspect in chart_payload.aspects:
         if not isinstance(aspect, dict):
             continue
 
-        # Vérifier que le sujet est impliqué
+        # Vérifier que le sujet est impliqué (normaliser les noms de planètes)
         planet1 = aspect.get('planet1', '').lower().replace(' ', '_')
         planet2 = aspect.get('planet2', '').lower().replace(' ', '_')
+        
+        # Mapping des variantes de noms pour le sujet
+        subject_variants = [subject_normalized]
+        if subject_normalized == 'midheaven':
+            subject_variants.extend(['mc', 'medium_coeli', 'mediumcoeli', 'milieu_du_ciel', 'mileuduciel'])
+        elif subject_normalized == 'north_node':
+            subject_variants.extend(['mean_node', 'truenode', 'meannode', 'noeud_nord', 'noeudnord'])
+        elif subject_normalized == 'south_node':
+            subject_variants.extend(['noeud_sud', 'noeudsud'])
 
-        if subject not in [planet1, planet2]:
+        if not any(variant in [planet1, planet2] for variant in subject_variants):
             continue
 
-        # Vérifier l'orbe
-        orb = aspect.get('orb', 999)
+        # Vérifier l'orbe (gérer les cas où orb est None ou un type incorrect)
+        orb_raw = aspect.get('orb', 999)
+        try:
+            orb = abs(float(orb_raw)) if orb_raw is not None else 999
+        except (ValueError, TypeError):
+            orb = 999
         if orb > 3:
             continue
 
         # Construire la description
         aspect_type = aspect.get('type', '').lower()
-        other_planet = planet2 if planet1 == subject else planet1
+        # Déterminer quelle planète est l'autre (pas le sujet)
+        other_planet = planet2 if any(variant == planet1 for variant in subject_variants) else planet1
 
         aspect_names = {
             'conjunction': 'conjonction',
@@ -146,6 +171,11 @@ def build_interpretation_prompt_v2(
     emoji = SUBJECT_EMOJI.get(subject, '⭐')
     subject_label = chart_payload.subject_label
     sign = chart_payload.sign
+    
+    # Validation : signe obligatoire
+    if not sign or sign.strip() == '':
+        logger.error(f"❌ Signe manquant pour {subject} - chart_payload: {chart_payload.model_dump() if hasattr(chart_payload, 'model_dump') else chart_payload}")
+        raise ValueError(f"Signe manquant pour {subject_label} ({subject}). Vérifiez que les données du thème natal contiennent le signe du Milieu du Ciel.")
 
     # Maison (obligatoire pour le prompt)
     house_context = ""
@@ -156,9 +186,38 @@ def build_interpretation_prompt_v2(
 
     # Aspect (max 1, si pertinent)
     aspect_context = ""
-    aspect_desc = find_relevant_aspect(subject, chart_payload)
-    if aspect_desc:
-        aspect_context = f"\n- Aspect majeur : {aspect_desc}"
+    try:
+        aspect_desc = find_relevant_aspect(subject, chart_payload)
+        if aspect_desc:
+            aspect_context = f"\n- Aspect majeur : {aspect_desc}"
+    except Exception as aspect_err:
+        # #region agent log
+        import json
+        import time
+        try:
+            log_data = {
+                "location": "natal_interpretation_service.py:177",
+                "message": "Error in find_relevant_aspect",
+                "data": {
+                    "error": str(aspect_err),
+                    "error_type": type(aspect_err).__name__,
+                    "subject": subject,
+                    "has_aspects": bool(chart_payload.aspects),
+                    "aspects_type": type(chart_payload.aspects).__name__ if chart_payload.aspects else None
+                },
+                "timestamp": int(time.time() * 1000),
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "F"
+            }
+            with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_data) + "\n")
+        except Exception as log_err:
+            logger.warning(f"Erreur écriture log debug: {log_err}")
+        # #endregion
+        # Ne pas faire échouer la génération si l'aspect échoue, continuer sans aspect
+        logger.warning(f"⚠️ Erreur lors de la recherche d'aspect pour {subject}: {aspect_err}")
+        aspect_desc = None
 
     # Ascendant (contexte global)
     asc_context = ""
@@ -204,23 +263,263 @@ CONTRAINTES STRICTES:
 
 GÉNÈRE L'INTERPRÉTATION MAINTENANT (français, markdown, 900-1200 chars):"""
 
+    # #region agent log
+    try:
+        log_data = {
+            "location": "natal_interpretation_service.py:225",
+            "message": "Prompt built successfully",
+            "data": {
+                "subject": subject,
+                "prompt_length": len(prompt),
+                "has_house": bool(chart_payload.house),
+                "house_value": chart_payload.house,
+                "house_short_label": house_short_label
+            },
+            "timestamp": int(time.time() * 1000),
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "G"
+        }
+        with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_data) + "\n")
+    except Exception as log_err:
+        logger.warning(f"Erreur écriture log debug: {log_err}")
+    # #endregion
+
     return prompt
 
 
-def validate_interpretation_length(text: str) -> Tuple[bool, int]:
+# ============================================================================
+# V3 SENIOR PROMPT - Aspects majeurs orb <=6°, sans micro-rituel
+# ============================================================================
+
+def find_relevant_aspect_v3(subject: str, chart_payload: ChartPayload) -> Optional[str]:
+    """
+    Trouve UN aspect majeur pertinent avec orb <= 6°
+
+    Différences avec v2:
+    - Orbe étendu à 6° (au lieu de 3°)
+    - Filtre UNIQUEMENT les aspects majeurs: conjunction, opposition, square, trine
+    - Exclut: sextile, quincunx, semi-sextile, etc.
+
+    Args:
+        subject: Objet céleste concerné
+        chart_payload: Données du chart
+
+    Returns:
+        Description de l'aspect ou None
+    """
+    # Aspects majeurs acceptés pour v3
+    MAJOR_ASPECTS = {'conjunction', 'opposition', 'square', 'trine'}
+
+    # Gérer le cas où aspects est None ou pas une liste
+    if not chart_payload.aspects:
+        return None
+    if not isinstance(chart_payload.aspects, list):
+        return None
+    if len(chart_payload.aspects) == 0:
+        return None
+
+    # Normaliser le sujet pour la comparaison
+    subject_normalized = subject.lower().replace(' ', '_')
+
+    # Chercher le premier aspect majeur valide impliquant le sujet
+    for aspect in chart_payload.aspects:
+        if not isinstance(aspect, dict):
+            continue
+
+        # Vérifier que le sujet est impliqué (normaliser les noms de planètes)
+        planet1 = aspect.get('planet1', '').lower().replace(' ', '_')
+        planet2 = aspect.get('planet2', '').lower().replace(' ', '_')
+
+        # Mapping des variantes de noms pour le sujet
+        subject_variants = [subject_normalized]
+        if subject_normalized == 'midheaven':
+            subject_variants.extend(['mc', 'medium_coeli', 'mediumcoeli', 'milieu_du_ciel', 'mileuduciel'])
+        elif subject_normalized == 'north_node':
+            subject_variants.extend(['mean_node', 'truenode', 'meannode', 'noeud_nord', 'noeudnord'])
+        elif subject_normalized == 'south_node':
+            subject_variants.extend(['noeud_sud', 'noeudsud'])
+
+        if not any(variant in [planet1, planet2] for variant in subject_variants):
+            continue
+
+        # Filtrer uniquement les aspects majeurs
+        aspect_type = aspect.get('type', '').lower()
+        if aspect_type not in MAJOR_ASPECTS:
+            continue
+
+        # Vérifier l'orbe (orb <= 6° pour v3)
+        orb_raw = aspect.get('orb', 999)
+        try:
+            orb = abs(float(orb_raw)) if orb_raw is not None else 999
+        except (ValueError, TypeError):
+            orb = 999
+        if orb > 6:
+            continue
+
+        # Construire la description
+        # Déterminer quelle planète est l'autre (pas le sujet)
+        other_planet = planet2 if any(variant == planet1 for variant in subject_variants) else planet1
+
+        aspect_names = {
+            'conjunction': 'conjonction',
+            'opposition': 'opposition',
+            'trine': 'trigone',
+            'square': 'carré'
+        }
+
+        aspect_name = aspect_names.get(aspect_type, aspect_type)
+
+        return f"{aspect_name} à {other_planet.replace('_', ' ').title()} (orbe {orb:.1f}°)"
+
+    return None
+
+
+def build_interpretation_prompt_v3_senior(
+    subject: str,
+    chart_payload: ChartPayload
+) -> str:
+    """
+    Construit le prompt v3 'senior astrologer' style
+
+    Différences avec v2:
+    - Pas de section "Micro-rituel du jour"
+    - Aspects majeurs uniquement (conjonction, opposition, carré, trigone)
+    - Orbe ≤6° au lieu de ≤3°
+    - Hiérarchisation: Soleil/Lune/ASC > Nœud Nord > autres
+    - Style senior professionnel avec exemples comportementaux
+    - Garde-fou: si aucun aspect majeur, fallback sur placements clés
+
+    Template v3:
+    # {emoji} {Sujet} en {Signe}
+    **En une phrase :** ...
+
+    ## Ton moteur
+    ...
+
+    ## Ton défi
+    ...
+
+    ## Maison {N} en {Signe}
+    ...
+
+    (PAS de section Micro-rituel)
+    """
+    emoji = SUBJECT_EMOJI.get(subject, '⭐')
+    subject_label = chart_payload.subject_label
+    sign = chart_payload.sign
+
+    # Validation : signe obligatoire
+    if not sign or sign.strip() == '':
+        logger.error(f"❌ Signe manquant pour {subject} - chart_payload: {chart_payload.model_dump() if hasattr(chart_payload, 'model_dump') else chart_payload}")
+        raise ValueError(f"Signe manquant pour {subject_label} ({subject}). Vérifiez que les données du thème natal contiennent le signe du Milieu du Ciel.")
+
+    # Maison (obligatoire pour le prompt)
+    house_context = ""
+    house_short_label = ""
+    if chart_payload.house:
+        house_short_label, house_full = get_house_label_v2(chart_payload.house)
+        house_context = f"\n- {house_full}"
+
+    # Aspect majeur v3 (orb <= 6°)
+    aspect_context = ""
+    aspect_desc = None
+    try:
+        aspect_desc = find_relevant_aspect_v3(subject, chart_payload)
+        if aspect_desc:
+            aspect_context = f"\n- Aspect majeur : {aspect_desc}"
+    except Exception as aspect_err:
+        logger.warning(f"⚠️ Erreur lors de la recherche d'aspect v3 pour {subject}: {aspect_err}")
+        aspect_desc = None
+
+    # Ascendant (contexte global)
+    asc_context = ""
+    if chart_payload.ascendant_sign:
+        asc_context = f"\n- Ascendant en {chart_payload.ascendant_sign} (filtre de perception général)"
+
+    # Hiérarchie: Soleil/Lune/ASC > Nœud Nord > autres
+    priority_level = ""
+    if subject in ['sun', 'moon', 'ascendant']:
+        priority_level = "\n\n⚠️ PRIORITÉ MAXIMALE: Ce placement est un pilier fondamental de l'identité. Traite-le comme structurant."
+    elif subject in ['north_node', 'south_node']:
+        priority_level = "\n\n⚠️ PRIORITÉ ÉLEVÉE: Le Nœud Nord représente le chemin de vie, la zone d'inconfort utile. Le Nœud Sud, le confort familier à transcender. Traite ce placement comme un guide d'évolution."
+
+    # Construire parties conditionnelles AVANT le f-string
+    aspect_mention = " + Aspect majeur" if aspect_desc else ""
+    aspect_integration = ". Si aspect majeur présent, l'intégrer comme tension ou soutien concret." if aspect_desc else ""
+
+    # Fallback si aucun aspect majeur (garde-fou)
+    fallback_note = ""
+    if not aspect_desc:
+        fallback_note = "\n\n(Aucun aspect majeur ≤6° détecté. Concentre-toi sur le triptyque Planète-Signe-Maison comme base solide.)"
+
+    prompt = f"""Tu es un astrologue senior, pédagogique, précis, non ésotérique. Objectif : produire une interprétation structurée, concrète, actionnable.
+
+RÈGLES STRICTES:
+- Tu utilises UNIQUEMENT les aspects majeurs fournis (conjonction, opposition, carré, trigone) avec orbe ≤6°.
+- Tu hiérarchises : Soleil/Lune/Ascendant > Nœud Nord/Sud > autres planètes.
+- Tu relies TOUJOURS : planète + signe + maison{aspect_mention}. Pas de généralités vagues.
+- Tu donnes des EXEMPLES COMPORTEMENTAUX concrets, pas de "tu es quelqu'un de...".
+- Ton style : français clair, moderne, direct, professionnel.
+
+DONNÉES DU THÈME:
+- {subject_label} en {sign}{house_context}{aspect_context}{asc_context}{priority_level}{fallback_note}
+
+TEMPLATE À SUIVRE (EXACT):
+
+# {emoji} {subject_label} en {sign}
+**En une phrase :** [UNE phrase très spécifique qui croise {subject_label} + {sign} + Maison {chart_payload.house or 'N'}{aspect_mention}, avec exemple comportemental concret]
+
+## Ton moteur
+[2-3 phrases max : ce que {subject_label} en {sign} en Maison {chart_payload.house or 'N'} pousse à faire, rechercher, exprimer. Croiser SYSTÉMATIQUEMENT ces 3 dimensions. Exemples concrets de manifestation (comportements, patterns, situations). Pas "tu es quelqu'un de..."]
+
+## Ton défi
+[1-2 phrases : le piège typique de {subject_label} en {sign} en Maison {chart_payload.house or 'N'}. Équilibré lumière-ombre. Exemple concret de comment ce piège se manifeste.]
+
+## Maison {chart_payload.house or 'N'} en {sign}
+[1-2 phrases : comment {subject_label} exprime {sign} concrètement dans le domaine de la Maison {chart_payload.house or 'N'} ({house_short_label}). Croiser les 3 infos{aspect_integration} Exemples de situations réelles.]
+
+CONTRAINTES STRICTES:
+1. LONGUEUR: 700 à 1000 caractères (max absolu 1200). Compte tes caractères.
+2. INTERDIT: "tu es quelqu'un de...", "tu ressens profondément...", généralités vides.
+3. INTERDIT: Prédictions ("tu vas rencontrer...", "il arrivera...").
+4. INTERDIT: Conseils santé/diagnostic.
+5. OBLIGATOIRE: CROISER SYSTÉMATIQUEMENT {subject_label} + {sign} + Maison {chart_payload.house or 'N'} dans CHAQUE section. C'est le triptyque central.
+6. OBLIGATOIRE: Exemples comportementaux concrets, situations réelles, patterns observables.
+7. TON: Présent ou infinitif. Jamais futur. Vocabulaire simple, moderne, professionnel.
+8. FORMAT: Markdown strict. Les ## sont obligatoires. Pas de titre supplémentaire après le #.
+9. PAS DE SECTION MICRO-RITUEL: Le template s'arrête après "Maison N en Signe".
+
+GÉNÈRE L'INTERPRÉTATION MAINTENANT (français, markdown, 700-1000 chars):"""
+
+    return prompt
+
+
+def validate_interpretation_length(text: str, version: int = 2) -> Tuple[bool, int]:
     """
     Valide que l'interprétation respecte les contraintes de longueur
+
+    Args:
+        text: Texte de l'interprétation
+        version: Version du prompt (2 ou 3)
 
     Returns:
         tuple: (is_valid, length)
     """
     length = len(text)
-    return (900 <= length <= 1400), length
+    if version == 3:
+        # v3: 700-1200 chars (prompt senior, sans micro-rituel)
+        return (700 <= length <= 1200), length
+    else:
+        # v2: 900-1400 chars (prompt moderne avec micro-rituel)
+        return (900 <= length <= 1400), length
 
 
 async def generate_with_sonnet_fallback_haiku(
     subject: str,
-    chart_payload: Dict[str, Any] | ChartPayload
+    chart_payload: Dict[str, Any] | ChartPayload,
+    version: int = None
 ) -> Tuple[str, str]:
     """
     Génère une interprétation avec Claude Sonnet, fallback sur Haiku si erreur
@@ -228,21 +527,102 @@ async def generate_with_sonnet_fallback_haiku(
     Stratégie:
     1. Essayer Sonnet 3.5
     2. Si erreur (429, timeout, 5xx) -> fallback Haiku
-    3. Valider longueur (900-1200 chars, max 1400)
+    3. Valider longueur selon version (v2: 900-1400, v3: 700-1200)
     4. Si hors limites -> retry 1x avec prompt d'ajustement
-    5. Si toujours hors limites -> tronquer à 1400 proprement
+    5. Si toujours hors limites -> tronquer proprement
+
+    Args:
+        subject: Objet céleste à interpréter
+        chart_payload: Données du chart
+        version: Version du prompt (2 ou 3). Si None, utilise PROMPT_VERSION global.
 
     Returns:
         tuple: (interpretation_text, model_used)
     """
+    # Utiliser PROMPT_VERSION global si non spécifié
+    if version is None:
+        version = PROMPT_VERSION
+    # #region agent log
+    import json
+    import time
+    try:
+        log_data = {
+            "location": "natal_interpretation_service.py:221",
+            "message": "generate_with_sonnet_fallback_haiku entry",
+            "data": {
+                "subject": subject,
+                "chart_payload_type": type(chart_payload).__name__,
+                "chart_payload_keys": list(chart_payload.keys()) if isinstance(chart_payload, dict) else list(chart_payload.model_dump().keys()) if hasattr(chart_payload, 'model_dump') else []
+            },
+            "timestamp": int(time.time() * 1000),
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "C"
+        }
+        with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_data) + "\n")
+    except Exception as log_err:
+        logger.warning(f"Erreur écriture log debug: {log_err}")
+    # #endregion
+    
     # Convertir en ChartPayload si nécessaire
     if isinstance(chart_payload, dict):
         payload = ChartPayload(**chart_payload)
     else:
         payload = chart_payload
 
-    # Construire le prompt v2
-    prompt = build_interpretation_prompt_v2(subject, payload)
+    # #region agent log
+    try:
+        log_data = {
+            "location": "natal_interpretation_service.py:245",
+            "message": f"Before build_interpretation_prompt_v{version}",
+            "data": {
+                "subject": subject,
+                "payload_sign": payload.sign,
+                "payload_house": payload.house,
+                "payload_subject_label": payload.subject_label,
+                "version": version
+            },
+            "timestamp": int(time.time() * 1000),
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "D"
+        }
+        with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_data) + "\n")
+    except Exception as log_err:
+        logger.warning(f"Erreur écriture log debug: {log_err}")
+    # #endregion
+
+    # Construire le prompt selon la version
+    try:
+        if version == 3:
+            prompt = build_interpretation_prompt_v3_senior(subject, payload)
+        else:
+            prompt = build_interpretation_prompt_v2(subject, payload)
+    except Exception as prompt_err:
+        # #region agent log
+        try:
+            log_data = {
+                "location": "natal_interpretation_service.py:250",
+                "message": "Error in build_interpretation_prompt_v2",
+                "data": {
+                    "error": str(prompt_err),
+                    "error_type": type(prompt_err).__name__,
+                    "subject": subject,
+                    "payload_sign": payload.sign if hasattr(payload, 'sign') else None
+                },
+                "timestamp": int(time.time() * 1000),
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "E"
+            }
+            with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_data) + "\n")
+        except Exception as log_err:
+            logger.warning(f"Erreur écriture log debug: {log_err}")
+        # #endregion
+        raise
 
     client = get_anthropic_client()
 
@@ -257,6 +637,28 @@ async def generate_with_sonnet_fallback_haiku(
     for model_id, model_name in models_to_try:
         try:
             logger.info(f"🤖 Appel Claude {model_name} pour {subject} en {payload.sign}")
+            
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:300",
+                    "message": "Before Claude API call",
+                    "data": {
+                        "model": model_name,
+                        "subject": subject,
+                        "prompt_length": len(prompt),
+                        "prompt_preview": prompt[:200] + "..." if len(prompt) > 200 else prompt
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "H"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
 
             message = client.messages.create(
                 model=model_id,
@@ -265,16 +667,99 @@ async def generate_with_sonnet_fallback_haiku(
                 messages=[{"role": "user", "content": prompt}],
                 timeout=30.0
             )
+            
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:440",
+                    "message": "Claude API call successful",
+                    "data": {
+                        "model": model_name,
+                        "has_content": bool(message.content),
+                        "content_length": len(message.content) if message.content else 0,
+                        "content_type": type(message.content).__name__ if message.content else None,
+                        "first_item_type": type(message.content[0]).__name__ if message.content and len(message.content) > 0 else None,
+                        "has_text_attr": hasattr(message.content[0], 'text') if message.content and len(message.content) > 0 else False
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "I"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
 
+            # Gérer le cas où message.content est vide ou mal formaté
+            if not message.content or len(message.content) == 0:
+                raise ValueError(f"Claude {model_name} a retourné un contenu vide")
+            
+            # Vérifier que le premier élément a un attribut text
+            if not hasattr(message.content[0], 'text'):
+                raise ValueError(f"Claude {model_name} a retourné un format de contenu inattendu: {type(message.content[0])}")
+            
             text_content = message.content[0].text.strip()
-            is_valid, length = validate_interpretation_length(text_content)
+            
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:465",
+                    "message": "Text content extracted",
+                    "data": {
+                        "model": model_name,
+                        "text_length": len(text_content),
+                        "text_preview": text_content[:100] if text_content else "EMPTY"
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "L"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
+            is_valid, length = validate_interpretation_length(text_content, version)
 
-            logger.info(f"✅ {model_name} - Texte généré: {length} chars (valid={is_valid})")
+            # Définir les seuils selon la version
+            min_chars = 700 if version == 3 else 900
+            max_chars = 1200 if version == 3 else 1400
+            target_range = "800-1000" if version == 3 else "1000-1200"
+
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:493",
+                    "message": "After validate_interpretation_length",
+                    "data": {
+                        "model": model_name,
+                        "version": version,
+                        "length": length,
+                        "is_valid": is_valid,
+                        "will_truncate": length > max_chars,
+                        "min_chars": min_chars,
+                        "max_chars": max_chars
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "M"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
+
+            logger.info(f"✅ {model_name} v{version} - Texte généré: {length} chars (valid={is_valid})")
 
             # Si longueur invalide, retry 1x avec prompt d'ajustement
-            if not is_valid and length < 900:
+            if not is_valid and length < min_chars:
                 logger.warning(f"⚠️ Texte trop court ({length} chars), retry avec expansion")
-                adjust_prompt = f"{prompt}\n\nATTENTION: Le texte précédent était trop court ({length} chars). Développe davantage en gardant le même template, vise 1000-1200 caractères."
+                adjust_prompt = f"{prompt}\n\nATTENTION: Le texte précédent était trop court ({length} chars). Développe davantage en gardant le même template, vise {target_range} caractères."
 
                 message = client.messages.create(
                     model=model_id,
@@ -285,12 +770,12 @@ async def generate_with_sonnet_fallback_haiku(
                 )
 
                 text_content = message.content[0].text.strip()
-                is_valid, length = validate_interpretation_length(text_content)
-                logger.info(f"✅ Retry {model_name}: {length} chars (valid={is_valid})")
+                is_valid, length = validate_interpretation_length(text_content, version)
+                logger.info(f"✅ Retry {model_name} v{version}: {length} chars (valid={is_valid})")
 
-            elif not is_valid and length > 1400:
+            elif not is_valid and length > max_chars:
                 logger.warning(f"⚠️ Texte trop long ({length} chars), retry avec réduction")
-                adjust_prompt = f"{prompt}\n\nATTENTION: Le texte précédent était trop long ({length} chars). Réduis-le à 1000-1200 caractères en retirant les répétitions et en gardant l'essentiel."
+                adjust_prompt = f"{prompt}\n\nATTENTION: Le texte précédent était trop long ({length} chars). Réduis-le à {target_range} caractères en retirant les répétitions et en gardant l'essentiel."
 
                 message = client.messages.create(
                     model=model_id,
@@ -301,21 +786,89 @@ async def generate_with_sonnet_fallback_haiku(
                 )
 
                 text_content = message.content[0].text.strip()
-                is_valid, length = validate_interpretation_length(text_content)
-                logger.info(f"✅ Retry {model_name}: {length} chars (valid={is_valid})")
+                is_valid, length = validate_interpretation_length(text_content, version)
+                logger.info(f"✅ Retry {model_name} v{version}: {length} chars (valid={is_valid})")
 
             # Si toujours trop long après retry, tronquer proprement
-            if length > 1400:
-                logger.warning(f"⚠️ Tronquage à 1400 chars (était {length})")
-                text_content = text_content[:1397] + "..."
+            if length > max_chars:
+                truncate_to = max_chars - 3
+                logger.warning(f"⚠️ Tronquage à {max_chars} chars (était {length})")
+                text_content = text_content[:truncate_to] + "..."
                 length = len(text_content)
 
-            logger.info(f"✅ Interprétation finale: {length} chars, modèle={model_name}")
+            logger.info(f"✅ Interprétation finale v{version}: {length} chars, modèle={model_name}")
+
+            # Calculer nombre d'aspects disponibles pour comparaison v2/v3
+            aspect_count_v2 = 0  # aspects avec orb <=3°
+            aspect_count_v3 = 0  # aspects majeurs avec orb <=6°
+            if payload.aspects and isinstance(payload.aspects, list):
+                MAJOR_ASPECTS = {'conjunction', 'opposition', 'square', 'trine'}
+                for aspect in payload.aspects:
+                    if not isinstance(aspect, dict):
+                        continue
+                    try:
+                        orb = abs(float(aspect.get('orb', 999)))
+                        aspect_type = aspect.get('type', '').lower()
+
+                        if orb <= 3:
+                            aspect_count_v2 += 1
+                        if orb <= 6 and aspect_type in MAJOR_ASPECTS:
+                            aspect_count_v3 += 1
+                    except (ValueError, TypeError):
+                        continue
+
+            # Log comparatif v2/v3 pour analyse qualitative
+            logger.info(f"📊 Aspects disponibles: v2={aspect_count_v2} (orb<=3°), v3={aspect_count_v3} (majeurs orb<=6°)")
+
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:540",
+                    "message": "Before return from generate_with_sonnet_fallback_haiku",
+                    "data": {
+                        "version": version,
+                        "model": model_name,
+                        "final_length": length,
+                        "aspect_count_v2": aspect_count_v2,
+                        "aspect_count_v3": aspect_count_v3,
+                        "text_preview": text_content[:150] if text_content else "EMPTY"
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "N"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
 
             return text_content, model_name
 
         except (RateLimitError, APIConnectionError) as e:
             logger.warning(f"⚠️ {model_name} échec ({type(e).__name__}): {str(e)[:100]}")
+            # #region agent log
+            try:
+                log_data = {
+                    "location": "natal_interpretation_service.py:508",
+                    "message": "Claude API error (RateLimit/Connection)",
+                    "data": {
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "model": model_name,
+                        "subject": subject
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "J"
+                }
+                with open('/Users/remibeaurain/astroia/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_data) + "\n")
+            except Exception as log_err:
+                logger.warning(f"Erreur écriture log debug: {log_err}")
+            # #endregion
             last_error = e
             # Continuer vers le fallback
             continue

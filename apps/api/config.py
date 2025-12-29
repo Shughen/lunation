@@ -65,7 +65,11 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: Optional[str] = Field(default=None, validation_alias="SUPABASE_URL")
     supabase_anon_key: Optional[str] = Field(default=None, validation_alias="SUPABASE_ANON_KEY")
-    
+
+    # Anthropic (Claude AI)
+    ANTHROPIC_API_KEY: str = Field(default="", description="Clé API Anthropic pour génération interprétations")
+    NATAL_INTERPRETATION_VERSION: int = Field(default=2, description="Version du prompt d'interprétation (2=moderne avec micro-rituel, 3=senior sans micro-rituel)")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True
