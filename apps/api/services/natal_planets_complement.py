@@ -95,25 +95,26 @@ def calculate_house_from_longitude(
     if not house_cusps or len(house_cusps) < 12:
         return 0
     
-    # Normaliser la longitude
+    # Normaliser toutes les longitudes à [0, 360)
     planet_longitude = planet_longitude % 360
+    normalized_cusps = [c % 360 for c in house_cusps[:12]]
     
     # Trouver la maison : la planète est dans la maison dont la cuspide est juste avant sa longitude
     for i in range(12):
-        cusp_current = house_cusps[i] % 360
-        cusp_next = house_cusps[(i + 1) % 12] % 360
+        cusp_current = normalized_cusps[i]
+        cusp_next = normalized_cusps[(i + 1) % 12]
         
         # Gérer le cas où on traverse le 0° (Bélier)
         if cusp_next < cusp_current:
-            # On traverse le 0°
+            # On traverse le 0° (ex: Maison 7 à 330°, Maison 8 à 0°)
             if planet_longitude >= cusp_current or planet_longitude < cusp_next:
                 return i + 1
         else:
-            # Cas normal
+            # Cas normal (cuspides dans l'ordre croissant)
             if cusp_current <= planet_longitude < cusp_next:
                 return i + 1
     
-    # Fallback : maison 1
+    # Si aucune maison trouvée (ne devrait pas arriver), retourner la maison 1
     return 1
 
 

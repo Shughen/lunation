@@ -217,16 +217,12 @@ async def calculate_natal_chart(
                 }
             else:
                 # Ajouter toutes les autres planètes et points (Mercure, Vénus, Mars, Jupiter, Saturne, Uranus, Neptune, Pluton, Nœuds, Lilith, Chiron, etc.)
-                # Traduire mean_node/true_node en "Nœud Nord" pour affichage
+                # Traduire mean_node/true_node en "Nœud Nord" pour affichage (unifier, éviter doublon)
                 display_name = name
                 if name in ["mean_node", "true_node"]:
-                    # Si on a déjà mean_node, skip true_node (éviter doublon)
-                    if name == "true_node" and "mean_node" in planets_dict:
+                    # Si on a déjà "Nœud Nord", skip (éviter doublon)
+                    if "Nœud Nord" in planets_dict:
                         continue
-                    # Si on a true_node mais pas mean_node, utiliser true_node
-                    if name == "mean_node" and "true_node" in planets_dict:
-                        # Remplacer true_node par mean_node
-                        planets_dict.pop("true_node", None)
                     display_name = "Nœud Nord"
                 elif name == "south_node":
                     display_name = "Nœud Sud"
