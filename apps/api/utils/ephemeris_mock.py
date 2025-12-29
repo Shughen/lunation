@@ -5,6 +5,7 @@ Utilisé quand EPHEMERIS_API_KEY n'est pas configurée et DEV_MOCK_EPHEMERIS=Tru
 
 from typing import Dict, Any
 from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -184,7 +185,7 @@ def generate_mock_lunar_return(
         )
     
     # Date de départ pour la recherche (milieu du mois)
-    search_start = datetime(year, month, 15, 12, 0, 0, tzinfo=timezone.utc)
+    search_start = datetime(year, month, 15, 12, 0, 0, tzinfo=dt_timezone.utc)
     
     if SWISS_EPHEMERIS_AVAILABLE:
         # Calcul réel du Lunar Return
@@ -226,20 +227,44 @@ def generate_mock_lunar_return(
         return_datetime_str = return_dt.isoformat()
         
     else:
-        # Fallback: placeholder (ancien comportement)
+        # Fallback: placeholder amélioré (approximation réaliste sans Swiss Ephemeris)
         logger.warning(
-            f"🎭 MODE MOCK DEV - Placeholder (Swiss Ephemeris non disponible) "
+            f"🎭 MODE MOCK DEV - Placeholder amélioré (Swiss Ephemeris non disponible) "
             f"pour {target_month}"
         )
-        return_dt = search_start
-        return_datetime_str = f"{target_month}-15T12:00:00"
+        
+        # Approximation réaliste : utiliser le mois sidéral (~27.32 jours) pour varier les dates
+        # Calculer un offset basé sur le numéro du mois depuis janvier pour créer de la variété
+        # On veut que les dates varient entre le 10 et le 20 du mois, avec des heures variées
+        month_offset = (year - 2025) * 12 + (month - 1)  # Numéro de mois depuis janvier 2025
+        lunar_cycle_offset = month_offset * 27.321582  # Mois sidéral en jours
+        
+        # Calculer le jour du mois (entre 10 et 20) basé sur l'offset
+        base_day = 15  # Jour de base
+        day_variation = int((lunar_cycle_offset % 10) - 5)  # Variation entre -5 et +5
+        calculated_day = max(10, min(20, base_day + day_variation))
+        
+        # Calculer l'heure (entre 8h et 20h) basée sur l'offset
+        hour_variation = int((lunar_cycle_offset * 2) % 12)  # Variation entre 0 et 11
+        calculated_hour = 8 + hour_variation  # Entre 8h et 19h
+        
+        # Calculer les minutes (0, 15, 30, 45) pour plus de réalisme
+        minute_variation = int((lunar_cycle_offset * 4) % 4) * 15  # 0, 15, 30, 45
+        
+        return_dt = datetime(year, month, calculated_day, calculated_hour, minute_variation, 0, tzinfo=dt_timezone.utc)
+        return_datetime_str = return_dt.isoformat()
+        
+        logger.info(
+            f"📅 Placeholder amélioré: {target_month} → {return_datetime_str} "
+            f"(jour={calculated_day}, heure={calculated_hour:02d}:{minute_variation:02d})"
+        )
         
         # Ascendant approximatif (basé sur le mois)
         ascendant_sign_index = month % len(_ASCENDANT_SIGNS)
         ascendant_sign = _ASCENDANT_SIGNS[ascendant_sign_index]
         
-        # Maison de la Lune (1-12)
-        moon_house = (month % 12) + 1
+        # Maison de la Lune (1-12, variée)
+        moon_house = (month_offset % 12) + 1
         
         moon_pos = None
         sun_pos = None
