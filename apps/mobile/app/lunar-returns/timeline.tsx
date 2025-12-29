@@ -22,6 +22,7 @@ import { lunarReturns, LunarReturn } from '../../services/api';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { formatDate } from '../../utils/date';
 import { formatAspects, parseInterpretation } from '../../utils/astrology-format';
+import { tSign } from '../../i18n/astro.format';
 
 type BadgeType = 'past' | 'today' | 'upcoming';
 
@@ -160,7 +161,7 @@ export default function LunarReturnsTimelineScreen() {
           <Text style={styles.itemDate}>{formatDate(item.return_date)}</Text>
           {item.moon_sign && (
             <Text style={styles.itemDetails}>
-              Lune en {item.moon_sign}
+              Lune en {tSign(item.moon_sign)}
               {item.moon_house && ` • Maison ${item.moon_house}`}
             </Text>
           )}
@@ -171,7 +172,7 @@ export default function LunarReturnsTimelineScreen() {
       </View>
       {item.lunar_ascendant && (
         <Text style={styles.itemAscendant}>
-          Ascendant: {item.lunar_ascendant}
+          Ascendant: {tSign(item.lunar_ascendant)}
         </Text>
       )}
     </TouchableOpacity>
@@ -267,14 +268,14 @@ export default function LunarReturnsTimelineScreen() {
                     <View style={styles.detailRow}>
                       {selectedItem.lunar_ascendant && (
                         <Text style={styles.detailValue}>
-                          Ascendant: <Text style={styles.detailValueHighlight}>{selectedItem.lunar_ascendant}</Text>
+                          Ascendant: <Text style={styles.detailValueHighlight}>{tSign(selectedItem.lunar_ascendant)}</Text>
                         </Text>
                       )}
                     </View>
                     <View style={styles.detailRow}>
                       {selectedItem.moon_sign && (
                         <Text style={styles.detailValue}>
-                          Signe lunaire: <Text style={styles.detailValueHighlight}>{selectedItem.moon_sign}</Text>
+                          Signe lunaire: <Text style={styles.detailValueHighlight}>{tSign(selectedItem.moon_sign)}</Text>
                         </Text>
                       )}
                     </View>
