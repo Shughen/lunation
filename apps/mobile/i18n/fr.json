@@ -187,14 +187,14 @@
   "ritualCard": {
     "header": "Aujourd'hui",
     "guidance": {
-      "new_moon": "Énergie de renouveau. Moment propice aux intentions.",
-      "waxing_crescent": "Élan créatif. Posez vos premières pierres.",
-      "first_quarter": "Tension fertile. Ajustez vos actions.",
-      "waxing_gibbous": "Affinez vos projets. La pleine lumière approche.",
-      "full_moon": "Apogée émotionnelle. Contemplez ce qui se révèle.",
-      "waning_gibbous": "Gratitude active. Partagez ce qui a mûri.",
-      "last_quarter": "Relâchez ce qui pèse. Faites de la place.",
-      "waning_crescent": "Transition douce. Intériorité avant le renouveau.",
+      "new_moon": "C'est un temps pour poser des intentions douces, sans urgence.",
+      "waxing_crescent": "L'élan se dessine. Tu peux nourrir ce qui commence à germer en toi.",
+      "first_quarter": "Une tension fertile. Tu peux ajuster ta direction avec douceur.",
+      "waxing_gibbous": "Tout continue de mûrir. Tu peux affiner, sans forcer.",
+      "full_moon": "C'est un sommet émotionnel. Tu peux contempler ce qui se révèle.",
+      "waning_gibbous": "La lumière commence à décroître. Tu peux partager ce qui a porté ses fruits.",
+      "last_quarter": "Un temps pour relâcher ce qui pèse. Tu peux faire de la place.",
+      "waning_crescent": "Tout ralentit en douceur. Tu peux te reposer avant le renouveau.",
       "fallback": "Écoutez votre intuition lunaire."
     },
     "vocActive": "Lune flottante jusqu'à {{endTime}}",
@@ -216,7 +216,17 @@
     "emptyState": "Aucune note pour aujourd'hui",
     "deleteConfirm": "Supprimer cette entrée ?",
     "characterCount": "{{count}} caractères",
-    "maxLength": "Maximum {{max}} caractères"
+    "maxLength": "Maximum {{max}} caractères",
+    "prompts": {
+      "new_moon": "Quelles intentions douces as-tu envie de poser aujourd'hui, même toutes petites ?",
+      "waxing_crescent": "Qu'est-ce qui commence à prendre forme en toi, sans être encore très clair ?",
+      "first_quarter": "Y a-t-il quelque chose que tu pourrais ajuster légèrement, pour te sentir plus alignée ?",
+      "waxing_gibbous": "Qu'est-ce qui est en train de mûrir dans ta vie, même discrètement ?",
+      "full_moon": "Qu'est-ce qui se révèle en ce moment, en toi ou autour de toi ?",
+      "waning_gibbous": "Qu'est-ce que tu as envie de reconnaître ou d'honorer, sans forcément le partager ?",
+      "last_quarter": "Y a-t-il quelque chose que tu pourrais relâcher, même partiellement ?",
+      "waning_crescent": "De quoi aurais-tu besoin pour te reposer un peu plus, à ta manière ?"
+    }
   },
   "timeline": {
     "title": "Timeline Lunaire",

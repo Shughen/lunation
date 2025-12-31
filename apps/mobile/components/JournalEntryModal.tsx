@@ -31,7 +31,7 @@ import {
   saveJournalEntry,
   deleteJournalEntry,
 } from '../services/journalService';
-import { getTodayDateString } from '../utils/ritualHelpers';
+import { getTodayDateString, getPhaseKey } from '../utils/ritualHelpers';
 import { MoonPhase } from '../types/ritual';
 
 interface JournalEntryModalProps {
@@ -194,8 +194,12 @@ export function JournalEntryModal({
             </Text>
           </View>
 
-          {/* Titre question */}
-          <Text style={styles.entryTitle}>{t('journal.entryTitle')}</Text>
+          {/* Titre question dynamique par phase */}
+          <Text style={styles.entryTitle}>
+            {t(`journal.prompts.${getPhaseKey(moonContext.phase)}`, {
+              defaultValue: t('journal.entryTitle'),
+            })}
+          </Text>
 
           {/* Loading state */}
           {isLoading ? (
