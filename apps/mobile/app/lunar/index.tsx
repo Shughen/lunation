@@ -11,9 +11,49 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { getLunarReturnReport, getVoidOfCourse, getLunarMansion } from '../../services/api';
+import { showNetworkErrorAlert } from '../../utils/errorHandler';
+
+/**
+ * Fonction utilitaire pour accéder aux propriétés imbriquées de manière sûre
+ * @param obj Objet à parcourir
+ * @param path Chemin vers la propriété (ex: 'data.mansion.name')
+ * @param defaultValue Valeur par défaut si la propriété n'existe pas
+ */
+function get(obj: any, path: string, defaultValue: any = undefined): any {
+  const keys = path.split('.');
+  let result = obj;
+
+  for (const key of keys) {
+    if (result == null || typeof result !== 'object') {
+      return defaultValue;
+    }
+    result = result[key];
+  }
+
+  return result !== undefined ? result : defaultValue;
+}
+
+/**
+ * Formate une date ISO en format court lisible
+ * Ex: "2025-12-31T10:30:00" -> "31/12 10:30"
+ */
+function formatShortDateTime(isoString: string | undefined): string {
+  if (!isoString) return 'N/A';
+
+  try {
+    const date = new Date(isoString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${day}/${month} ${hours}:${minutes}`;
+  } catch {
+    return isoString;
+  }
+}
 
 export default function LunaPackScreen() {
   const [loading, setLoading] = useState(false);
@@ -46,7 +86,11 @@ export default function LunaPackScreen() {
       const response = await getLunarReturnReport(payload);
       setResult(response);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors du calcul du Lunar Return Report');
+      showNetworkErrorAlert(
+        error,
+        () => handleLunarReturnReport(),
+        'Le rapport est temporairement indisponible.'
+      );
     } finally {
       setLoading(false);
     }
@@ -61,7 +105,11 @@ export default function LunaPackScreen() {
       const response = await getVoidOfCourse(testPayload);
       setResult(response);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors du calcul du Void of Course');
+      showNetworkErrorAlert(
+        error,
+        () => handleVoidOfCourse(),
+        'Le Void of Course est temporairement indisponible.'
+      );
     } finally {
       setLoading(false);
     }
@@ -76,7 +124,11 @@ export default function LunaPackScreen() {
       const response = await getLunarMansion(testPayload);
       setResult(response);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors du calcul de la Lunar Mansion');
+      showNetworkErrorAlert(
+        error,
+        () => handleLunarMansion(),
+        'La Lunar Mansion est temporairement indisponible.'
+      );
     } finally {
       setLoading(false);
     }
@@ -99,47 +151,97 @@ export default function LunaPackScreen() {
 
         <View style={styles.summaryBox}>
           <Text style={styles.summaryTitle}>Résumé</Text>
-          
-          {/* Affichage simplifié - à adapter selon la structure réelle des données */}
+
+          {/* Lunar Return Report */}
           {kind === 'lunar_return_report' && (
             <>
               <Text style={styles.summaryText}>
-                Mois: {result.month || 'N/A'}
+                📅 Date de retour: {get(data, 'return_date', 'N/A')}
               </Text>
               <Text style={styles.summaryText}>
-                Données disponibles: {Object.keys(data).length} clés
+                🌙 Lune: {get(data, 'moon.sign', 'N/A')} {get(data, 'moon.degree') ? `(${Math.round(get(data, 'moon.degree'))}°)` : ''}
               </Text>
+              {get(data, 'moon.house') && (
+                <Text style={styles.summaryText}>
+                  🏠 Maison: {get(data, 'moon.house')}
+                </Text>
+              )}
+              {get(data, 'interpretation') && (
+                <Text style={styles.summaryText} numberOfLines={2}>
+                  💬 {get(data, 'interpretation', '').substring(0, 80)}...
+                </Text>
+              )}
             </>
           )}
 
+          {/* Void of Course */}
           {kind === 'void_of_course' && (
             <>
               <Text style={styles.summaryText}>
-                Statut VoC: {data.is_active ? '✅ Actif' : '❌ Inactif'}
+                {get(data, 'is_void', false) ? '✅ Actif' : '❌ Inactif'}
               </Text>
-              {data.start_at && (
-                <Text style={styles.summaryText}>Début: {data.start_at}</Text>
+
+              {get(data, 'is_void') && get(data, 'void_of_course') && (
+                <>
+                  <Text style={styles.summaryText}>
+                    🕐 Début: {formatShortDateTime(get(data, 'void_of_course.start'))}
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    🕐 Fin: {formatShortDateTime(get(data, 'void_of_course.end'))}
+                  </Text>
+                </>
               )}
-              {data.end_at && (
-                <Text style={styles.summaryText}>Fin: {data.end_at}</Text>
+
+              {!get(data, 'is_void') && get(data, 'next_void') && (
+                <>
+                  <Text style={styles.summaryText}>
+                    🔮 Prochain VoC:
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    🕐 Début: {formatShortDateTime(get(data, 'next_void.start'))}
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    🕐 Fin: {formatShortDateTime(get(data, 'next_void.end'))}
+                  </Text>
+                </>
+              )}
+
+              {get(data, 'moon_sign') && (
+                <Text style={styles.summaryText}>
+                  🌙 Signe lunaire: {get(data, 'moon_sign')}
+                </Text>
               )}
             </>
           )}
 
+          {/* Lunar Mansion */}
           {kind === 'lunar_mansion' && (
             <>
               <Text style={styles.summaryText}>
-                Mansion ID: {data.mansion?.number || data.mansion_id || 'N/A'}
+                🏰 Mansion #{get(data, 'mansion.number', 'N/A')}: {get(data, 'mansion.name', 'N/A')}
               </Text>
-              <Text style={styles.summaryText}>
-                Nom: {data.mansion?.name || 'N/A'}
-              </Text>
+
+              {get(data, 'mansion.interpretation') && (
+                <Text style={styles.summaryText} numberOfLines={2}>
+                  💬 {get(data, 'mansion.interpretation')}
+                </Text>
+              )}
+
+              {get(data, 'upcoming_changes.0') && (
+                <>
+                  <Text style={styles.summaryText}>
+                    🔄 Prochain changement:
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    🕐 {formatShortDateTime(get(data, 'upcoming_changes.0.change_time'))}
+                  </Text>
+                  <Text style={styles.summaryText}>
+                    ➡️ Mansion #{get(data, 'upcoming_changes.0.to_mansion.number')}: {get(data, 'upcoming_changes.0.to_mansion.name', 'N/A')}
+                  </Text>
+                </>
+              )}
             </>
           )}
-
-          <Text style={styles.summaryText}>
-            {JSON.stringify(data).substring(0, 150)}...
-          </Text>
         </View>
 
         <TouchableOpacity
@@ -333,7 +435,7 @@ const styles = StyleSheet.create({
   summaryText: {
     fontSize: 14,
     color: '#C0C0D0',
-    marginBottom: 4,
+    marginBottom: 6,
     lineHeight: 20,
   },
   toggleButton: {
@@ -379,4 +481,3 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
-
