@@ -1,3 +1,13 @@
+/**
+ * Écran Void of Course (Phase 1.3 MVP)
+ *
+ * Scope strict :
+ * - VoC maintenant ? (oui/non + fenêtre active)
+ * - Prochaine fenêtre VoC
+ * - Liste 2-3 prochaines fenêtres (48h)
+ * - UX épurée, zéro pavé
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,13 +18,24 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { lunaPack } from '../../services/api';
+import { router } from 'expo-router';
+import apiClient from '../../services/api';
 
-export default function VoidOfCourse() {
+interface VocWindow {
+  start_at: string;
+  end_at: string;
+}
+
+interface VocStatus {
+  now: (VocWindow & { is_active: true }) | null;
+  next: VocWindow | null;
+  upcoming: VocWindow[];
+}
+
+export default function VoidOfCourseScreen() {
+  const [status, setStatus] = useState<VocStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [vocData, setVocData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,11 +54,11 @@ export default function VoidOfCourse() {
       }
       setError(null);
 
-      // Charger le VoC actuel depuis le cache
-      const current = await lunaPack.getCurrentVoc();
-      setVocData(current);
+      const response = await apiClient.get('/api/lunar/voc/status');
+      setStatus(response.data);
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du chargement du VoC');
+      console.error('[VoC] Erreur chargement status:', err);
+      setError('Erreur lors du chargement du Void of Course');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,167 +67,248 @@ export default function VoidOfCourse() {
 
   const onRefresh = () => loadVocStatus(true);
 
+  const formatDateTime = (isoString: string, showDate = false): string => {
+    const date = new Date(isoString);
+    const options: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+    };
+
+    if (showDate) {
+      options.weekday = 'short';
+      options.day = 'numeric';
+      options.month = 'short';
+    }
+
+    return date.toLocaleString('fr-FR', options);
+  };
+
+  const formatDuration = (start: string, end: string): string => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 0) {
+      return `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''}`;
+    }
+    return `${minutes}min`;
+  };
+
   if (loading) {
     return (
-      <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#b794f6" />
-          <Text style={styles.loadingText}>Vérification du Void of Course...</Text>
-        </View>
-      </LinearGradient>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B7BF7" />
+        <Text style={styles.loadingText}>Chargement du Void of Course...</Text>
+      </View>
     );
   }
 
-  const isActive = vocData?.is_active || false;
+  if (error || !status) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error || 'Données non disponibles'}</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>← Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const isActive = !!status.now;
 
   return (
-    <LinearGradient colors={['#1a0b2e', '#2d1b4e']} style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#b794f6" />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>🌑 Void of Course</Text>
-          <Text style={styles.subtitle}>Période lunaire sans aspects</Text>
-        </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B7BF7" />
+      }
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButtonSmall} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>← Retour</Text>
+        </TouchableOpacity>
 
-        {/* Status Badge */}
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: isActive ? 'rgba(248, 113, 113, 0.2)' : 'rgba(74, 222, 128, 0.2)' },
-          ]}
-        >
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isActive ? '#f87171' : '#4ade80' },
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {isActive ? 'VoC EN COURS' : 'Pas de VoC Actif'}
-          </Text>
-        </View>
+        <Text style={styles.title}>🌑 Void of Course</Text>
+        <Text style={styles.subtitle}>Période lunaire sans aspects majeurs</Text>
+      </View>
 
-        {/* Active VoC Info */}
-        {isActive && vocData && (
-          <View style={styles.vocCard}>
-            <Text style={styles.vocTitle}>⏰ Fenêtre Void of Course Active</Text>
-            
-            <View style={styles.vocInfo}>
-              <View style={styles.vocRow}>
-                <Text style={styles.vocLabel}>Début :</Text>
-                <Text style={styles.vocValue}>
-                  {new Date(vocData.start_at).toLocaleString('fr-FR', {
-                    weekday: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </View>
-              
-              <View style={styles.vocRow}>
-                <Text style={styles.vocLabel}>Fin :</Text>
-                <Text style={styles.vocValue}>
-                  {new Date(vocData.end_at).toLocaleString('fr-FR', {
-                    weekday: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </View>
-            </View>
+      {/* Status Badge */}
+      <View style={[styles.statusBadge, isActive ? styles.statusBadgeActive : styles.statusBadgeInactive]}>
+        <View style={[styles.statusDot, isActive ? styles.statusDotActive : styles.statusDotInactive]} />
+        <Text style={styles.statusText}>{isActive ? 'VoC EN COURS' : 'Pas de VoC actif'}</Text>
+      </View>
 
-            <View style={styles.warningBox}>
-              <Text style={styles.warningEmoji}>⚠️</Text>
-              <Text style={styles.warningText}>
-                Période peu propice aux nouvelles initiatives. Privilégier la réflexion et la consolidation.
-              </Text>
-            </View>
+      {/* VoC Actif Maintenant */}
+      {isActive && status.now && (
+        <View style={styles.activeCard}>
+          <Text style={styles.cardTitle}>⏰ Fenêtre active</Text>
+
+          <View style={styles.timeRow}>
+            <Text style={styles.timeLabel}>Début :</Text>
+            <Text style={styles.timeValue}>{formatDateTime(status.now.start_at, true)}</Text>
           </View>
-        )}
 
-        {/* Not Active Info */}
-        {!isActive && (
-          <View style={styles.safeCard}>
-            <Text style={styles.safeEmoji}>✅</Text>
-            <Text style={styles.safeTitle}>Période Favorable</Text>
-            <Text style={styles.safeText}>
-              La Lune forme des aspects actifs. C'est le bon moment pour lancer de nouveaux projets et prendre des décisions importantes.
+          <View style={styles.timeRow}>
+            <Text style={styles.timeLabel}>Fin :</Text>
+            <Text style={styles.timeValue}>{formatDateTime(status.now.end_at, true)}</Text>
+          </View>
+
+          <View style={styles.durationRow}>
+            <Text style={styles.durationLabel}>Durée :</Text>
+            <Text style={styles.durationValue}>{formatDuration(status.now.start_at, status.now.end_at)}</Text>
+          </View>
+
+          <View style={styles.hintBox}>
+            <Text style={styles.hintEmoji}>💡</Text>
+            <Text style={styles.hintText}>
+              Période peu propice aux initiatives. Privilégiez la réflexion et la consolidation.
             </Text>
           </View>
-        )}
+        </View>
+      )}
 
-        {/* What is VoC? */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>📚 Qu'est-ce que le Void of Course ?</Text>
-          <Text style={styles.infoText}>
-            Le Void of Course (VoC) est une période où la Lune ne forme plus d'aspects majeurs avant de changer de signe.
-          </Text>
-          <Text style={styles.infoText}>
-            Pendant cette période, les actions entreprises ont tendance à "ne mener nulle part" ou à nécessiter des ajustements ultérieurs.
-          </Text>
-          <View style={styles.infoList}>
-            <Text style={styles.infoListTitle}>À éviter pendant le VoC :</Text>
-            <Text style={styles.infoListItem}>• Signer des contrats importants</Text>
-            <Text style={styles.infoListItem}>• Lancer de nouveaux projets</Text>
-            <Text style={styles.infoListItem}>• Faire des achats importants</Text>
-            <Text style={styles.infoListItem}>• Prendre des décisions majeures</Text>
+      {/* Prochaine Fenêtre VoC */}
+      {status.next && (
+        <View style={styles.nextCard}>
+          <Text style={styles.cardTitle}>📅 Prochaine fenêtre VoC</Text>
+
+          <View style={styles.timeRow}>
+            <Text style={styles.timeLabel}>Début :</Text>
+            <Text style={styles.timeValue}>{formatDateTime(status.next.start_at, true)}</Text>
           </View>
-          <View style={styles.infoList}>
-            <Text style={styles.infoListTitle}>Favorable pendant le VoC :</Text>
-            <Text style={styles.infoListItem}>• Méditation et introspection</Text>
-            <Text style={styles.infoListItem}>• Tâches routinières</Text>
-            <Text style={styles.infoListItem}>• Repos et relaxation</Text>
-            <Text style={styles.infoListItem}>• Créativité sans objectif précis</Text>
+
+          <View style={styles.timeRow}>
+            <Text style={styles.timeLabel}>Fin :</Text>
+            <Text style={styles.timeValue}>{formatDateTime(status.next.end_at, true)}</Text>
+          </View>
+
+          <View style={styles.durationRow}>
+            <Text style={styles.durationLabel}>Durée :</Text>
+            <Text style={styles.durationValue}>{formatDuration(status.next.start_at, status.next.end_at)}</Text>
           </View>
         </View>
+      )}
 
-        {/* Last Update */}
-        <Text style={styles.lastUpdate}>
-          Dernière mise à jour : {new Date().toLocaleTimeString('fr-FR')}
+      {/* Upcoming Windows (48h) */}
+      {status.upcoming && status.upcoming.length > 0 && (
+        <View style={styles.upcomingCard}>
+          <Text style={styles.cardTitle}>🔮 Prochaines fenêtres (48h)</Text>
+
+          {status.upcoming.map((window, index) => (
+            <View key={index} style={styles.upcomingItem}>
+              <View style={styles.upcomingDot} />
+              <View style={styles.upcomingInfo}>
+                <Text style={styles.upcomingTime}>
+                  {formatDateTime(window.start_at, true)} → {formatDateTime(window.end_at)}
+                </Text>
+                <Text style={styles.upcomingDuration}>Durée : {formatDuration(window.start_at, window.end_at)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Info VoC */}
+      <View style={styles.infoCard}>
+        <Text style={styles.infoTitle}>Qu'est-ce que le VoC ?</Text>
+        <Text style={styles.infoText}>
+          Période où la Lune ne forme plus d'aspects majeurs avant de changer de signe. Les actions entreprises ont
+          tendance à nécessiter des ajustements ultérieurs.
         </Text>
-      </ScrollView>
-    </LinearGradient>
+      </View>
+
+      {/* Last Update */}
+      <Text style={styles.lastUpdate}>Dernière mise à jour : {new Date().toLocaleTimeString('fr-FR')}</Text>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0A0E27',
   },
-  centerContainer: {
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#0A0E27',
   },
-  scrollContent: {
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#8B7BF7',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0A0E27',
     padding: 20,
   },
+  errorText: {
+    fontSize: 18,
+    color: '#FF6B6B',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   header: {
-    marginBottom: 24,
-    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#1A1F3E',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7BF7',
+    position: 'relative',
+  },
+  backButtonSmall: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    zIndex: 10,
+  },
+  backButton: {
+    backgroundColor: '#8B7BF7',
+    padding: 16,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffd700',
-    marginBottom: 8,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
+    marginTop: 24,
   },
   subtitle: {
     fontSize: 16,
-    color: '#b794f6',
+    color: '#A0A0B0',
+    textAlign: 'center',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
+    margin: 16,
     borderRadius: 12,
-    marginBottom: 24,
+  },
+  statusBadgeActive: {
+    backgroundColor: 'rgba(248, 113, 113, 0.2)',
+  },
+  statusBadgeInactive: {
+    backgroundColor: 'rgba(74, 222, 128, 0.2)',
   },
   statusDot: {
     width: 12,
@@ -214,127 +316,147 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginRight: 12,
   },
+  statusDotActive: {
+    backgroundColor: '#F87171',
+  },
+  statusDotInactive: {
+    backgroundColor: '#4ADE80',
+  },
   statusText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
-  vocCard: {
-    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+  activeCard: {
+    margin: 16,
+    marginTop: 0,
     padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
+    backgroundColor: '#1A1F3E',
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'rgba(248, 113, 113, 0.3)',
+    borderColor: '#F87171',
   },
-  vocTitle: {
+  nextCard: {
+    margin: 16,
+    marginTop: 0,
+    padding: 20,
+    backgroundColor: '#1A1F3E',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2D3561',
+  },
+  upcomingCard: {
+    margin: 16,
+    marginTop: 0,
+    padding: 20,
+    backgroundColor: '#1A1F3E',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2D3561',
+  },
+  cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#f87171',
+    color: '#8B7BF7',
     marginBottom: 16,
   },
-  vocInfo: {
-    marginBottom: 16,
-  },
-  vocRow: {
+  timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  vocLabel: {
+  timeLabel: {
     fontSize: 14,
-    color: '#a0a0b0',
+    color: '#A0A0B0',
   },
-  vocValue: {
+  timeValue: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
-  warningBox: {
+  durationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#2D3561',
+  },
+  durationLabel: {
+    fontSize: 14,
+    color: '#A0A0B0',
+  },
+  durationValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B7BF7',
+  },
+  hintBox: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     padding: 12,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
+    marginTop: 16,
   },
-  warningEmoji: {
-    fontSize: 20,
+  hintEmoji: {
+    fontSize: 18,
     marginRight: 8,
   },
-  warningText: {
+  hintText: {
     flex: 1,
-    fontSize: 14,
-    color: '#ffd700',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#FFD700',
+    lineHeight: 18,
   },
-  safeCard: {
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(74, 222, 128, 0.3)',
-    alignItems: 'center',
-  },
-  safeEmoji: {
-    fontSize: 48,
+  upcomingItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
-  safeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4ade80',
-    marginBottom: 8,
+  upcomingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#8B7BF7',
+    marginTop: 6,
+    marginRight: 12,
   },
-  safeText: {
+  upcomingInfo: {
+    flex: 1,
+  },
+  upcomingTime: {
     fontSize: 14,
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 20,
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
-  infoSection: {
-    backgroundColor: 'rgba(42, 26, 78, 0.4)',
+  upcomingDuration: {
+    fontSize: 12,
+    color: '#A0A0B0',
+  },
+  infoCard: {
+    margin: 16,
+    marginTop: 0,
     padding: 20,
+    backgroundColor: '#1A1F3E',
     borderRadius: 12,
-    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#2D3561',
   },
   infoTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#b794f6',
+    color: '#8B7BF7',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#ffffff',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  infoList: {
-    marginTop: 12,
-  },
-  infoListTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffd700',
-    marginBottom: 8,
-  },
-  infoListItem: {
-    fontSize: 13,
-    color: '#a0a0b0',
-    lineHeight: 20,
+    color: '#C0C0D0',
+    lineHeight: 22,
   },
   lastUpdate: {
     fontSize: 12,
-    color: '#a0a0b0',
+    color: '#A0A0B0',
     textAlign: 'center',
-    marginTop: 8,
-  },
-  loadingText: {
-    color: '#ffffff',
-    marginTop: 16,
-    fontSize: 16,
+    marginBottom: 20,
   },
 });
-

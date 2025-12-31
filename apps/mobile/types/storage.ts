@@ -27,6 +27,10 @@ export const STORAGE_KEYS = {
 
   // Daily Ritual
   DAILY_RESONANCE: 'daily_resonance', // {date: "YYYY-MM-DD", value: "yes"|"no"|"maybe"}
+
+  // Notifications (Phase 1.4)
+  NOTIFICATIONS_ENABLED: 'notifications_enabled',
+  NOTIFICATIONS_LAST_SCHEDULED_AT: 'notifications_last_scheduled_at',
 } as const;
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];

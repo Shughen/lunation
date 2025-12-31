@@ -333,6 +333,29 @@ export interface LunarReturn {
 
 export const lunarReturns = {
   /**
+   * Récupère la révolution lunaire en cours (mois actuel)
+   */
+  getCurrent: async (): Promise<LunarReturn | null> => {
+    try {
+      const response = await apiClient.get('/api/lunar-returns/current');
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.log('[API] Aucune révolution lunaire en cours (404)');
+        return null;
+      }
+      console.error('[API] Erreur getCurrent:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+      });
+      throw error;
+    }
+  },
+
+  /**
    * Récupère le prochain retour lunaire (>= maintenant)
    */
   getNext: async (): Promise<LunarReturn | null> => {

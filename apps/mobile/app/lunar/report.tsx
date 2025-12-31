@@ -1,6 +1,11 @@
 /**
- * Écran de détail du Lunar Return Report
- * Affichage formaté et lisible du rapport mensuel de révolution lunaire
+ * Écran Rapport Mensuel de Révolution Lunaire (Phase 1.2)
+ *
+ * Affiche le rapport généré par lunar_report_builder.py v4 :
+ * - Header (mois, dates, lune, ascendant)
+ * - Climat général (template-based)
+ * - Axes dominants (2-3 domaines de vie)
+ * - Aspects majeurs (max 5, enrichis v4)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,222 +17,273 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { tPlanet, tAspect, formatOrb } from '../../i18n/astro.format';
+import { router, useLocalSearchParams } from 'expo-router';
+import apiClient from '../../services/api';
+import { AspectDetailSheet } from '../../components/AspectDetailSheet';
+import { Skeleton, SkeletonCard } from '../../components/Skeleton';
+import { showNetworkErrorAlert, getHumanErrorMessage } from '../../utils/errorHandler';
+import type { AspectV4 } from '../../types/api';
 
-interface LunarReturnReport {
-  provider: string;
-  kind: string;
-  data: {
-    moon?: {
-      sign?: string;
-      house?: number;
-      degree?: number;
-    };
-    ascendant?: string;
-    interpretation?: string;
-    aspects?: any[];
-    planets?: any[];
-    houses?: any[];
-    [key: string]: any;
-  };
-  cached?: boolean;
+interface LunarReportHeader {
+  month: string;
+  dates: string;
+  moon_sign: string;
+  moon_house: number;
+  lunar_ascendant: string;
 }
 
-export default function LunarReportDetailScreen() {
-  const params = useLocalSearchParams();
-  const [report, setReport] = useState<LunarReturnReport | null>(null);
+interface LunarReport {
+  header: LunarReportHeader;
+  general_climate: string;
+  dominant_axes: string[];
+  major_aspects: AspectV4[];
+}
+
+export default function LunarReportScreen() {
+  const params = useLocalSearchParams<{ id?: string }>();
+  const [report, setReport] = useState<LunarReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedAspect, setSelectedAspect] = useState<AspectV4 | null>(null);
 
   useEffect(() => {
-    // En production, on chargerait les données depuis l'API ou le cache
-    // Pour l'instant, simulation avec données de test
-    const mockReport: LunarReturnReport = {
-      provider: 'rapidapi',
-      kind: 'lunar_return_report',
-      data: {
-        moon: {
-          sign: 'Taurus',
-          house: 2,
-          degree: 15.5,
-        },
-        ascendant: 'Leo',
-        interpretation:
-          'Ce mois lunaire met l\'accent sur la stabilité financière et les valeurs personnelles. ' +
-          'La Lune en Taureau dans la maison 2 suggère une période favorable pour consolider vos ressources ' +
-          'et développer une approche pragmatique de vos finances. L\'ascendant Léon apporte confiance ' +
-          'et créativité dans la gestion de vos affaires matérielles.',
-        aspects: [
-          { planet1: 'Moon', planet2: 'Venus', type: 'trine', orb: 3.2 },
-          { planet1: 'Moon', planet2: 'Mars', type: 'square', orb: 2.5 },
-        ],
-        planets: [
-          { name: 'Sun', sign: 'Gemini', house: 11 },
-          { name: 'Mercury', sign: 'Cancer', house: 12 },
-        ],
-      },
-      cached: false,
-    };
+    loadReport();
+  }, [params.id]);
 
-    // Simuler un délai de chargement
-    setTimeout(() => {
-      setReport(mockReport);
+  const loadReport = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Si params.id existe, charger le rapport par ID, sinon charger le cycle courant
+      const endpoint = params.id
+        ? `/api/lunar-returns/${params.id}/report`
+        : '/api/lunar-returns/current/report';
+
+      const response = await apiClient.get(endpoint);
+      setReport(response.data);
+    } catch (err: any) {
+      console.error('[LunarReport] Erreur chargement rapport:', err);
+      if (err.response?.status === 404) {
+        setError(params.id ? 'Cycle lunaire non trouvé' : 'Aucune révolution lunaire en cours');
+      } else {
+        // Utiliser le helper pour formater le message d'erreur
+        const errorMessage = getHumanErrorMessage(err);
+        setError(errorMessage);
+        // Afficher aussi un Alert avec option Réessayer
+        showNetworkErrorAlert(
+          err,
+          () => loadReport(),
+          'Le rapport est temporairement indisponible.'
+        );
+      }
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, [params]);
+    }
+  };
 
-  const renderMoonInfo = () => {
-    if (!report?.data.moon) return null;
+  const renderHeader = () => {
+    if (!report) return null;
 
-    const { sign, house, degree } = report.data.moon;
+    const { month, dates, moon_sign, moon_house, lunar_ascendant } = report.header;
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🌙 Position de la Lune</Text>
-        
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Signe:</Text>
-          <Text style={styles.value}>{sign || 'N/A'}</Text>
-        </View>
+      <View style={styles.headerCard}>
+        <Text style={styles.monthTitle}>{month}</Text>
+        <Text style={styles.dates}>{dates}</Text>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Maison:</Text>
-          <Text style={styles.value}>{house || 'N/A'}</Text>
-        </View>
-
-        {degree !== undefined && (
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Degré:</Text>
-            <Text style={styles.value}>{degree.toFixed(2)}°</Text>
+        <View style={styles.headerInfoGrid}>
+          <View style={styles.headerInfoItem}>
+            <Text style={styles.headerLabel}>Lune en</Text>
+            <Text style={styles.headerValue}>
+              {moon_sign} (Maison {moon_house})
+            </Text>
           </View>
-        )}
+
+          <View style={styles.headerInfoItem}>
+            <Text style={styles.headerLabel}>Ascendant lunaire</Text>
+            <Text style={styles.headerValue}>{lunar_ascendant}</Text>
+          </View>
+        </View>
       </View>
     );
   };
 
-  const renderInterpretation = () => {
-    if (!report?.data.interpretation) return null;
+  const renderClimate = () => {
+    if (!report || !report.general_climate) return null;
 
     return (
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📖 Interprétation</Text>
-        <Text style={styles.interpretationText}>
-          {report.data.interpretation}
-        </Text>
+        <Text style={styles.cardTitle}>🌙 Climat général du mois</Text>
+        <Text style={styles.climateText}>{report.general_climate}</Text>
       </View>
     );
   };
 
-  const renderAspects = () => {
-    if (!report?.data.aspects || report.data.aspects.length === 0) return null;
+  const renderAxes = () => {
+    if (!report || !report.dominant_axes || report.dominant_axes.length === 0) {
+      return null;
+    }
 
     return (
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>⭐ Aspects Majeurs</Text>
-        {report.data.aspects.map((aspect, index) => {
-          // Détecter les noms de champs (variantes)
-          const planet1 = aspect.planet1 || aspect.p1 || aspect.transit_planet || aspect.from_planet;
-          const planet2 = aspect.planet2 || aspect.p2 || aspect.natal_planet || aspect.to_planet;
-          const aspectType = aspect.aspect || aspect.type;
-          const orb = aspect.orb;
-
-          return (
-            <View key={index} style={styles.aspectRow}>
-              <Text style={styles.aspectText}>
-                {tPlanet(planet1)} {tAspect(aspectType).toLowerCase()} {tPlanet(planet2)}
-              </Text>
-              <Text style={styles.aspectOrb}>
-                Orbe: {formatOrb(orb)}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
-
-  const renderKeyPoints = () => {
-    const keyPoints = [
-      '🔑 Consolidez vos ressources financières',
-      '🔑 Période favorable aux investissements stables',
-      '🔑 Développez votre confiance en vous',
-      '🔑 Attention aux dépenses impulsives (carré Mars)',
-    ];
-
-    return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🎯 Points Clés du Mois</Text>
-        {keyPoints.map((point, index) => (
-          <Text key={index} style={styles.keyPoint}>
-            {point}
-          </Text>
+        <Text style={styles.cardTitle}>🎯 Axes dominants du cycle</Text>
+        {report.dominant_axes.map((axis, index) => (
+          <View key={index} style={styles.axisItem}>
+            <Text style={styles.axisBullet}>•</Text>
+            <Text style={styles.axisText}>{axis}</Text>
+          </View>
         ))}
       </View>
     );
   };
 
+  const renderAspects = () => {
+    if (!report || !report.major_aspects || report.major_aspects.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>⭐ Aspects majeurs du cycle</Text>
+        <Text style={styles.aspectsSubtitle}>
+          {report.major_aspects.length} aspect{report.major_aspects.length > 1 ? 's' : ''} identifié{report.major_aspects.length > 1 ? 's' : ''}
+        </Text>
+
+        {report.major_aspects.map((aspect, index) => (
+          <TouchableOpacity
+            key={aspect.id || index}
+            style={styles.aspectRow}
+            onPress={() => setSelectedAspect(aspect)}
+          >
+            <View style={styles.aspectHeader}>
+              <Text style={styles.aspectPlanets}>
+                {aspect.planet1} {getAspectSymbol(aspect.type)} {aspect.planet2}
+              </Text>
+              <Text style={styles.aspectOrb}>
+                {Math.abs(aspect.orb).toFixed(1)}°
+              </Text>
+            </View>
+
+            {aspect.copy?.summary && (
+              <Text style={styles.aspectSummary} numberOfLines={2}>
+                {aspect.copy.summary}
+              </Text>
+            )}
+
+            <Text style={styles.aspectCTA}>Voir détails →</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  // CTA timeline masqué pour MVP (route non implémentée Phase 1.3)
+  // const renderCTA = () => {
+  //   return (
+  //     <View style={styles.ctaSection}>
+  //       <TouchableOpacity
+  //         style={styles.ctaButton}
+  //         onPress={() => router.push('/lunar/timeline')}
+  //       >
+  //         <Text style={styles.ctaButtonText}>📅 Voir la timeline du cycle</Text>
+  //       </TouchableOpacity>
+  //     </View>
+  //   );
+  // };
+
+  const getAspectSymbol = (type: string): string => {
+    const symbols: { [key: string]: string } = {
+      conjunction: '☌',
+      opposition: '☍',
+      square: '□',
+      trine: '△',
+    };
+    return symbols[type.toLowerCase()] || type;
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B7BF7" />
-        <Text style={styles.loadingText}>Chargement du rapport...</Text>
-      </View>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButtonSmall}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Retour</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>Rapport Mensuel</Text>
+          <Text style={styles.subtitle}>Révolution Lunaire</Text>
+        </View>
+
+        <View style={{ margin: 16 }}>
+          <SkeletonCard style={{ marginBottom: 16 }} />
+          <SkeletonCard style={{ marginBottom: 16 }} />
+          <SkeletonCard style={{ marginBottom: 16 }} />
+        </View>
+      </ScrollView>
     );
   }
 
-  if (!report) {
+  if (error || !report) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>❌ Rapport non disponible</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>Retour</Text>
-        </TouchableOpacity>
+        <Text style={styles.errorText}>
+          {error || 'Rapport non disponible'}
+        </Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity
+            style={[styles.errorButton, styles.retryButton]}
+            onPress={() => loadReport()}
+          >
+            <Text style={styles.errorButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.errorButton, styles.backButton]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.errorButtonText}>← Retour</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButtonSmall}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>← Retour</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>Rapport Lunaire Mensuel</Text>
-        <Text style={styles.subtitle}>
-          {new Date().toLocaleDateString('fr-FR', { 
-            month: 'long', 
-            year: 'numeric' 
-          })}
-        </Text>
+    <>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButtonSmall}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Retour</Text>
+          </TouchableOpacity>
 
-        {report.cached && (
-          <View style={styles.cachedBadge}>
-            <Text style={styles.cachedText}>📦 Depuis le cache</Text>
-          </View>
-        )}
-      </View>
+          <Text style={styles.title}>Rapport Mensuel</Text>
+          <Text style={styles.subtitle}>Révolution Lunaire</Text>
+        </View>
 
-      {renderMoonInfo()}
-      {renderInterpretation()}
-      {renderKeyPoints()}
-      {renderAspects()}
+        {renderHeader()}
+        {renderClimate()}
+        {renderAxes()}
+        {renderAspects()}
+        {/* CTA timeline masqué pour MVP */}
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Rapport généré par {report.provider}
-        </Text>
-        <Text style={styles.footerText}>
-          Type: {report.kind}
-        </Text>
-      </View>
-    </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Rapport généré par templates v4 (architecture déterministe)
+          </Text>
+        </View>
+      </ScrollView>
+
+      <AspectDetailSheet
+        aspect={selectedAspect}
+        visible={!!selectedAspect}
+        onClose={() => setSelectedAspect(null)}
+      />
+    </>
   );
 }
 
@@ -257,7 +313,23 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     color: '#FF6B6B',
-    marginBottom: 20,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    maxWidth: 300,
+  },
+  errorButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#8B7BF7',
   },
   header: {
     padding: 20,
@@ -274,9 +346,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backButton: {
-    backgroundColor: '#8B7BF7',
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: '#2D3561',
+  },
+  errorButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   backButtonText: {
     color: '#FFFFFF',
@@ -288,7 +363,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
     marginTop: 24,
   },
   subtitle: {
@@ -296,20 +371,50 @@ const styles = StyleSheet.create({
     color: '#A0A0B0',
     textAlign: 'center',
   },
-  cachedBadge: {
-    marginTop: 12,
-    alignSelf: 'center',
-    backgroundColor: '#2D3561',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  headerCard: {
+    margin: 16,
+    padding: 20,
+    backgroundColor: '#1A1F3E',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#8B7BF7',
   },
-  cachedText: {
+  monthTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8B7BF7',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  dates: {
+    fontSize: 16,
+    color: '#A0A0B0',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  headerInfoGrid: {
+    gap: 16,
+  },
+  headerInfoItem: {
+    backgroundColor: '#0A0E27',
+    padding: 12,
+    borderRadius: 8,
+  },
+  headerLabel: {
     fontSize: 12,
+    color: '#A0A0B0',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  headerValue: {
+    fontSize: 16,
     color: '#FFFFFF',
+    fontWeight: '600',
   },
   card: {
     margin: 16,
+    marginTop: 0,
     padding: 20,
     backgroundColor: '#1A1F3E',
     borderRadius: 12,
@@ -322,46 +427,82 @@ const styles = StyleSheet.create({
     color: '#8B7BF7',
     marginBottom: 16,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 16,
-    color: '#A0A0B0',
-  },
-  value: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  interpretationText: {
+  climateText: {
     fontSize: 15,
     color: '#C0C0D0',
     lineHeight: 24,
   },
-  aspectRow: {
+  axisItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2D3561',
+    marginBottom: 12,
+    alignItems: 'flex-start',
   },
-  aspectText: {
-    fontSize: 14,
-    color: '#FFFFFF',
+  axisBullet: {
+    fontSize: 18,
+    color: '#8B7BF7',
+    marginRight: 8,
+    marginTop: 2,
   },
-  aspectOrb: {
-    fontSize: 12,
-    color: '#A0A0B0',
-  },
-  keyPoint: {
+  axisText: {
     fontSize: 15,
     color: '#C0C0D0',
-    marginBottom: 12,
     lineHeight: 22,
+    flex: 1,
+  },
+  aspectsSubtitle: {
+    fontSize: 14,
+    color: '#A0A0B0',
+    marginBottom: 16,
+  },
+  aspectRow: {
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#0A0E27',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2D3561',
+  },
+  aspectHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  aspectPlanets: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  aspectOrb: {
+    fontSize: 14,
+    color: '#8B7BF7',
+    fontWeight: '600',
+  },
+  aspectSummary: {
+    fontSize: 14,
+    color: '#A0A0B0',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  aspectCTA: {
+    fontSize: 14,
+    color: '#8B7BF7',
+    fontWeight: '600',
+  },
+  ctaSection: {
+    margin: 16,
+    marginTop: 0,
+  },
+  ctaButton: {
+    backgroundColor: '#8B7BF7',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  ctaButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   footer: {
     padding: 20,
@@ -373,7 +514,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: '#A0A0B0',
-    marginBottom: 4,
+    textAlign: 'center',
   },
 });
-

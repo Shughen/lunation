@@ -14,6 +14,7 @@ import {
   Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import NetInfo from '@react-native-community/netinfo';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors, style, children, ...props }: any) => {
@@ -69,6 +70,7 @@ export default function HomeScreen() {
   const [dailyInsight, setDailyInsight] = useState<DailyInsight | null>(null);
   const isLoadingDailyClimateRef = useRef(false);
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+  const [isOnline, setIsOnline] = useState(true);
 
   // S'assurer que le composant est monté avant de naviguer
   useLayoutEffect(() => {
@@ -238,6 +240,16 @@ export default function HomeScreen() {
       loadPreferences();
     }
   }, [hydrated, loadPreferences]);
+
+  // Détecter l'état du réseau
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? true);
+      console.log('[INDEX] 📡 Network state:', state.isConnected ? 'Online' : 'Offline');
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Setup listener tap notifications au mount
   useEffect(() => {
@@ -409,6 +421,20 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Carte Mode Hors Connexion */}
+        {!isOnline && (
+          <View style={styles.offlineCard}>
+            <Text style={styles.offlineEmoji}>🌙</Text>
+            <Text style={styles.offlineTitle}>Mode hors connexion</Text>
+            <Text style={styles.offlineText}>
+              Vous êtes actuellement hors ligne. Certaines fonctionnalités nécessitant une connexion Internet sont désactivées.
+            </Text>
+            <Text style={styles.offlineHint}>
+              ✓ Journal et données locales disponibles
+            </Text>
+          </View>
+        )}
+
         {/* Salutation temporelle */}
         {moonPosition && (
           <Text style={styles.greeting}>{greeting}</Text>
@@ -472,17 +498,23 @@ export default function HomeScreen() {
                 {t('emptyStates.noCycles.title')}
               </Text>
               <TouchableOpacity
-                style={styles.generateButton}
+                style={[styles.generateButton, (!isOnline || generating) && styles.generateButtonDisabled]}
                 onPress={(e) => {
                   e.stopPropagation();
+                  if (!isOnline) {
+                    Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
+                    return;
+                  }
                   handleGenerate();
                 }}
-                disabled={generating}
+                disabled={generating || !isOnline}
               >
                 {generating ? (
                   <ActivityIndicator color={colors.text} />
                 ) : (
-                  <Text style={styles.generateButtonText}>{t('emptyStates.noCycles.cta')}</Text>
+                  <Text style={styles.generateButtonText}>
+                    {!isOnline ? '🌙 Hors ligne' : t('emptyStates.noCycles.cta')}
+                  </Text>
                 )}
               </TouchableOpacity>
             </>
@@ -495,12 +527,20 @@ export default function HomeScreen() {
         {/* Menu principal (MVP : 5 cards) */}
         <View style={styles.grid}>
           <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push('/lunar-returns/timeline')}
+            style={[styles.menuCard, !isOnline && styles.menuCardDisabled]}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
+                return;
+              }
+              router.push('/lunar-returns/timeline');
+            }}
+            disabled={!isOnline}
           >
             <Text style={styles.menuEmoji}>📅</Text>
             <Text style={styles.menuTitle}>Timeline</Text>
             <Text style={styles.menuDesc}>Mes 12 prochains cycles lunaires</Text>
+            {!isOnline && <Text style={styles.offlineBadge}>Hors ligne</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -513,12 +553,20 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push('/lunar/voc')}
+            style={[styles.menuCard, !isOnline && styles.menuCardDisabled]}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
+                return;
+              }
+              router.push('/lunar/voc');
+            }}
+            disabled={!isOnline}
           >
             <Text style={styles.menuEmoji}>🌑</Text>
             <Text style={styles.menuTitle}>Void of Course</Text>
             <Text style={styles.menuDesc}>Lune en VoC maintenant ?</Text>
+            {!isOnline && <Text style={styles.offlineBadge}>Hors ligne</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -716,6 +764,50 @@ const styles = StyleSheet.create({
   generateButtonText: {
     ...fonts.button,
     color: colors.text,
+  },
+  generateButtonDisabled: {
+    opacity: 0.5,
+  },
+  offlineCard: {
+    backgroundColor: 'rgba(139, 123, 247, 0.15)',
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 123, 247, 0.3)',
+    alignItems: 'center',
+  },
+  offlineEmoji: {
+    fontSize: 32,
+    marginBottom: spacing.xs,
+  },
+  offlineTitle: {
+    ...fonts.h3,
+    color: colors.accent,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  offlineText: {
+    ...fonts.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    lineHeight: 20,
+  },
+  offlineHint: {
+    ...fonts.bodySmall,
+    color: colors.accent,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  menuCardDisabled: {
+    opacity: 0.5,
+  },
+  offlineBadge: {
+    ...fonts.bodySmall,
+    color: colors.accent,
+    marginTop: spacing.xs,
+    fontSize: 10,
   },
 });
 

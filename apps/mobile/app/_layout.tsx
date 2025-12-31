@@ -6,6 +6,12 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 
+// Initialize i18n (side effect import)
+import '../i18n';
+
+// Lunar Context Provider
+import { LunarProvider } from '../contexts/LunarProvider';
+
 export default function RootLayout() {
   // Vérifier que Stack est disponible au runtime
   if (!Stack) {
@@ -21,7 +27,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <LunarProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -44,9 +50,9 @@ export default function RootLayout() {
         <Stack.Screen name="calendar/month" />
         <Stack.Screen name="cycle/index" />
         <Stack.Screen name="cycle/history" />
-        <Stack.Screen name="settings/index" />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="debug/selftest" />
       </Stack>
-    </>
+    </LunarProvider>
   );
 }

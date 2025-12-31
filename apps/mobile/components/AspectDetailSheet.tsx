@@ -115,30 +115,25 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
 
               {aspect.actual_angle !== undefined && aspect.actual_angle !== null && (
                 <View style={styles.metadataRow}>
-                  <Text style={styles.metadataLabel}>Angle réel :</Text>
-                  <Text style={styles.metadataValue}>{aspect.actual_angle.toFixed(2)}°</Text>
+                  <Text style={styles.metadataLabel}>Angle mesuré :</Text>
+                  <Text style={styles.metadataValue}>{aspect.actual_angle.toFixed(1)}°</Text>
                 </View>
               )}
-
-              <View style={styles.metadataRow}>
-                <Text style={styles.metadataLabel}>Orbe :</Text>
-                <Text style={styles.metadataValue}>
-                  {Math.abs(aspect.orb).toFixed(1)}° (
-                  {Math.abs(aspect.orb) <= 1
-                    ? 'exact'
-                    : Math.abs(aspect.orb) <= 3
-                    ? 'serré'
-                    : Math.abs(aspect.orb) <= 6
-                    ? 'moyen'
-                    : 'large'}
-                  )
-                </Text>
-              </View>
 
               {aspect.delta_to_exact !== undefined && aspect.delta_to_exact !== null && (
                 <View style={styles.metadataRow}>
                   <Text style={styles.metadataLabel}>Distance à l'exact :</Text>
-                  <Text style={styles.metadataValue}>{aspect.delta_to_exact.toFixed(2)}°</Text>
+                  <Text style={styles.metadataValue}>
+                    {aspect.delta_to_exact.toFixed(1)}° (
+                    {aspect.delta_to_exact <= 1
+                      ? 'exact'
+                      : aspect.delta_to_exact <= 3
+                      ? 'serré'
+                      : aspect.delta_to_exact <= 6
+                      ? 'moyen'
+                      : 'large'}
+                    )
+                  </Text>
                 </View>
               )}
             </View>
