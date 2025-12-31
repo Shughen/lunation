@@ -441,13 +441,24 @@ async def calculate_natal_chart(
     big3 = extract_big3_from_positions(chart.positions)
     
     logger.info(f"✨ Big3 extrait - Sun={big3['sun_sign']}, Moon={big3['moon_sign']}, Asc={big3['ascendant_sign']}")
-    
+
     # Extraire planets, houses, aspects depuis positions JSONB
     positions_data = chart.positions or {}
     planets = positions_data.get("planets", {})
     houses = positions_data.get("houses", {})
-    aspects = positions_data.get("aspects", [])
-    
+    raw_aspects = positions_data.get("aspects", [])
+
+    # Enrichir aspects avec métadonnées + copy v4 (si version v4 activée)
+    aspects = raw_aspects
+    if settings.ASPECTS_VERSION == 4:
+        try:
+            from services.aspect_explanation_service import enrich_aspects_v4
+            aspects = enrich_aspects_v4(raw_aspects, planets, limit=10)
+            logger.info(f"✅ Aspects enrichis v4: {len(aspects)} aspects avec copy")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur enrichissement aspects v4 (fallback raw aspects): {e}")
+            aspects = raw_aspects
+
     # Stocker chart.id AVANT toute opération qui pourrait causer un rollback
     # pour éviter l'erreur MissingGreenlet lors de l'accès après rollback
     chart_id_str = str(chart.id)
@@ -569,13 +580,24 @@ async def get_natal_chart(
     
     # Extraire Big3 depuis positions pour la réponse
     big3 = extract_big3_from_positions(chart.positions)
-    
+
     # Extraire planets, houses, aspects depuis positions JSONB
     positions_data = chart.positions or {}
     planets = positions_data.get("planets", {})
     houses = positions_data.get("houses", {})
-    aspects = positions_data.get("aspects", [])
-    
+    raw_aspects = positions_data.get("aspects", [])
+
+    # Enrichir aspects avec métadonnées + copy v4 (si version v4 activée)
+    aspects = raw_aspects
+    if settings.ASPECTS_VERSION == 4:
+        try:
+            from services.aspect_explanation_service import enrich_aspects_v4
+            aspects = enrich_aspects_v4(raw_aspects, planets, limit=10)
+            logger.info(f"✅ Aspects enrichis v4: {len(aspects)} aspects avec copy")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur enrichissement aspects v4 (fallback raw aspects): {e}")
+            aspects = raw_aspects
+
     # Construire la réponse avec Big3 extrait depuis positions
     return {
         "id": str(chart.id),  # UUID -> string

@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = Field(default="", description="Clé API Anthropic pour génération interprétations")
     NATAL_INTERPRETATION_VERSION: int = Field(default=2, description="Version du prompt d'interprétation (2=moderne avec micro-rituel, 3=senior expérimental déprécié, 4=senior professionnel structuré)")
 
+    # Aspect Explanations (v4)
+    ASPECT_COPY_ENGINE: str = Field(default="template", description="Moteur de génération copy aspects: 'template' (déterministe) ou 'ai' (Haiku)")
+    ASPECTS_VERSION: int = Field(default=4, description="Version du filtrage aspects (4=types majeurs, orbe ≤6°, exclure Lilith)")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True

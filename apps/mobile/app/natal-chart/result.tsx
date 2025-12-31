@@ -18,7 +18,9 @@ import { useNatalStore } from '../../stores/useNatalStore';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { tSign, tPlanet, formatAspectFR, formatDegree } from '../../i18n/astro.format';
 import NatalInterpretationModal from '../../components/NatalInterpretationModal';
+import { AspectDetailSheet } from '../../components/AspectDetailSheet';
 import { NatalSubject, ChartPayload } from '../../types/natal';
+import { AspectV4 } from '../../types/api';
 import { planetNameToSubject, buildSubjectPayload, filterMajorAspectsV4 } from '../../utils/natalChartUtils';
 
 // Mapping français des signes
@@ -58,6 +60,10 @@ export default function NatalChartResultScreen() {
   const [selectedSubject, setSelectedSubject] = useState<NatalSubject | null>(null);
   const [selectedPayload, setSelectedPayload] = useState<ChartPayload | null>(null);
 
+  // State pour le sheet de détail d'aspect
+  const [aspectDetailVisible, setAspectDetailVisible] = useState(false);
+  const [selectedAspect, setSelectedAspect] = useState<AspectV4 | null>(null);
+
   // Générer chart_id stable (simplifié pour V1 - utiliser hash en prod)
   const chartId = chart ? `chart_${chart.sun_sign}_${chart.moon_sign}_${chart.ascendant}` : 'unknown';
 
@@ -88,6 +94,22 @@ export default function NatalChartResultScreen() {
     setSelectedSubject(subject);
     setSelectedPayload(payload);
     setModalVisible(true);
+  };
+
+  // Handler pour clic sur un aspect
+  const handleAspectClick = (aspect: any) => {
+    // Type guard: vérifier si l'aspect est enrichi (AspectV4) ou brut
+    const isEnriched = aspect && aspect.id && aspect.expected_angle !== undefined;
+
+    if (isEnriched) {
+      // Aspect v4 enrichi avec copy
+      setSelectedAspect(aspect as AspectV4);
+      setAspectDetailVisible(true);
+    } else {
+      // Aspect brut (fallback si enrichissement échoue côté backend)
+      // Ne rien faire ou afficher un toast
+      console.log('Aspect non enrichi, détails non disponibles');
+    }
   };
 
   // Si pas de chart, rediriger vers l'écran intermédiaire
@@ -346,9 +368,16 @@ export default function NatalChartResultScreen() {
                   return filteredAspects.slice(0, 10).map((aspect: any, index: number) => {
                     const aspectText = formatAspectFR(aspect);
                     const orb = aspect.orb !== undefined && aspect.orb !== null ? Math.abs(aspect.orb) : null;
+                    const isEnriched = aspect.id && aspect.expected_angle !== undefined;
 
                     return (
-                      <View key={index} style={styles.aspectRow}>
+                      <TouchableOpacity
+                        key={aspect.id || index}
+                        style={[styles.aspectRow, isEnriched && styles.aspectRowClickable]}
+                        onPress={() => handleAspectClick(aspect)}
+                        activeOpacity={isEnriched ? 0.7 : 1}
+                        disabled={!isEnriched}
+                      >
                         <View style={styles.aspectContent}>
                           <Text style={styles.aspectText}>
                             {aspectText.replace(/ \(orbe [^)]+\)/, '')}  {/* Enlever l'orbe du texte principal */}
@@ -363,7 +392,8 @@ export default function NatalChartResultScreen() {
                             </Text>
                           )}
                         </View>
-                      </View>
+                        {isEnriched && <Text style={styles.chevron}>›</Text>}
+                      </TouchableOpacity>
                     );
                   });
                 })()}
@@ -396,6 +426,13 @@ export default function NatalChartResultScreen() {
             chartPayload={selectedPayload}
           />
         )}
+
+        {/* Sheet de détail d'aspect */}
+        <AspectDetailSheet
+          visible={aspectDetailVisible}
+          onClose={() => setAspectDetailVisible(false)}
+          aspect={selectedAspect}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -531,9 +568,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  aspectRowClickable: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
   aspectContent: {
     flexDirection: 'column',
+    flex: 1,
   },
   aspectText: {
     ...fonts.body,

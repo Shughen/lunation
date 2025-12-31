@@ -65,6 +65,34 @@ export interface Aspect {
   orb?: number;
 }
 
+// Aspect v4 enrichi avec explications pédagogiques (backend v4)
+export interface AspectV4 {
+  id: string;
+  planet1: string;
+  planet2: string;
+  type: string;
+  orb: number;
+  expected_angle: 0 | 90 | 120 | 180;
+  actual_angle?: number;
+  delta_to_exact?: number;
+  placements: {
+    planet1: {
+      sign: string;
+      house?: number;
+    };
+    planet2: {
+      sign: string;
+      house?: number;
+    };
+  };
+  copy?: {
+    summary: string;
+    why: string[];
+    manifestation: string;
+    advice?: string;
+  };
+}
+
 // Transits
 export interface TransitResponse {
   provider: string;
