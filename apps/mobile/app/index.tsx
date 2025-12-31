@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
@@ -28,30 +27,8 @@ import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { useNotificationsStore } from '../stores/useNotificationsStore';
 import { lunarReturns, LunarReturn, isDevAuthBypassActive, getDevUserId } from '../services/api';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
-import { formatDate, getDaysUntil } from '../utils/date';
-import { formatAspects, parseInterpretation } from '../utils/astrology-format';
-import DailyLunarClimate from '../components/DailyLunarClimate';
 import { DailyRitualCard } from '../components/DailyRitualCard';
-import { Skeleton, SkeletonCard } from '../components/Skeleton';
-import { getMoonPositionWithCache } from '../services/moonPositionCache';
-import { getDailyClimateWithCache, DailyClimate, DailyInsight } from '../services/dailyClimateCache';
-import { MoonPosition } from '../services/lunarClimate';
 import { setupNotificationTapListener, shouldReschedule } from '../services/notificationScheduler';
-
-// Fonction utilitaire pour obtenir la salutation selon l'heure
-const getTimeBasedGreeting = (): string => {
-  const hour = new Date().getHours();
-
-  if (hour >= 6 && hour < 12) {
-    return 'Bonjour';
-  } else if (hour >= 12 && hour < 18) {
-    return 'Bon après-midi';
-  } else if (hour >= 18 && hour < 24) {
-    return 'Bonsoir';
-  } else {
-    return 'Belle nuit';
-  }
-};
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -60,16 +37,10 @@ export default function HomeScreen() {
   const onboardingStore = useOnboardingStore();
   const { notificationsEnabled, hydrated, loadPreferences, scheduleAllNotifications } = useNotificationsStore();
   const [currentLunarReturn, setCurrentLunarReturn] = useState<LunarReturn | null>(null);
-  const [loadingCurrent, setLoadingCurrent] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [isCheckingRouting, setIsCheckingRouting] = useState(true);
   const [shouldNavigate, setShouldNavigate] = useState<{ route: string } | null>(null);
   const hasCheckedRoutingRef = useRef(false);
   const isMountedRef = useRef(false);
-  const [moonPosition, setMoonPosition] = useState<MoonPosition | null>(null);
-  const [dailyInsight, setDailyInsight] = useState<DailyInsight | null>(null);
-  const isLoadingDailyClimateRef = useRef(false);
-  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
   const [isOnline, setIsOnline] = useState(true);
 
   // S'assurer que le composant est monté avant de naviguer
@@ -261,26 +232,17 @@ export default function HomeScreen() {
     return () => subscription.remove();
   }, [router]);
 
-  // Charger daily climate avec cache (appelé au mount initial)
+  // Charger le cycle lunaire actuel au mount
   useEffect(() => {
-    // En mode DEV_AUTH_BYPASS, charger même sans authentification
     if ((isAuthenticated || isDevAuthBypassActive()) && !isCheckingRouting) {
       loadCurrentLunarReturn();
-      loadDailyClimate(false); // false = utiliser cache
     }
   }, [isAuthenticated, isCheckingRouting]);
 
-  // Refresh daily climate au focus de l'écran (avec cache quotidien)
+  // Re-scheduler notifications au focus si nécessaire
   useFocusEffect(
     useCallback(() => {
-      // Ne charger que si authentifié et routing vérifié
       if ((isAuthenticated || isDevAuthBypassActive()) && !isCheckingRouting) {
-        console.log('[INDEX] 🔄 useFocusEffect: écran Home en focus, refresh daily climate');
-        loadDailyClimate(false); // false = utiliser cache si même jour
-
-        // Mettre à jour la salutation au focus
-        setGreeting(getTimeBasedGreeting());
-
         // Re-scheduler notifications si nécessaire (max 1x/24h)
         if (notificationsEnabled && hydrated) {
           (async () => {
@@ -295,86 +257,15 @@ export default function HomeScreen() {
     }, [isAuthenticated, isCheckingRouting, notificationsEnabled, hydrated, scheduleAllNotifications])
   );
 
-  const loadDailyClimate = async (forceRefresh: boolean = false) => {
-    // Éviter les appels concurrents
-    if (isLoadingDailyClimateRef.current) {
-      console.log('[INDEX] ⏭️ Chargement daily climate déjà en cours, skip');
-      return;
-    }
-
-    isLoadingDailyClimateRef.current = true;
-
-    try {
-      // Essayer de récupérer le climate complet avec insight
-      const climate = await getDailyClimateWithCache(forceRefresh);
-
-      if (climate) {
-        // Success: climate complet avec insight
-        setMoonPosition(climate.moon);
-        setDailyInsight(climate.insight);
-      } else {
-        // Fallback: API failed, utiliser seulement moonPosition
-        console.warn('[INDEX] ⚠️ Daily climate API failed, fallback sur moonPosition seul');
-        const position = await getMoonPositionWithCache(forceRefresh);
-        setMoonPosition(position);
-        setDailyInsight(null); // Pas d'insight
-      }
-    } catch (error) {
-      console.error('[INDEX] ❌ Erreur chargement daily climate:', error);
-      // Dernier fallback: essayer au moins de charger moonPosition
-      try {
-        const position = await getMoonPositionWithCache(forceRefresh);
-        setMoonPosition(position);
-        setDailyInsight(null);
-      } catch (fallbackError) {
-        console.error('[INDEX] ❌ Erreur fallback moonPosition:', fallbackError);
-      }
-    } finally {
-      isLoadingDailyClimateRef.current = false;
-    }
-  };
-
   const loadCurrentLunarReturn = async () => {
-    setLoadingCurrent(true);
     try {
       const current = await lunarReturns.getCurrent();
       setCurrentLunarReturn(current);
     } catch (error: any) {
-      console.error('Erreur chargement révolution lunaire en cours:', error);
-      // Ne pas afficher d'erreur si 404 (pas de retour pour le mois en cours)
+      // Silencieux si 404 (pas de retour pour le mois en cours)
       if (error.response?.status !== 404) {
-        handleApiError(error);
+        console.error('[INDEX] Erreur chargement cycle lunaire:', error);
       }
-    } finally {
-      setLoadingCurrent(false);
-    }
-  };
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      await lunarReturns.generate();
-      Alert.alert('Succès', 'Révolutions lunaires générées avec succès ! ✨');
-      await loadCurrentLunarReturn();
-    } catch (error: any) {
-      handleApiError(error);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleApiError = (error: any) => {
-    const errorData = error.response?.data;
-    if (errorData?.detail && typeof errorData.detail === 'object') {
-      // Format structuré: {detail: "...", step: "...", correlation_id: "..."}
-      const message = errorData.detail.detail || errorData.detail;
-      const correlationId = errorData.detail.correlation_id;
-      Alert.alert(
-        'Erreur',
-        `${message}${correlationId ? `\n\nRef: ${correlationId}` : ''}`
-      );
-    } else {
-      Alert.alert('Erreur', error.response?.data?.detail || error.message || 'Une erreur est survenue');
     }
   };
 
@@ -408,12 +299,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>🌙 Quel est mon cycle actuel ?</Text>
-          {currentLunarReturn && (
-            <Text style={styles.subtitle}>
-              Révolution lunaire • {new Date(currentLunarReturn.return_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-            </Text>
-          )}
+          <Text style={styles.title}>🌙 Rituel Lunaire</Text>
           {isDevAuthBypassActive() && (
             <Text style={styles.devBypassLabel}>
               DEV AUTH BYPASS (user_id={getDevUserId()})
@@ -421,111 +307,52 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Carte Mode Hors Connexion */}
+        {/* Carte Mode Hors Connexion (calme, non anxiogène) */}
         {!isOnline && (
           <View style={styles.offlineCard}>
             <Text style={styles.offlineEmoji}>🌙</Text>
-            <Text style={styles.offlineTitle}>Mode hors connexion</Text>
+            <Text style={styles.offlineTitle}>Mode hors ligne</Text>
             <Text style={styles.offlineText}>
-              Vous êtes actuellement hors ligne. Certaines fonctionnalités nécessitant une connexion Internet sont désactivées.
-            </Text>
-            <Text style={styles.offlineHint}>
-              ✓ Journal et données locales disponibles
+              Ton rituel quotidien et ton journal restent accessibles. Les données viennent du cache local.
             </Text>
           </View>
         )}
 
-        {/* Salutation temporelle */}
-        {moonPosition && (
-          <Text style={styles.greeting}>{greeting}</Text>
-        )}
-
-        {/* Carte Rituel Quotidien */}
+        {/* Carte Rituel Quotidien (HERO) */}
         <DailyRitualCard />
 
-        {/* HERO : Mon Cycle Lunaire Actuel */}
-        <TouchableOpacity
-          style={styles.currentCycleCard}
-          onPress={() => {
-            if (currentLunarReturn) {
-              router.push('/lunar/report');
-            }
-          }}
-          disabled={!currentLunarReturn}
-          activeOpacity={currentLunarReturn ? 0.7 : 1}
-        >
-          <Text style={styles.cardTitle}>🌙 Mon Cycle Actuel</Text>
-          {loadingCurrent ? (
-            <View>
-              <Skeleton width="60%" height={28} borderRadius={6} style={{ marginBottom: 8 }} />
-              <Skeleton width="80%" height={16} borderRadius={4} style={{ marginBottom: 12 }} />
-              <Skeleton width="100%" height={16} borderRadius={4} style={{ marginBottom: 16 }} />
-              <Skeleton width="50%" height={48} borderRadius={8} />
-            </View>
-          ) : currentLunarReturn ? (
-            <>
-              <Text style={styles.cycleMonth}>
-                {new Date(currentLunarReturn.return_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+        {/* Résumé Cycle Lunaire du mois (3 lignes max) */}
+        {currentLunarReturn && (
+          <View style={styles.cycleSummary}>
+            <Text style={styles.cycleSummaryTitle}>
+              Ton cycle lunaire • {new Date(currentLunarReturn.return_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+            </Text>
+            {currentLunarReturn.moon_sign && (
+              <Text style={styles.cycleSummaryDetails}>
+                Lune en {currentLunarReturn.moon_sign}
+                {currentLunarReturn.lunar_ascendant && ` • Ascendant ${currentLunarReturn.lunar_ascendant}`}
               </Text>
-              <Text style={styles.cycleDates}>
-                Du {formatDate(currentLunarReturn.return_date)} au {formatDate((() => {
-                  const endDate = new Date(currentLunarReturn.return_date);
-                  endDate.setMonth(endDate.getMonth() + 1);
-                  return endDate.toISOString();
-                })())}
-              </Text>
-              {currentLunarReturn.moon_sign && (
-                <Text style={styles.returnDetails}>
-                  Lune en {currentLunarReturn.moon_sign}
-                  {currentLunarReturn.lunar_ascendant && ` • Ascendant ${currentLunarReturn.lunar_ascendant}`}
-                </Text>
-              )}
-              <View style={styles.ctaContainer}>
-                <TouchableOpacity
-                  style={styles.primaryCTA}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    router.push('/lunar/report');
-                  }}
-                >
-                  <Text style={styles.primaryCTAText}>Voir mon rapport mensuel</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={styles.emptyText}>
-                {t('emptyStates.noCycles.title')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.generateButton, (!isOnline || generating) && styles.generateButtonDisabled]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  if (!isOnline) {
-                    Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
-                    return;
-                  }
-                  handleGenerate();
-                }}
-                disabled={generating || !isOnline}
-              >
-                {generating ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.generateButtonText}>
-                    {!isOnline ? '🌙 Hors ligne' : t('emptyStates.noCycles.cta')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => router.push('/lunar/report')}
+              style={styles.cycleSummaryLink}
+            >
+              <Text style={styles.cycleSummaryLinkText}>→ Voir le rapport mensuel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        {/* Climat Lunaire du Jour */}
-        {moonPosition && <DailyLunarClimate moonPosition={moonPosition} insight={dailyInsight} />}
-
-        {/* Menu principal (MVP : 5 cards) */}
+        {/* Menu principal (V1 : 4 cards, 2×2 grid) */}
         <View style={styles.grid}>
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => router.push('/journal')}
+          >
+            <Text style={styles.menuEmoji}>📖</Text>
+            <Text style={styles.menuTitle}>Journal</Text>
+            <Text style={styles.menuDesc}>Mes entrées récentes</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.menuCard, !isOnline && styles.menuCardDisabled]}
             onPress={() => {
@@ -533,23 +360,14 @@ export default function HomeScreen() {
                 Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
                 return;
               }
-              router.push('/lunar-returns/timeline');
+              router.push('/timeline');
             }}
             disabled={!isOnline}
           >
-            <Text style={styles.menuEmoji}>📅</Text>
+            <Text style={styles.menuEmoji}>🌙</Text>
             <Text style={styles.menuTitle}>Timeline</Text>
-            <Text style={styles.menuDesc}>Mes 12 prochains cycles lunaires</Text>
+            <Text style={styles.menuDesc}>Cette semaine lunaire</Text>
             {!isOnline && <Text style={styles.offlineBadge}>Hors ligne</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push('/journal')}
-          >
-            <Text style={styles.menuEmoji}>📖</Text>
-            <Text style={styles.menuTitle}>Journal</Text>
-            <Text style={styles.menuDesc}>Mon rituel quotidien</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -564,18 +382,9 @@ export default function HomeScreen() {
             disabled={!isOnline}
           >
             <Text style={styles.menuEmoji}>🌑</Text>
-            <Text style={styles.menuTitle}>Void of Course</Text>
-            <Text style={styles.menuDesc}>Lune en VoC maintenant ?</Text>
+            <Text style={styles.menuTitle}>Lune en transition</Text>
+            <Text style={styles.menuDesc}>Void of Course actuel</Text>
             {!isOnline && <Text style={styles.offlineBadge}>Hors ligne</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => router.push('/natal-chart')}
-          >
-            <Text style={styles.menuEmoji}>⭐</Text>
-            <Text style={styles.menuTitle}>Thème Natal</Text>
-            <Text style={styles.menuDesc}>Ma carte du ciel de naissance</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -634,14 +443,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     opacity: 0.7,
   },
-  greeting: {
-    ...fonts.body,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 14,
-    fontWeight: '300',
-    marginBottom: spacing.md,
-    paddingLeft: spacing.lg,
-  },
   button: {
     backgroundColor: colors.accent,
     paddingVertical: spacing.md,
@@ -689,116 +490,54 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
   },
-  currentCycleCard: {
-    backgroundColor: colors.cardBg,
+  cycleSummary: {
+    backgroundColor: 'rgba(183, 148, 246, 0.05)',
     borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  cycleMonth: {
-    ...fonts.h2,
-    color: colors.accent,
-    marginBottom: spacing.xs,
-    textTransform: 'capitalize',
-  },
-  cycleDates: {
-    ...fonts.body,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  cardTitle: {
-    ...fonts.h3,
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  loadingContainer: {
     padding: spacing.md,
-    alignItems: 'center',
-  },
-  returnDate: {
-    ...fonts.h2,
-    color: colors.accent,
-    marginBottom: spacing.xs,
-  },
-  daysUntil: {
-    ...fonts.body,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  returnDetails: {
-    ...fonts.bodySmall,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
-  ctaContainer: {
-    marginTop: spacing.md,
-  },
-  primaryCTA: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  primaryCTAText: {
-    ...fonts.button,
-    color: colors.text,
-    fontSize: fonts.sizes.md,
-  },
-  emptyText: {
-    ...fonts.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  generateButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  generateButtonText: {
-    ...fonts.button,
-    color: colors.text,
-  },
-  generateButtonDisabled: {
-    opacity: 0.5,
-  },
-  offlineCard: {
-    backgroundColor: 'rgba(139, 123, 247, 0.15)',
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(139, 123, 247, 0.3)',
-    alignItems: 'center',
+    borderColor: 'rgba(183, 148, 246, 0.15)',
+  },
+  cycleSummaryTitle: {
+    ...fonts.body,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  cycleSummaryDetails: {
+    ...fonts.bodySmall,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  cycleSummaryLink: {
+    paddingVertical: spacing.xs,
+  },
+  cycleSummaryLinkText: {
+    ...fonts.body,
+    color: colors.accent,
+    fontSize: 14,
+  },
+  offlineCard: {
+    backgroundColor: 'rgba(183, 148, 246, 0.08)',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(183, 148, 246, 0.2)',
   },
   offlineEmoji: {
-    fontSize: 32,
+    fontSize: 24,
     marginBottom: spacing.xs,
   },
   offlineTitle: {
-    ...fonts.h3,
-    color: colors.accent,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
+    ...fonts.body,
+    color: colors.text,
+    marginBottom: spacing.xs,
+    fontWeight: '500',
   },
   offlineText: {
-    ...fonts.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-    lineHeight: 20,
-  },
-  offlineHint: {
     ...fonts.bodySmall,
-    color: colors.accent,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: colors.textMuted,
+    lineHeight: 18,
   },
   menuCardDisabled: {
     opacity: 0.5,
