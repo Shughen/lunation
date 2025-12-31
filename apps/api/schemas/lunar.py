@@ -35,8 +35,18 @@ class LunarReturnReportRequest(LunarRequestBase):
 
 
 class VoidOfCourseRequest(LunarRequestBase):
-    """Requête spécifique pour Void of Course"""
-    pass
+    """Requête spécifique pour Void of Course - Format FLAT"""
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "date": "2025-12-31",
+                "time": "12:00",
+                "latitude": 48.8566,
+                "longitude": 2.3522,
+                "timezone": "Europe/Paris"
+            }
+        }
 
 
 class DateTimeLocation(BaseModel):
@@ -51,11 +61,23 @@ class DateTimeLocation(BaseModel):
     country_code: str = Field(default="FR")
 
 
-class LunarMansionRequest(BaseModel):
-    """Requête spécifique pour Lunar Mansions - Format RapidAPI"""
-    datetime_location: DateTimeLocation
-    system: str = Field(default="arabian_tropical", description="Système de mansions (arabian_tropical, vedic, etc.)")
-    days_ahead: int = Field(default=28, description="Nombre de jours à calculer")
+class LunarMansionRequest(LunarRequestBase):
+    """Requête spécifique pour Lunar Mansions - Format FLAT (comme VoC)"""
+    system: Optional[str] = Field(default="arabian_tropical", description="Système de mansions (arabian_tropical, vedic, etc.)")
+    days_ahead: Optional[int] = Field(default=28, description="Nombre de jours à calculer")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "date": "2025-12-31",
+                "time": "14:30",
+                "latitude": 48.8566,
+                "longitude": 2.3522,
+                "timezone": "Europe/Paris",
+                "system": "arabian_tropical",
+                "days_ahead": 28
+            }
+        }
 
 
 class LunarResponse(BaseModel):
@@ -70,15 +92,58 @@ class LunarResponse(BaseModel):
     
     class Config:
         json_schema_extra = {
-            "example": {
-                "provider": "rapidapi",
-                "kind": "lunar_return_report",
-                "data": {
-                    "moon": {"sign": "Taurus", "house": 2},
-                    "interpretation": "Mois favorable aux finances..."
+            "examples": [
+                {
+                    "provider": "rapidapi",
+                    "kind": "lunar_return_report",
+                    "data": {
+                        "moon": {"sign": "Taurus", "house": 2},
+                        "interpretation": "Mois favorable aux finances..."
+                    },
+                    "cached": False
                 },
-                "cached": False
-            }
+                {
+                    "provider": "rapidapi",
+                    "kind": "void_of_course",
+                    "data": {
+                        "is_void": True,
+                        "void_of_course": {
+                            "start": "2025-12-31T10:30:00",
+                            "end": "2025-12-31T14:45:00"
+                        },
+                        "moon_sign": "Gemini"
+                    },
+                    "cached": False
+                },
+                {
+                    "provider": "rapidapi",
+                    "kind": "lunar_mansion",
+                    "data": {
+                        "mansion": {
+                            "number": 14,
+                            "name": "Al-Simak",
+                            "interpretation": "Favorable aux nouveaux projets"
+                        },
+                        "upcoming_changes": [
+                            {
+                                "change_time": "2025-12-31T15:30:00",
+                                "from_mansion": {"number": 14, "name": "Al-Simak"},
+                                "to_mansion": {"number": 15, "name": "Al-Ghafr"}
+                            }
+                        ],
+                        "calendar_summary": {
+                            "significant_periods": [
+                                {
+                                    "change_time": "2025-12-31T15:30:00",
+                                    "from_mansion": {"number": 14, "name": "Al-Simak"},
+                                    "to_mansion": {"number": 15, "name": "Al-Ghafr"}
+                                }
+                            ]
+                        }
+                    },
+                    "cached": False
+                }
+            ]
         }
 
 

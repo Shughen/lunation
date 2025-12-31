@@ -97,7 +97,10 @@ async def test_post_json_max_retries_exceeded():
                 await rapidapi_client.post_json("/test/path", {})
             
             assert exc_info.value.status_code == 502
-            assert "après 3 tentatives" in exc_info.value.detail
+            # Le detail est maintenant un dict avec code, message, provider_error
+            assert isinstance(exc_info.value.detail, dict)
+            assert exc_info.value.detail["code"] == "PROVIDER_UNAVAILABLE"
+            assert "après 3 tentatives" in exc_info.value.detail["message"]
 
 
 @pytest.mark.asyncio
@@ -116,7 +119,10 @@ async def test_post_json_non_retriable_error():
         
         # Ne devrait pas retry
         assert exc_info.value.status_code == 502
-        assert "HTTP 401" in exc_info.value.detail
+        # Le detail est maintenant un dict avec code, message, provider_error
+        assert isinstance(exc_info.value.detail, dict)
+        assert exc_info.value.detail["code"] == "PROVIDER_AUTH_ERROR"
+        assert "authentification" in exc_info.value.detail["message"].lower()
 
 
 @pytest.mark.asyncio

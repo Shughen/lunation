@@ -3,6 +3,7 @@ Routes FastAPI pour le Luna Pack (P1)
 Endpoints pour Lunar Return Report, Void of Course, et Lunar Mansions
 """
 
+from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -25,6 +26,60 @@ from models.lunar_pack import LunarReport, LunarVocWindow, LunarMansionDaily
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/lunar", tags=["Luna Pack"])
+
+
+def _deduplicate_mansion_response(result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Déduplique les entrées identiques dans upcoming_changes et calendar_summary.significant_periods.
+
+    Stratégie : key = (change_time, from_mansion.number, to_mansion.name)
+
+    Args:
+        result: Réponse brute de l'API avec potentiellement des doublons
+
+    Returns:
+        Réponse nettoyée sans doublons
+    """
+    # Dédupliquer upcoming_changes
+    if "upcoming_changes" in result and isinstance(result["upcoming_changes"], list):
+        seen = set()
+        deduplicated_changes = []
+
+        for change in result["upcoming_changes"]:
+            # Créer une clé unique basée sur change_time, from_mansion.number, to_mansion.name
+            change_time = change.get("change_time", "")
+            from_number = change.get("from_mansion", {}).get("number", 0) if isinstance(change.get("from_mansion"), dict) else 0
+            to_name = change.get("to_mansion", {}).get("name", "") if isinstance(change.get("to_mansion"), dict) else ""
+
+            key = (change_time, from_number, to_name)
+
+            if key not in seen:
+                seen.add(key)
+                deduplicated_changes.append(change)
+
+        result["upcoming_changes"] = deduplicated_changes
+
+    # Dédupliquer calendar_summary.significant_periods (même stratégie)
+    if "calendar_summary" in result and isinstance(result["calendar_summary"], dict):
+        if "significant_periods" in result["calendar_summary"] and isinstance(result["calendar_summary"]["significant_periods"], list):
+            seen = set()
+            deduplicated_periods = []
+
+            for period in result["calendar_summary"]["significant_periods"]:
+                # Créer une clé unique
+                change_time = period.get("change_time", "")
+                from_number = period.get("from_mansion", {}).get("number", 0) if isinstance(period.get("from_mansion"), dict) else 0
+                to_name = period.get("to_mansion", {}).get("name", "") if isinstance(period.get("to_mansion"), dict) else ""
+
+                key = (change_time, from_number, to_name)
+
+                if key not in seen:
+                    seen.add(key)
+                    deduplicated_periods.append(period)
+
+            result["calendar_summary"]["significant_periods"] = deduplicated_periods
+
+    return result
 
 
 @router.get("/current")
@@ -119,23 +174,28 @@ async def lunar_return_report(
 ):
     """
     Génère un rapport mensuel de révolution lunaire.
-    
+
     Le rapport contient l'analyse complète de la position de retour de la Lune
     et ses implications pour le mois à venir.
-    
+
     - **user_id**: (Optionnel) ID utilisateur pour sauvegarder en base
     - **month**: (Optionnel) Format YYYY-MM pour indexation
     - **payload**: Données requises par RapidAPI (date, coords, etc.)
+
+    Raises:
+        HTTPException:
+            - 422 si payload invalide (champs manquants ou mauvais format)
+            - 502 si erreur provider RapidAPI
     """
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
-        
+
         logger.info(f"📝 Génération Lunar Return Report - user: {request.user_id}, month: {request.month}")
-        
-        # Appel au service RapidAPI
+
+        # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_lunar_return_report(payload)
-        
+
         # Sauvegarde en DB si user_id et month fournis
         if request.user_id and request.month:
             try:
@@ -148,7 +208,7 @@ async def lunar_return_report(
                 )
                 existing = await db.execute(stmt)
                 existing_report = existing.scalar_one_or_none()
-                
+
                 if existing_report:
                     # Mise à jour du rapport existant
                     existing_report.report = result
@@ -162,26 +222,48 @@ async def lunar_return_report(
                     )
                     db.add(lunar_report)
                     logger.info(f"💾 Nouveau rapport sauvegardé pour {request.month}")
-                
+
                 await db.commit()
-                
+
             except Exception as e:
                 logger.error(f"❌ Erreur sauvegarde DB: {str(e)}")
                 await db.rollback()
                 # On continue malgré l'erreur DB, on retourne quand même les données
-        
+
         return LunarResponse(
             provider="rapidapi",
             kind="lunar_return_report",
             data=result,
             cached=False
         )
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de la génération du Lunar Return Report: {str(e)}")
+
+    except HTTPException:
+        # Re-raise HTTPExceptions (from rapidapi_client or transformation)
+        # They already have proper status codes and error details
+        raise
+
+    except ValueError as e:
+        # Payload transformation errors (missing fields, invalid format)
+        logger.error(f"❌ Payload invalide: {str(e)}")
         raise HTTPException(
-            status_code=502,
-            detail=f"Erreur provider RapidAPI: {str(e)}"
+            status_code=422,
+            detail={
+                "code": "INVALID_PAYLOAD",
+                "message": str(e),
+                "hint": "Vérifiez que birth_date (YYYY-MM-DD), birth_time (HH:MM), latitude, et longitude sont fournis"
+            }
+        )
+
+    except Exception as e:
+        # Unexpected errors
+        logger.error(f"❌ Erreur inattendue lors de la génération du Lunar Return Report: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "INTERNAL_ERROR",
+                "message": "Erreur interne du serveur",
+                "details": str(e)
+            }
         )
 
 
@@ -192,21 +274,26 @@ async def void_of_course(
 ):
     """
     Obtient les informations Void of Course (VoC) de la Lune.
-    
+
     Le VoC représente la période où la Lune ne fait plus d'aspects majeurs
     avant de changer de signe - considérée comme peu propice aux initiatives.
-    
+
     - **date**: Date à vérifier (YYYY-MM-DD)
     - **time**: Heure (HH:MM)
     - **coords**: Latitude/longitude pour calcul précis
+
+    Raises:
+        HTTPException:
+            - 422 si payload invalide (champs manquants ou mauvais format)
+            - 502 si erreur provider RapidAPI
     """
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
-        
+
         logger.info(f"🌑 Vérification Void of Course - date: {request.date}")
-        
-        # Appel au service RapidAPI
+
+        # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_void_of_course_status(payload)
         
         # Option: Sauvegarder les fenêtres VoC actives en DB
@@ -240,12 +327,34 @@ async def void_of_course(
             data=result,
             cached=False
         )
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur lors du calcul du Void of Course: {str(e)}")
+
+    except HTTPException:
+        # Re-raise HTTPExceptions (from rapidapi_client or transformation)
+        # They already have proper status codes and error details
+        raise
+
+    except ValueError as e:
+        # Payload transformation errors (missing fields, invalid format)
+        logger.error(f"❌ Payload invalide pour VoC: {str(e)}")
         raise HTTPException(
-            status_code=502,
-            detail=f"Erreur provider RapidAPI: {str(e)}"
+            status_code=422,
+            detail={
+                "code": "INVALID_PAYLOAD",
+                "message": str(e),
+                "hint": "Vérifiez que date (YYYY-MM-DD), time (HH:MM), latitude, et longitude sont fournis"
+            }
+        )
+
+    except Exception as e:
+        # Unexpected errors (NOT database errors - those are logged but don't block response)
+        logger.error(f"❌ Erreur inattendue lors du calcul du Void of Course: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "INTERNAL_ERROR",
+                "message": "Erreur interne du serveur",
+                "details": str(e)
+            }
         )
 
 
@@ -271,7 +380,10 @@ async def lunar_mansion(
         
         # Appel au service RapidAPI
         result = await lunar_services.get_lunar_mansions(payload)
-        
+
+        # Dédupliquer upcoming_changes et calendar_summary.significant_periods
+        result = _deduplicate_mansion_response(result)
+
         # Option: Sauvegarder la mansion du jour en DB
         if request.date and "mansion" in result:
             try:
@@ -311,12 +423,34 @@ async def lunar_mansion(
             data=result,
             cached=False
         )
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur lors du calcul de la Lunar Mansion: {str(e)}")
+
+    except HTTPException:
+        # Re-raise HTTPExceptions (from rapidapi_client or transformation)
+        # They already have proper status codes and error details
+        raise
+
+    except ValueError as e:
+        # Payload transformation errors (missing fields, invalid format)
+        logger.error(f"❌ Payload invalide pour Lunar Mansion: {str(e)}")
         raise HTTPException(
-            status_code=502,
-            detail=f"Erreur provider RapidAPI: {str(e)}"
+            status_code=422,
+            detail={
+                "code": "INVALID_PAYLOAD",
+                "message": str(e),
+                "hint": "Vérifiez que date (YYYY-MM-DD), time (HH:MM), latitude, et longitude sont fournis"
+            }
+        )
+
+    except Exception as e:
+        # Unexpected errors
+        logger.error(f"❌ Erreur inattendue lors du calcul de la Lunar Mansion: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "INTERNAL_ERROR",
+                "message": "Erreur interne du serveur",
+                "details": str(e)
+            }
         )
 
 
@@ -414,22 +548,99 @@ async def get_today_mansion(db: AsyncSession = Depends(get_db)):
 async def get_next_voc_window():
     """
     Récupère la prochaine fenêtre Void of Course depuis la DB.
-    
+
     Utile pour planifier des notifications et alertes.
     """
     try:
         from services.scheduler_services import get_next_voc_window
-        
+
         next_voc = await get_next_voc_window()
-        
+
         if next_voc:
             return next_voc
         else:
             return {
                 "message": "Aucune fenêtre VoC à venir dans la base de données."
             }
-            
+
     except Exception as e:
         logger.error(f"❌ Erreur récupération next VoC window: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/voc/status", response_model=Dict[str, Any])
+async def get_voc_status(db: AsyncSession = Depends(get_db)):
+    """
+    Endpoint unifié pour l'écran VoC MVP (Phase 1.3).
+
+    Retourne :
+    - now : fenêtre VoC active maintenant (ou null)
+    - next : prochaine fenêtre VoC à venir
+    - upcoming : liste 2-3 prochaines fenêtres (24-48h)
+    """
+    try:
+        now = datetime.now()
+
+        # 1. VoC actif maintenant ?
+        stmt_current = select(LunarVocWindow).where(
+            and_(
+                LunarVocWindow.start_at <= now,
+                LunarVocWindow.end_at >= now
+            )
+        )
+        result_current = await db.execute(stmt_current)
+        active_voc = result_current.scalar_one_or_none()
+
+        current_window = None
+        if active_voc:
+            current_window = {
+                "is_active": True,
+                "start_at": active_voc.start_at.isoformat(),
+                "end_at": active_voc.end_at.isoformat()
+            }
+
+        # 2. Prochaine fenêtre VoC
+        stmt_next = select(LunarVocWindow).where(
+            LunarVocWindow.start_at > now
+        ).order_by(LunarVocWindow.start_at.asc()).limit(1)
+
+        result_next = await db.execute(stmt_next)
+        next_voc = result_next.scalar_one_or_none()
+
+        next_window = None
+        if next_voc:
+            next_window = {
+                "start_at": next_voc.start_at.isoformat(),
+                "end_at": next_voc.end_at.isoformat()
+            }
+
+        # 3. Upcoming (2-3 prochaines fenêtres dans les 48h)
+        hours_48 = now + timedelta(hours=48)
+        stmt_upcoming = select(LunarVocWindow).where(
+            and_(
+                LunarVocWindow.start_at > now,
+                LunarVocWindow.start_at <= hours_48
+            )
+        ).order_by(LunarVocWindow.start_at.asc()).limit(3)
+
+        result_upcoming = await db.execute(stmt_upcoming)
+        upcoming_vocs = result_upcoming.scalars().all()
+
+        upcoming_windows = [
+            {
+                "start_at": voc.start_at.isoformat(),
+                "end_at": voc.end_at.isoformat()
+            }
+            for voc in upcoming_vocs
+        ]
+
+        return {
+            "now": current_window,
+            "next": next_window,
+            "upcoming": upcoming_windows
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération VoC status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
