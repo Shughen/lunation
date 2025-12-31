@@ -76,6 +76,33 @@ async def test_success_generate_201(override_dependencies):
 
 
 @pytest.mark.asyncio
+async def test_get_current_lunar_return_null_when_not_found(override_dependencies):
+    """
+    Test: GET /api/lunar-returns/current renvoie 200 avec null quand aucune révolution lunaire n'existe
+
+    Scenario: Aucune révolution lunaire pour le mois en cours
+    - Vérifie statut 200 (pas 404)
+    - Vérifie que le body est null
+    """
+    # Ne pas ajouter de révolution lunaire au fake_db (empty state)
+
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get(
+            "/api/lunar-returns/current",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        # Vérifier le statut 200 (pas 404!)
+        assert response.status_code == status.HTTP_200_OK, \
+            f"Expected 200, got {response.status_code}. Body: {response.text}"
+
+        # Vérifier que le body est null (JSON null)
+        data = response.json()
+        assert data is None, \
+            f"Expected null, got {data}"
+
+
+@pytest.mark.asyncio
 async def test_error_json_shape(override_dependencies_no_natal):
     """
     Test: Force une erreur (pas de natal_chart) => réponse JSON contient exactement {detail, step, correlation_id}

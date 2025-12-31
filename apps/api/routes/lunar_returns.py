@@ -579,6 +579,166 @@ async def get_all_lunar_returns(
     return returns
 
 
+@router.get("/current")
+async def get_current_lunar_return(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Récupère la révolution lunaire en cours (mois actuel).
+
+    Retourne null si aucune révolution lunaire n'existe pour le mois en cours
+    (au lieu d'une 404), ce qui permet au mobile d'afficher un état vide gracieux.
+    """
+    correlation_id = str(uuid4())
+
+    try:
+        logger.info(f"[corr={correlation_id}] 🔍 Recherche révolution lunaire en cours pour user_id={current_user.id}")
+
+        # Mois actuel au format YYYY-MM
+        now = datetime.now(timezone.utc)
+        current_month = now.strftime('%Y-%m')
+
+        result = await db.execute(
+            select(LunarReturn)
+            .where(
+                LunarReturn.user_id == current_user.id,
+                LunarReturn.month == current_month
+            )
+        )
+        lunar_return = result.scalar_one_or_none()
+
+        if not lunar_return:
+            logger.info(f"[corr={correlation_id}] ℹ️ Aucune révolution lunaire pour le mois {current_month} (retour null)")
+            # Retourner null au lieu de 404 pour permettre un état vide gracieux
+            return None
+
+        logger.info(f"[corr={correlation_id}] ✅ Révolution lunaire trouvée: {lunar_return.month}")
+
+        # Convertir en dict pour retourner avec response_model
+        return {
+            "id": lunar_return.id,
+            "month": lunar_return.month,
+            "return_date": lunar_return.return_date,
+            "lunar_ascendant": lunar_return.lunar_ascendant,
+            "moon_house": lunar_return.moon_house,
+            "moon_sign": lunar_return.moon_sign,
+            "aspects": lunar_return.aspects,
+            "interpretation": lunar_return.interpretation,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[corr={correlation_id}] ❌ Erreur get_current_lunar_return: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération de la révolution lunaire en cours"
+        )
+
+
+@router.get("/current/report")
+async def get_current_lunar_report(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Récupère le rapport mensuel de la révolution lunaire en cours"""
+    correlation_id = str(uuid4())
+
+    try:
+        logger.info(f"[corr={correlation_id}] 📊 Génération rapport mensuel pour user_id={current_user.id}")
+
+        # 1. Récupérer révolution lunaire courante
+        now = datetime.now(timezone.utc)
+        current_month = now.strftime('%Y-%m')
+
+        result = await db.execute(
+            select(LunarReturn)
+            .where(
+                LunarReturn.user_id == current_user.id,
+                LunarReturn.month == current_month
+            )
+        )
+        lunar_return = result.scalar_one_or_none()
+
+        if not lunar_return:
+            logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire pour le mois {current_month}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Aucune révolution lunaire pour le mois en cours ({current_month})"
+            )
+
+        # 2. Construire le rapport via le builder
+        from services.lunar_report_builder import build_lunar_report_v4
+
+        report = build_lunar_report_v4(lunar_return)
+
+        logger.info(f"[corr={correlation_id}] ✅ Rapport généré - climate_len={len(report['general_climate'])}, axes={len(report['dominant_axes'])}, aspects={len(report['major_aspects'])}")
+
+        return report
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[corr={correlation_id}] ❌ Erreur get_current_lunar_report: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération du rapport mensuel"
+        )
+
+
+@router.get("/{lunar_return_id}/report")
+async def get_lunar_report_by_id(
+    lunar_return_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Récupère le rapport mensuel d'une révolution lunaire spécifique par ID (Phase 1.5)
+
+    Utilisé par la timeline pour afficher le rapport d'un cycle particulier.
+    """
+    correlation_id = str(uuid4())
+
+    try:
+        logger.info(f"[corr={correlation_id}] 📊 Génération rapport mensuel pour lunar_return_id={lunar_return_id}, user_id={current_user.id}")
+
+        # 1. Récupérer révolution lunaire par ID
+        result = await db.execute(
+            select(LunarReturn)
+            .where(
+                LunarReturn.id == lunar_return_id,
+                LunarReturn.user_id == current_user.id  # Sécurité : user ne peut accéder qu'à ses propres cycles
+            )
+        )
+        lunar_return = result.scalar_one_or_none()
+
+        if not lunar_return:
+            logger.info(f"[corr={correlation_id}] ❌ Révolution lunaire {lunar_return_id} non trouvée")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Révolution lunaire {lunar_return_id} non trouvée"
+            )
+
+        # 2. Construire le rapport via le builder
+        from services.lunar_report_builder import build_lunar_report_v4
+
+        report = build_lunar_report_v4(lunar_return)
+
+        logger.info(f"[corr={correlation_id}] ✅ Rapport généré pour cycle {lunar_return_id} - climate_len={len(report['general_climate'])}, axes={len(report['dominant_axes'])}, aspects={len(report['major_aspects'])}")
+
+        return report
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[corr={correlation_id}] ❌ Erreur get_lunar_report_by_id: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération du rapport mensuel"
+        )
+
+
 @router.get("/next", response_model=LunarReturnResponse)
 async def get_next_lunar_return(
     current_user: User = Depends(get_current_user),
@@ -586,10 +746,10 @@ async def get_next_lunar_return(
 ):
     """Récupère le prochain retour lunaire de l'utilisateur (>= maintenant)"""
     correlation_id = str(uuid4())
-    
+
     try:
         logger.info(f"[corr={correlation_id}] 🔍 Recherche prochain retour lunaire pour user_id={current_user.id}")
-        
+
         now = datetime.now(timezone.utc)
         result = await db.execute(
             select(LunarReturn)
