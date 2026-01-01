@@ -34,20 +34,35 @@ function getMidnightTimestamp(date: string): number {
 
 /**
  * Vérifie si le cache est encore valide (avant TTL et avant minuit)
+ * Note: la vérification à minuit ne s'applique que pour la date du jour actuel
  */
 function isCacheValid(cached: CachedLunarData, date: string, config: LunarCacheConfig = DEFAULT_CONFIG): boolean {
   const now = Date.now();
   const age = now - cached.cached_at;
-  const midnight = getMidnightTimestamp(date);
-
+  
+  // Vérifier si la date correspond au jour actuel (format YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = date === today;
+  
   // Invalide si:
-  // - TTL dépassé
-  // - Minuit passé (changement de jour)
   // - Date ne correspond pas
-  if (age > config.ttl || now > midnight || cached.data.date !== date) {
+  if (cached.data.date !== date) {
     return false;
   }
-
+  
+  // Invalide si TTL dépassé
+  if (age > config.ttl) {
+    return false;
+  }
+  
+  // Pour la date du jour actuel uniquement: invalide si minuit passé (changement de jour)
+  if (isToday) {
+    const midnight = getMidnightTimestamp(date);
+    if (now > midnight) {
+      return false;
+    }
+  }
+  
   return true;
 }
 
