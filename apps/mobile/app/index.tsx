@@ -388,6 +388,23 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.menuCard, !isOnline && styles.menuCardDisabled]}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert('Hors ligne', 'Cette fonctionnalité nécessite une connexion Internet.');
+                return;
+              }
+              router.push('/natal-chart');
+            }}
+            disabled={!isOnline}
+          >
+            <Text style={styles.menuEmoji}>⭐</Text>
+            <Text style={styles.menuTitle}>Thème natal</Text>
+            <Text style={styles.menuDesc}>Mon ciel de naissance</Text>
+            {!isOnline && <Text style={styles.offlineBadge}>Hors ligne</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.menuCard}
             onPress={() => router.push('/settings')}
           >

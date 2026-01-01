@@ -39,7 +39,9 @@ export default function RootLayout() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="login" />
-        <Stack.Screen name="natal-chart" />
+        {/* Natal Chart screens - Stack routes (not tabs) for birth chart calculation and display */}
+        <Stack.Screen name="natal-chart/index" />
+        <Stack.Screen name="natal-chart/result" />
         <Stack.Screen name="lunar-month/[month]" />
         <Stack.Screen name="lunar/index" />
         <Stack.Screen name="lunar/report" />

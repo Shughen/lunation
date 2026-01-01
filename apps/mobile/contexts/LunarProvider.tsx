@@ -151,6 +151,9 @@ export function LunarProvider({ children }: LunarProviderProps) {
   // Ref pour éviter les fetchs parallèles
   const isFetchingRef = useRef(false);
 
+  // Ref pour accès stable à current sans dépendance dans getDayData
+  const currentRef = useRef<LunarDayData | null>(null);
+
   /**
    * Load lunar data with stale-while-revalidate strategy
    */
@@ -254,17 +257,23 @@ export function LunarProvider({ children }: LunarProviderProps) {
   /**
    * Récupère les données d'un jour spécifique
    * Utilisé par Timeline pour générer plusieurs jours
+   * Note: utilise currentRef pour éviter de recréer la fonction à chaque changement de current
    */
   const getDayData = useCallback(async (date: string): Promise<LunarDayData> => {
     const today = getTodayDateString();
 
     // Si aujourd'hui, retourner current ou charger
     if (date === today) {
-      if (current) {
-        return current;
+      // Utiliser currentRef.current au lieu de current pour éviter dependency
+      if (currentRef.current) {
+        return currentRef.current;
       }
-      await loadLunarData(date);
-      return current || calculateLocalLunarData(date);
+      // Ne pas await ici car ça crée des dépendances, juste trigger le load
+      loadLunarData(date).catch(err => {
+        if (__DEV__) console.warn('[LunarProvider] getDayData loadLunarData error:', err);
+      });
+      // Retourner fallback immédiatement
+      return calculateLocalLunarData(date);
     }
 
     // Autre jour : essayer cache puis fallback local
@@ -277,7 +286,7 @@ export function LunarProvider({ children }: LunarProviderProps) {
     const localData = calculateLocalLunarData(date);
     await setLunarCache(date, localData, 'local');
     return localData;
-  }, [current, loadLunarData]);
+  }, []);
 
   /**
    * Clear tout le cache
@@ -286,6 +295,13 @@ export function LunarProvider({ children }: LunarProviderProps) {
     await clearAllLunarCache();
     await loadLunarData(currentDay, true);
   }, [currentDay, loadLunarData]);
+
+  /**
+   * Sync currentRef with current state
+   */
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   /**
    * Load data au montage
