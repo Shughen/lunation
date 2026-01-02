@@ -64,3 +64,8 @@ coverage/
 
 apps/api/.env.bak
 apps/api/.env.bak2
+
+
+*.bak
+*.save
+.schema_inspection.json
