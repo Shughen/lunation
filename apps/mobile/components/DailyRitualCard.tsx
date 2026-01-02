@@ -26,7 +26,6 @@ import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 import { useLunar } from '../contexts/LunarProvider';
 import { isFirstViewToday, markAsViewedToday } from '../services/ritualService';
 import { getTodayDateString, translatePhaseToFrench } from '../utils/ritualHelpers';
-import { calculateLunarDay } from '../utils/moonCalc';
 import { Skeleton } from './Skeleton';
 import { JournalEntryModal } from './JournalEntryModal';
 import { LunarCycleIndicator } from './LunarCycleIndicator';
@@ -160,6 +159,9 @@ export function DailyRitualCard() {
   });
   const vocActive = helpers.vocActive;
   const vocEndTime = helpers.vocEndTime;
+  
+  // Accès défensif à cachedAt (non typé dans LunarContextStatus)
+  const cachedAt = (status as any)?.cachedAt;
 
   // Texte phase + signe (traduit en français)
   const phaseFr = translatePhaseToFrench(data.moon.phase);
@@ -168,8 +170,8 @@ export function DailyRitualCard() {
       ? `${phaseFr.toUpperCase()} EN ${data.moon.sign.toUpperCase()}`
       : phaseFr.toUpperCase();
 
-  // Calculer le jour du cycle lunaire
-  const currentLunarDay = calculateLunarDay();
+  // Récupérer le jour du cycle lunaire depuis les données (fallback à null si absent)
+  const currentLunarDay = (data.moon as any)?.lunar_day ?? null;
 
   return (
     <Animated.View
@@ -208,17 +210,17 @@ export function DailyRitualCard() {
         )}
 
         {/* Cache/Offline indicator */}
-        {status.cachedAt && status.source !== 'api' && (
+        {cachedAt && status.source !== 'api' && (
           <View style={styles.cacheBadge}>
             <Text style={styles.cacheText}>
               {status.source === 'local'
                 ? 'ℹ️ Connexion requise pour la mise à jour'
-                : `ℹ️ Dernière mise à jour : ${formatCachedDate(status.cachedAt)}`
+                : `ℹ️ Dernière mise à jour : ${formatCachedDate(cachedAt)}`
               }
             </Text>
           </View>
         )}
-        {!status.cachedAt && status.source === 'local' && (
+        {!cachedAt && status.source === 'local' && (
           <View style={styles.cacheBadge}>
             <Text style={styles.cacheText}>
               ℹ️ Calcul local (connexion requise pour données complètes)
