@@ -22,6 +22,8 @@ from schemas.lunar import (
     LunarResponse
 )
 from models.lunar_pack import LunarReport, LunarVocWindow, LunarMansionDaily
+from models.user import User
+from routes.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +172,8 @@ async def get_daily_lunar_climate():
 @router.post("/return/report", response_model=LunarResponse, status_code=200)
 async def lunar_return_report(
     request: LunarReturnReportRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # P0-2 FIX: Auth required
 ):
     """
     Génère un rapport mensuel de révolution lunaire.
@@ -182,8 +185,11 @@ async def lunar_return_report(
     - **month**: (Optionnel) Format YYYY-MM pour indexation
     - **payload**: Données requises par RapidAPI (date, coords, etc.)
 
+    **Authentification requise**: Bearer token ou DEV_AUTH_BYPASS
+
     Raises:
         HTTPException:
+            - 401 si non authentifié
             - 422 si payload invalide (champs manquants ou mauvais format)
             - 502 si erreur provider RapidAPI
     """
@@ -191,7 +197,7 @@ async def lunar_return_report(
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
 
-        logger.info(f"📝 Génération Lunar Return Report - user: {request.user_id}, month: {request.month}")
+        logger.info(f"📝 Génération Lunar Return Report - user: {current_user.id}, month: {request.month}")
 
         # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_lunar_return_report(payload)
@@ -358,49 +364,75 @@ async def void_of_course(
         )
 
 
-@router.post("/mansion", response_model=LunarResponse, status_code=200)
+@router.post("/mansion", status_code=200)
 async def lunar_mansion(
     request: LunarMansionRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Obtient les informations sur la mansion lunaire du jour.
-    
+
     Les 28 mansions lunaires sont un système ancien divisant l'orbite lunaire
     en 28 segments, chacun ayant sa propre signification et influence.
-    
+
     - **date**: Date à vérifier (YYYY-MM-DD)
     - **coords**: Latitude/longitude pour calcul précis
     """
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
-        
+
         logger.info(f"🏰 Calcul Lunar Mansion - date: {request.date}")
-        
+
         # Appel au service RapidAPI
         result = await lunar_services.get_lunar_mansions(payload)
 
         # Dédupliquer upcoming_changes et calendar_summary.significant_periods
         result = _deduplicate_mansion_response(result)
 
-        # Option: Sauvegarder la mansion du jour en DB
-        if request.date and "mansion" in result:
+        # P0-1 FIX: Vérifier mansion_id AVANT de tenter la sauvegarde DB
+        mansion_data = result.get("mansion", {})
+        mansion_id = mansion_data.get("number") if isinstance(mansion_data, dict) else None
+
+        # Si mansion_id manquant => 503 Service Unavailable (provider data incomplete)
+        if mansion_id is None:
+            # Log debug: clés présentes dans raw response pour debug
+            from fastapi.responses import JSONResponse
+            raw_keys = list(result.keys())
+            mansion_keys = list(mansion_data.keys()) if isinstance(mansion_data, dict) else []
+            logger.warning(
+                f"⚠️  mansion_id=None | raw_response_keys={raw_keys} | "
+                f"mansion_keys={mansion_keys} | provider data incomplete"
+            )
+
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "reason": "missing_mansion_id",
+                    "date": request.date,
+                    "provider": "rapidapi",
+                    "message": "Lunar Mansion data temporarily unavailable (provider returned incomplete data)",
+                    "data": result  # Retourner les données partielles pour debug
+                }
+            )
+
+        # mansion_id présent => on peut sauvegarder en DB
+        if request.date:
             try:
-                mansion_data = result["mansion"]
-                mansion_id = mansion_data.get("number", 0)
                 target_date = date.fromisoformat(request.date)
-                
+
                 # Upsert: vérifier si existe déjà pour cette date
                 stmt = select(LunarMansionDaily).where(LunarMansionDaily.date == target_date)
                 existing = await db.execute(stmt)
                 existing_mansion = existing.scalar_one_or_none()
-                
+
                 if existing_mansion:
                     # Mise à jour
                     existing_mansion.mansion_id = mansion_id
                     existing_mansion.data = result
-                    logger.info(f"♻️  Mansion existante mise à jour pour {target_date}")
+                    await db.commit()
+                    logger.info(f"♻️  Mansion #{mansion_id} mise à jour pour {target_date}")
                 else:
                     # Création
                     mansion_entry = LunarMansionDaily(
@@ -409,14 +441,14 @@ async def lunar_mansion(
                         data=result
                     )
                     db.add(mansion_entry)
-                    logger.info(f"💾 Nouvelle mansion sauvegardée pour {target_date}")
-                
-                await db.commit()
-                
+                    await db.commit()
+                    logger.info(f"💾 Mansion #{mansion_id} sauvegardée pour {target_date}")
+
             except Exception as e:
-                logger.warning(f"⚠️  Impossible de sauvegarder la mansion: {str(e)}")
+                logger.error(f"❌ Erreur sauvegarde DB mansion: {str(e)}")
                 await db.rollback()
-        
+                # Continue malgré erreur DB, on retourne quand même les données
+
         return LunarResponse(
             provider="rapidapi",
             kind="lunar_mansion",
