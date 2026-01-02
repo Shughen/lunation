@@ -38,9 +38,10 @@ function get(obj: any, path: string, defaultValue: any = undefined): any {
 /**
  * Formate une date ISO en format court lisible
  * Ex: "2025-12-31T10:30:00" -> "31/12 10:30"
+ * UI FIX: Retourner "—" au lieu de "N/A" pour valeurs manquantes
  */
 function formatShortDateTime(isoString: string | undefined): string {
-  if (!isoString) return 'N/A';
+  if (!isoString) return '—';
 
   try {
     const date = new Date(isoString);
@@ -155,12 +156,24 @@ export default function LunaPackScreen() {
           {/* Lunar Return Report */}
           {kind === 'lunar_return_report' && (
             <>
-              <Text style={styles.summaryText}>
-                📅 Date de retour: {get(data, 'return_date', 'N/A')}
-              </Text>
-              <Text style={styles.summaryText}>
-                🌙 Lune: {get(data, 'moon.sign', 'N/A')} {get(data, 'moon.degree') ? `(${Math.round(get(data, 'moon.degree'))}°)` : ''}
-              </Text>
+              {get(data, 'return_date') ? (
+                <Text style={styles.summaryText}>
+                  📅 Date de retour: {get(data, 'return_date')}
+                </Text>
+              ) : (
+                <Text style={styles.summaryText}>
+                  📅 Date de retour: —
+                </Text>
+              )}
+              {get(data, 'moon.sign') ? (
+                <Text style={styles.summaryText}>
+                  🌙 Lune: {get(data, 'moon.sign')} {get(data, 'moon.degree') ? `(${Math.round(get(data, 'moon.degree'))}°)` : ''}
+                </Text>
+              ) : (
+                <Text style={styles.summaryText}>
+                  🌙 Lune: —
+                </Text>
+              )}
               {get(data, 'moon.house') && (
                 <Text style={styles.summaryText}>
                   🏠 Maison: {get(data, 'moon.house')}
@@ -217,9 +230,15 @@ export default function LunaPackScreen() {
           {/* Lunar Mansion */}
           {kind === 'lunar_mansion' && (
             <>
-              <Text style={styles.summaryText}>
-                🏰 Mansion #{get(data, 'mansion.number', 'N/A')}: {get(data, 'mansion.name', 'N/A')}
-              </Text>
+              {get(data, 'mansion.number') ? (
+                <Text style={styles.summaryText}>
+                  🏰 Mansion #{get(data, 'mansion.number')}: {get(data, 'mansion.name', '—')}
+                </Text>
+              ) : (
+                <Text style={styles.summaryText}>
+                  🏰 Mansion: Indisponible pour le moment
+                </Text>
+              )}
 
               {get(data, 'mansion.interpretation') && (
                 <Text style={styles.summaryText} numberOfLines={2}>
@@ -235,9 +254,11 @@ export default function LunaPackScreen() {
                   <Text style={styles.summaryText}>
                     🕐 {formatShortDateTime(get(data, 'upcoming_changes.0.change_time'))}
                   </Text>
-                  <Text style={styles.summaryText}>
-                    ➡️ Mansion #{get(data, 'upcoming_changes.0.to_mansion.number')}: {get(data, 'upcoming_changes.0.to_mansion.name', 'N/A')}
-                  </Text>
+                  {get(data, 'upcoming_changes.0.to_mansion.number') ? (
+                    <Text style={styles.summaryText}>
+                      ➡️ Mansion #{get(data, 'upcoming_changes.0.to_mansion.number')}: {get(data, 'upcoming_changes.0.to_mansion.name', '—')}
+                    </Text>
+                  ) : null}
                 </>
               )}
             </>
