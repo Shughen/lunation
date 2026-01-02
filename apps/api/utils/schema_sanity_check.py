@@ -96,9 +96,39 @@ async def check_schema_sanity(db: AsyncSession, correlation_id: Optional[str] = 
                     )
                 })
         
+        # Vérifier que natal_charts.id a un default gen_random_uuid()
+        default_query = text("""
+            SELECT
+                table_name,
+                column_name,
+                column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+                AND table_name = 'natal_charts'
+                AND column_name = 'id'
+        """)
+
+        default_result = await db.execute(default_query)
+        default_row = default_result.fetchone()
+
+        if default_row:
+            column_default = default_row.column_default
+            # Vérifier que le default contient gen_random_uuid
+            if not column_default or 'gen_random_uuid' not in column_default:
+                errors.append({
+                    "table_name": "natal_charts",
+                    "column_name": "id",
+                    "expected_type": "uuid DEFAULT gen_random_uuid()",
+                    "actual_type": f"uuid DEFAULT {column_default or 'NULL'}",
+                    "message": (
+                        f"natal_charts.id n'a pas de default gen_random_uuid(). "
+                        f"Exécuter: ALTER TABLE natal_charts ALTER COLUMN id SET DEFAULT gen_random_uuid();"
+                    )
+                })
+
         # Vérifier aussi les contraintes FK (optionnel mais utile)
         fk_query = text("""
-            SELECT 
+            SELECT
                 tc.table_name,
                 kcu.column_name,
                 ccu.table_name AS foreign_table_name,

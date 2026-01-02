@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"[corr={correlation_id}] 🚀 Lunation API démarrage...")
     logger.info(f"[corr={correlation_id}] 📊 Environment: {settings.APP_ENV}")
     logger.info(f"[corr={correlation_id}] 🔗 Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'local'}")
+    logger.info(f"[corr={correlation_id}] 🔑 RapidAPI key configured: {bool(settings.RAPIDAPI_KEY)}")
     
     # Log état des routes DEV
     import os

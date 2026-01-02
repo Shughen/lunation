@@ -63,6 +63,7 @@ async def call_rapidapi_natal_chart(birth_data: Dict[str, Any]) -> Dict[str, Any
     }
     
     logger.info(f"🌐 Appel RapidAPI: /api/v3/charts/natal pour {birth_data.get('city')}")
+    logger.info(f"🔑 RapidAPI key configured: {bool(settings.RAPIDAPI_KEY)}")
     
     try:
         response = await client.post(url, json=payload, headers=headers)

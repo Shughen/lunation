@@ -36,7 +36,15 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
-  const onboardingStore = useOnboardingStore();
+  // ⚠️ CRITIQUE: Subscribe explicitement au flag hydrated via selector
+  const isOnboardingHydrated = useOnboardingStore((state) => state.hydrated);
+  const hasSeenWelcomeScreen = useOnboardingStore((state) => state.hasSeenWelcomeScreen);
+  const hasAcceptedConsent = useOnboardingStore((state) => state.hasAcceptedConsent);
+  const hasCompletedProfile = useOnboardingStore((state) => state.hasCompletedProfile);
+  const hasSeenDisclaimer = useOnboardingStore((state) => state.hasSeenDisclaimer);
+  const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
+  const hydrateOnboarding = useOnboardingStore((state) => state.hydrate);
+
   const { notificationsEnabled, hydrated, loadPreferences, scheduleAllNotifications } = useNotificationsStore();
   const { isResetting } = useResetStore();
   const [currentLunarReturn, setCurrentLunarReturn] = useState<LunarReturn | null>(null);
@@ -64,24 +72,26 @@ export default function HomeScreen() {
 
       try {
         // Migration one-shot: nettoyer flags fantômes AVANT hydratation
-        if (!onboardingStore.hydrated) {
+        if (!isOnboardingHydrated) {
           await cleanupGhostFlags();
         }
 
         // Guard absolu: hydratation BLOQUANTE
-        if (!onboardingStore.hydrated) {
+        if (!isOnboardingHydrated) {
           console.log('[INDEX] ⏳ Hydratation en cours...');
-          await onboardingStore.hydrate();
+          await hydrateOnboarding();
           console.log('[INDEX] ✅ Hydratation terminée');
+          // IMPORTANT: Le state sera mis à jour et déclenchera un re-render via subscription
+          return; // Sortir immédiatement, le prochain render verra hydrated=true
         }
 
         console.log('[INDEX] 📍 Début checkRouting');
         console.log('[INDEX] 📊 État onboarding:', {
-          hasSeenWelcomeScreen: onboardingStore.hasSeenWelcomeScreen,
-          hasAcceptedConsent: onboardingStore.hasAcceptedConsent,
-          hasCompletedProfile: onboardingStore.hasCompletedProfile,
-          hasSeenDisclaimer: onboardingStore.hasSeenDisclaimer,
-          hasCompletedOnboarding: onboardingStore.hasCompletedOnboarding,
+          hasSeenWelcomeScreen,
+          hasAcceptedConsent,
+          hasCompletedProfile,
+          hasSeenDisclaimer,
+          hasCompletedOnboarding,
         });
 
         // En mode DEV_AUTH_BYPASS, log clair et skip uniquement auth
@@ -99,35 +109,35 @@ export default function HomeScreen() {
         }
 
         // B) Vérifier hasSeenWelcomeScreen
-        if (!onboardingStore.hasSeenWelcomeScreen) {
+        if (!hasSeenWelcomeScreen) {
           console.log('[INDEX] → Redirection /welcome');
           router.replace('/welcome');
           return;
         }
 
         // C) Vérifier consentement RGPD
-        if (!onboardingStore.hasAcceptedConsent) {
+        if (!hasAcceptedConsent) {
           console.log('[INDEX] → Redirection /onboarding/consent');
           router.replace('/onboarding/consent');
           return;
         }
 
         // D) Vérifier profil setup
-        if (!onboardingStore.hasCompletedProfile) {
+        if (!hasCompletedProfile) {
           console.log('[INDEX] → Redirection /onboarding/profile-setup');
           router.replace('/onboarding/profile-setup');
           return;
         }
 
         // E) Vérifier disclaimer médical
-        if (!onboardingStore.hasSeenDisclaimer) {
+        if (!hasSeenDisclaimer) {
           console.log('[INDEX] → Redirection /onboarding/disclaimer');
           router.replace('/onboarding/disclaimer');
           return;
         }
 
         // F) Vérifier onboarding complet (slides)
-        if (!onboardingStore.hasCompletedOnboarding) {
+        if (!hasCompletedOnboarding) {
           console.log('[INDEX] → Redirection /onboarding');
           router.replace('/onboarding');
           return;
@@ -147,7 +157,18 @@ export default function HomeScreen() {
     };
 
     checkRouting();
-  }, [isAuthenticated, isResetting, onboardingStore.hydrated, router]);
+  }, [
+    isAuthenticated,
+    isResetting,
+    isOnboardingHydrated,
+    hasSeenWelcomeScreen,
+    hasAcceptedConsent,
+    hasCompletedProfile,
+    hasSeenDisclaimer,
+    hasCompletedOnboarding,
+    hydrateOnboarding,
+    router,
+  ]);
 
   // Hydratation store notifications au mount
   useEffect(() => {
