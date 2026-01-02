@@ -235,6 +235,7 @@ async def resolve_dev_user(
 
 async def get_current_user(
     x_dev_user_id: Optional[str] = Header(default=None, alias="X-Dev-User-Id"),
+    x_dev_external_id: Optional[str] = Header(default=None, alias="X-Dev-External-Id"),
     token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
 ) -> User:
@@ -247,31 +248,45 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # ===== MODE DEV: bypass avec header X-Dev-User-Id (uniquement en development) =====
+    # ===== MODE DEV: bypass avec header X-Dev-User-Id OU X-Dev-External-Id (uniquement en development) =====
     if settings.APP_ENV == "development" and settings.DEV_AUTH_BYPASS:
         logger.info("🔧 DEV_AUTH_BYPASS enabled")
 
-        # Si header X-Dev-User-Id présent, retourner un user lightweight SANS DB
-        # pour éviter les collisions asyncpg dans les tests ASGI
+        # Priorité 1: Si header X-Dev-External-Id présent (UUID, email), résoudre via DB
+        if x_dev_external_id:
+            logger.info(f"📥 DEV_AUTH_BYPASS: X-Dev-External-Id header={x_dev_external_id}")
+            user, method = await resolve_dev_user(x_dev_external_id, db)
+            logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={user.id}, method={method}")
+            return user
+
+        # Priorité 2: Si header X-Dev-User-Id présent, essayer de résoudre via DB d'abord (pour UUID)
+        # Si c'est un int, créer un user lightweight avec email synthétique
         if x_dev_user_id:
             logger.info(f"📥 DEV_AUTH_BYPASS: X-Dev-User-Id header={x_dev_user_id}")
-            
+
             # Tenter de parser comme integer (cas le plus courant)
             try:
                 user_id = int(x_dev_user_id)
                 logger.info(f"✅ DEV_AUTH_BYPASS: user lightweight créé avec id={user_id} (sans DB)")
-                # Retourner un objet lightweight avec juste l'id pour éviter les requêtes DB
-                return SimpleNamespace(id=user_id)
+                # Retourner un objet lightweight avec id ET email pour éviter crash ailleurs
+                return SimpleNamespace(id=user_id, email=f"dev+{user_id}@local.dev")
             except (ValueError, TypeError):
-                # Header présent mais non-int → erreur explicite
-                logger.warning(f"❌ DEV_AUTH_BYPASS: X-Dev-User-Id doit être un entier, reçu: {x_dev_user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"DEV_AUTH_BYPASS: X-Dev-User-Id doit être un entier valide, reçu: {x_dev_user_id}",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                # Header présent mais non-int → essayer de résoudre via DB (peut être UUID/email)
+                logger.info(f"📥 DEV_AUTH_BYPASS: X-Dev-User-Id n'est pas un int, résolution via DB: {x_dev_user_id}")
+                try:
+                    user, method = await resolve_dev_user(x_dev_user_id, db)
+                    logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={user.id}, method={method}")
+                    return user
+                except HTTPException:
+                    # Si résolution échoue, erreur explicite
+                    logger.warning(f"❌ DEV_AUTH_BYPASS: X-Dev-User-Id invalide ou introuvable: {x_dev_user_id}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail=f"DEV_AUTH_BYPASS: X-Dev-User-Id invalide ou introuvable: {x_dev_user_id}",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
         
-        # Si pas de header mais DEV_USER_ID en env, utiliser celui-ci
+        # Priorité 3: Si pas de header mais DEV_USER_ID en env, utiliser celui-ci
         if settings.DEV_USER_ID:
             user_identifier = settings.DEV_USER_ID
             logger.info(f"📥 DEV_AUTH_BYPASS: DEV_USER_ID env={user_identifier}")
@@ -280,7 +295,8 @@ async def get_current_user(
             try:
                 user_id = int(user_identifier)
                 logger.info(f"✅ DEV_AUTH_BYPASS: user lightweight créé avec id={user_id} depuis env (sans DB)")
-                return SimpleNamespace(id=user_id)
+                # Retourner un objet lightweight avec id ET email pour éviter crash ailleurs
+                return SimpleNamespace(id=user_id, email=f"dev+{user_id}@local.dev")
             except (ValueError, TypeError):
                 # DEV_USER_ID non-int → fallback vers resolve_dev_user (pour UUID/email)
                 logger.info(f"📥 DEV_AUTH_BYPASS: DEV_USER_ID n'est pas un int, résolution via DB: {user_identifier}")

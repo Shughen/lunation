@@ -110,12 +110,13 @@ async def calculate_natal_chart(
 
         if existing_chart:
             # Convertir birth_date/birth_time existants pour comparaison
-            existing_date_str = existing_chart.birth_date.isoformat() if existing_chart.birth_date else None
-            existing_time_str = existing_chart.birth_time.isoformat()[:5] if existing_chart.birth_time else None  # HH:MM
+            # Note: Les données de naissance sont dans User, pas dans NatalChart
+            existing_date_str = current_user.birth_date if current_user.birth_date else None
+            existing_time_str = current_user.birth_time[:5] if current_user.birth_time and len(current_user.birth_time) >= 5 else (current_user.birth_time if current_user.birth_time else None)  # HH:MM
 
             # Convertir Decimal (NUMERIC) en float pour comparaison (gérer NULL)
-            existing_lat = float(existing_chart.latitude) if existing_chart.latitude is not None else None
-            existing_lon = float(existing_chart.longitude) if existing_chart.longitude is not None else None
+            existing_lat = float(current_user.birth_latitude) if current_user.birth_latitude is not None else None
+            existing_lon = float(current_user.birth_longitude) if current_user.birth_longitude is not None else None
 
             # Normaliser les inputs en float (sécurité)
             lat_in = float(data.latitude)
@@ -125,7 +126,7 @@ async def calculate_natal_chart(
             same_date = existing_date_str == data.date
             same_time = existing_time_str == birth_time
             same_coords = _same_coords(existing_lat, existing_lon, lat_in, lon_in)
-            same_timezone = existing_chart.timezone == detected_timezone
+            same_timezone = getattr(current_user, 'birth_timezone', None) == detected_timezone
 
             params_match = same_date and same_time and same_coords and same_timezone
 
@@ -191,7 +192,100 @@ async def calculate_natal_chart(
         logger.error(f"❌ Erreur DB lors de la vérification idempotence: {e}", exc_info=True)
         # Continuer malgré l'erreur de vérification, on recalculera
 
-    logger.info(f"📊 Calcul thème natal - user_id={current_user.id}, email={current_user.email}, date={data.date} {birth_time}, timezone={detected_timezone}")
+    # Protéger l'accès à email (peut être un SimpleNamespace lightweight en DEV)
+    user_email = getattr(current_user, "email", f"dev+{current_user.id}@local.dev")
+    logger.info(f"📊 Calcul thème natal - user_id={current_user.id}, email={user_email}, date={data.date} {birth_time}, timezone={detected_timezone}")
+    
+    # Mode DEV Mock: retourner un thème natal fake sans appeler RapidAPI
+    if settings.APP_ENV == "development" and settings.DEV_MOCK_NATAL:
+        logger.info("🎭 Mode DEV_MOCK_NATAL activé - génération thème natal fake")
+        
+        # Générer un thème natal fake cohérent (structure minimale utilisée côté mobile)
+        import random
+        sign_names = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+                     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+        
+        # Big3 aléatoires (ou fixes pour cohérence)
+        sun_sign = random.choice(sign_names)
+        moon_sign = random.choice(sign_names)
+        ascendant_sign = random.choice(sign_names)
+        
+        # Construire raw_data minimal
+        raw_data = {
+            "sun": {"sign": sun_sign, "degree": 15.0, "house": 1},
+            "moon": {"sign": moon_sign, "degree": 20.0, "house": 2},
+            "ascendant": {"sign": ascendant_sign, "degree": 10.0},
+            "planets": {
+                "sun": {"sign": sun_sign, "degree": 15.0, "house": 1},
+                "moon": {"sign": moon_sign, "degree": 20.0, "house": 2},
+                "Ascendant": {"sign": ascendant_sign, "degree": 10.0, "house": 1}
+            },
+            "houses": {str(i): {"sign": random.choice(sign_names), "degree": round(random.uniform(0, 30), 2)} for i in range(1, 13)},
+            "aspects": []
+        }
+        
+        # Construire positions JSONB
+        positions = {
+            "sun": raw_data["sun"],
+            "moon": raw_data["moon"],
+            "ascendant": raw_data["ascendant"],
+            "planets": raw_data["planets"],
+            "houses": raw_data["houses"],
+            "aspects": raw_data["aspects"]
+        }
+        
+        # Sauvegarder en DB (même logique que le vrai calcul)
+        try:
+            result = await db.execute(
+                select(NatalChart).where(NatalChart.user_id == current_user.id)
+            )
+            existing_chart = result.scalar_one_or_none()
+            
+            if existing_chart:
+                existing_chart.positions = positions
+                existing_chart.sun_sign = sun_sign
+                existing_chart.moon_sign = moon_sign
+                existing_chart.ascendant = ascendant_sign
+                chart = existing_chart
+            else:
+                chart = NatalChart(
+                    user_id=current_user.id,
+                    positions=positions,
+                    sun_sign=sun_sign,
+                    moon_sign=moon_sign,
+                    ascendant=ascendant_sign
+                )
+                db.add(chart)
+            
+            # Mettre à jour les infos de naissance du user
+            current_user.birth_date = data.date
+            current_user.birth_time = birth_time
+            current_user.birth_latitude = str(data.latitude)
+            current_user.birth_longitude = str(data.longitude)
+            current_user.birth_place_name = data.place_name
+            current_user.birth_timezone = detected_timezone
+            
+            await db.commit()
+            await db.refresh(chart)
+            logger.info(f"✅ Thème natal mock sauvegardé - natal_chart_id={chart.id}")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"❌ Erreur DB lors de la sauvegarde natal_chart mock: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erreur lors de la sauvegarde en base de données"
+            )
+        
+        # Retourner la réponse au format attendu
+        return {
+            "id": str(chart.id),
+            "sun_sign": sun_sign,
+            "moon_sign": moon_sign,
+            "ascendant": ascendant_sign,
+            "planets": raw_data["planets"],
+            "houses": raw_data["houses"],
+            "aspects": raw_data["aspects"]
+        }
     
     # Calculer via RapidAPI (Best Astrology API)
     try:
@@ -414,12 +508,36 @@ async def calculate_natal_chart(
         
         logger.info(f"✅ Thème natal parsé depuis RapidAPI - {len(planets_dict)} planètes, {len(houses_dict)} maisons, {len(aspects_list)} aspects")
         
+    except HTTPException:
+        # HTTPException déjà levée par call_rapidapi_natal_chart (avec status 502/503 approprié)
+        # Re-lever telle quelle pour préserver le status code et le message
+        raise
     except httpx.HTTPStatusError as e:
-        logger.error(f"❌ Erreur HTTP RapidAPI: {e.response.status_code} - {e.response.text}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erreur RapidAPI (HTTP {e.response.status_code}): {e.response.text[:200]}"
-        )
+        # Catch direct si HTTPStatusError n'a pas été transformé en HTTPException
+        status_code = e.response.status_code
+        error_text = e.response.text[:200] if e.response.text else "No error body"
+        
+        logger.error(f"❌ Erreur HTTP RapidAPI: {status_code} - {error_text}")
+        
+        # Différencier les codes HTTP pour renvoyer le bon status
+        if status_code in (401, 403):
+            # 401/403 => Bad Gateway (problème avec l'API externe)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Erreur RapidAPI (HTTP {status_code}): {error_text}"
+            )
+        elif status_code == 429:
+            # 429 => Service Unavailable (quota/rate limit)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Limite de requêtes RapidAPI dépassée (HTTP 429): {error_text}"
+            )
+        else:
+            # Autres erreurs 4xx/5xx => Bad Gateway
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Erreur RapidAPI (HTTP {status_code}): {error_text}"
+            )
     except httpx.RequestError as e:
         logger.error(f"❌ Erreur requête RapidAPI: {str(e)}")
         raise HTTPException(

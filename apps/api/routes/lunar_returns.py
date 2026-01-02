@@ -1597,9 +1597,15 @@ async def dev_purge_lunar_returns(
     try:
         # Récupérer l'email de l'utilisateur si disponible (peut être None en mode DEV_AUTH_BYPASS lightweight)
         user_email = None
+        user_external_id = None
+
         if hasattr(current_user, 'email') and current_user.email:
             user_email = current_user.email
-        elif hasattr(current_user, 'id'):
+
+        if hasattr(current_user, 'dev_external_id') and current_user.dev_external_id:
+            user_external_id = current_user.dev_external_id
+
+        if hasattr(current_user, 'id'):
             # En mode DEV_AUTH_BYPASS lightweight, on peut avoir juste un SimpleNamespace avec id
             # Essayer de récupérer l'email depuis la DB
             try:
@@ -1608,13 +1614,15 @@ async def dev_purge_lunar_returns(
                 )
                 user_obj = user_result.scalar_one_or_none()
                 if user_obj:
-                    user_email = user_obj.email
-            except Exception:
+                    user_email = user_obj.email or user_email
+                    user_external_id = user_obj.dev_external_id or user_external_id
+            except Exception as e:
+                logger.warning(f"[corr={correlation_id}] ⚠️ Échec récupération user details: {e}")
                 pass  # Si échec, user_email reste None
-        
+
         logger.info(
             f"[corr={correlation_id}] 🗑️  DEV Purge lunar returns pour user_id={current_user.id} "
-            f"(email={user_email or 'N/A'})"
+            f"(email={user_email or 'N/A'}, external_id={user_external_id or 'N/A'})"
         )
         
         # Compter avant suppression pour log
@@ -1650,6 +1658,7 @@ async def dev_purge_lunar_returns(
             "message": "Purge effectuée",
             "user_id": current_user.id,
             "user_email": user_email,
+            "user_external_id": user_external_id,
             "deleted_count": deleted_count if deleted_count is not None else count_before_num,
             "count_before": count_before_num,
             "count_after": count_after_num,
