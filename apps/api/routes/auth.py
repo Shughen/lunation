@@ -11,6 +11,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from uuid import UUID
+from types import SimpleNamespace
 import logging
 
 from database import get_db
@@ -250,61 +251,78 @@ async def get_current_user(
     if settings.APP_ENV == "development" and settings.DEV_AUTH_BYPASS:
         logger.info("🔧 DEV_AUTH_BYPASS enabled")
 
-        # Ordre de résolution:
-        # 1. Header X-Dev-User-Id
-        # 2. ENV variable DEV_USER_ID
-        # 3. User explicite dev@local.dev (créé si nécessaire)
-
-        user_identifier = None
-
+        # Si header X-Dev-User-Id présent, retourner un user lightweight SANS DB
+        # pour éviter les collisions asyncpg dans les tests ASGI
         if x_dev_user_id:
-            user_identifier = x_dev_user_id
-            logger.info(f"📥 DEV_AUTH_BYPASS: X-Dev-User-Id header={user_identifier}")
-        elif settings.DEV_USER_ID:
+            logger.info(f"📥 DEV_AUTH_BYPASS: X-Dev-User-Id header={x_dev_user_id}")
+            
+            # Tenter de parser comme integer (cas le plus courant)
+            try:
+                user_id = int(x_dev_user_id)
+                logger.info(f"✅ DEV_AUTH_BYPASS: user lightweight créé avec id={user_id} (sans DB)")
+                # Retourner un objet lightweight avec juste l'id pour éviter les requêtes DB
+                return SimpleNamespace(id=user_id)
+            except (ValueError, TypeError):
+                # Header présent mais non-int → erreur explicite
+                logger.warning(f"❌ DEV_AUTH_BYPASS: X-Dev-User-Id doit être un entier, reçu: {x_dev_user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"DEV_AUTH_BYPASS: X-Dev-User-Id doit être un entier valide, reçu: {x_dev_user_id}",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        # Si pas de header mais DEV_USER_ID en env, utiliser celui-ci
+        if settings.DEV_USER_ID:
             user_identifier = settings.DEV_USER_ID
             logger.info(f"📥 DEV_AUTH_BYPASS: DEV_USER_ID env={user_identifier}")
-        else:
-            # Fallback: chercher ou créer user avec email dev@local.dev
-            logger.info("📥 DEV_AUTH_BYPASS: pas de header/env, fallback vers dev@local.dev")
+            
+            # Tenter de parser comme integer
+            try:
+                user_id = int(user_identifier)
+                logger.info(f"✅ DEV_AUTH_BYPASS: user lightweight créé avec id={user_id} depuis env (sans DB)")
+                return SimpleNamespace(id=user_id)
+            except (ValueError, TypeError):
+                # DEV_USER_ID non-int → fallback vers resolve_dev_user (pour UUID/email)
+                logger.info(f"📥 DEV_AUTH_BYPASS: DEV_USER_ID n'est pas un int, résolution via DB: {user_identifier}")
+                user, method = await resolve_dev_user(user_identifier, db)
+                logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={user.id}, method={method}")
+                return user
+        
+        # Fallback: chercher ou créer user avec email dev@local.dev
+        logger.info("📥 DEV_AUTH_BYPASS: pas de header/env, fallback vers dev@local.dev")
+        result = await db.execute(select(User).where(User.email == "dev@local.dev"))
+        dev_user = result.scalar_one_or_none()
+
+        if dev_user:
+            logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={dev_user.id}, method=dev_default")
+            return dev_user
+
+        # Créer le user dev@local.dev
+        logger.info("🆕 DEV_AUTH_BYPASS: création user dev@local.dev")
+        try:
+            # Utiliser un hash pré-calculé pour éviter les problèmes avec bcrypt
+            # Hash de "dev-password" pré-calculé avec bcrypt (généré avec bcrypt.gensalt())
+            dev_password_hash = "$2b$12$A2rj/gsY/fAzI5GY9TCQFOByzS/J8TIL3ElOyFSAAxHzVdg.OluOq"
+            dev_user = User(
+                email="dev@local.dev",
+                hashed_password=dev_password_hash,
+                is_active=True,
+                is_premium=False
+            )
+            db.add(dev_user)
+            await db.commit()
+            await db.refresh(dev_user)
+            logger.info(f"✅ DEV_AUTH_BYPASS created: user_id={dev_user.id}, method=dev_default")
+            return dev_user
+        except IntegrityError:
+            # L'utilisateur a peut-être été créé entre temps
+            await db.rollback()
             result = await db.execute(select(User).where(User.email == "dev@local.dev"))
             dev_user = result.scalar_one_or_none()
-
             if dev_user:
-                logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={dev_user.id}, method=dev_default")
+                logger.info(f"✅ DEV_AUTH_BYPASS: user dev@local.dev trouvé après rollback - id={dev_user.id}")
                 return dev_user
-
-            # Créer le user dev@local.dev
-            logger.info("🆕 DEV_AUTH_BYPASS: création user dev@local.dev")
-            try:
-                # Utiliser un hash pré-calculé pour éviter les problèmes avec bcrypt
-                # Hash de "dev-password" pré-calculé avec bcrypt (généré avec bcrypt.gensalt())
-                dev_password_hash = "$2b$12$A2rj/gsY/fAzI5GY9TCQFOByzS/J8TIL3ElOyFSAAxHzVdg.OluOq"
-                dev_user = User(
-                    email="dev@local.dev",
-                    hashed_password=dev_password_hash,
-                    is_active=True,
-                    is_premium=False
-                )
-                db.add(dev_user)
-                await db.commit()
-                await db.refresh(dev_user)
-                logger.info(f"✅ DEV_AUTH_BYPASS created: user_id={dev_user.id}, method=dev_default")
-                return dev_user
-            except IntegrityError:
-                # L'utilisateur a peut-être été créé entre temps
-                await db.rollback()
-                result = await db.execute(select(User).where(User.email == "dev@local.dev"))
-                dev_user = result.scalar_one_or_none()
-                if dev_user:
-                    logger.info(f"✅ DEV_AUTH_BYPASS: user dev@local.dev trouvé après rollback - id={dev_user.id}")
-                    return dev_user
-                raise
-
-        # Si on a un user_identifier, résoudre via resolve_dev_user()
-        if user_identifier:
-            user, method = await resolve_dev_user(user_identifier, db)
-            logger.info(f"✅ DEV_AUTH_BYPASS resolved: user_id={user.id}, method={method}")
-            return user
+            raise
 
     # ===== MODE NORMAL: JWT =====
     if not token:
