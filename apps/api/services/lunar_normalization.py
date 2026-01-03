@@ -57,6 +57,12 @@ def normalize_lunar_mansion_response(raw_response: Dict[str, Any]) -> Dict[str, 
         if key in raw_response:
             normalized[key] = raw_response[key]
 
+    # CRITICAL: Preserve mock metadata (if present) so mobile can detect mock responses
+    # These fields are added by rapidapi_mocks.py when DEV_MOCK_RAPIDAPI=true or fallback on 403
+    for meta_key in ["_mock", "_reason"]:
+        if meta_key in raw_response:
+            normalized[meta_key] = raw_response[meta_key]
+
     # Optional: include raw response for debugging (can be disabled in production)
     if logger.isEnabledFor(logging.DEBUG):
         normalized["raw"] = raw_response
@@ -187,6 +193,12 @@ def normalize_lunar_return_report_response(raw_response: Dict[str, Any], request
     for key in ["aspects", "houses", "planets", "provider"]:
         if key in raw_response:
             normalized[key] = raw_response[key]
+
+    # CRITICAL: Preserve mock metadata (if present) so mobile can detect mock responses
+    # These fields are added by rapidapi_mocks.py when DEV_MOCK_RAPIDAPI=true or fallback on 403
+    for meta_key in ["_mock", "_reason"]:
+        if meta_key in raw_response:
+            normalized[meta_key] = raw_response[meta_key]
 
     # Optional: include raw response for debugging
     if logger.isEnabledFor(logging.DEBUG):

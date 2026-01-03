@@ -181,11 +181,13 @@ async def lunar_return_report(
     Le rapport contient l'analyse complète de la position de retour de la Lune
     et ses implications pour le mois à venir.
 
-    - **user_id**: (Optionnel) ID utilisateur pour sauvegarder en base
-    - **month**: (Optionnel) Format YYYY-MM pour indexation
+    - **month**: (Optionnel) Format YYYY-MM pour indexation et sauvegarde en DB
     - **payload**: Données requises par RapidAPI (date, coords, etc.)
 
     **Authentification requise**: Bearer token ou DEV_AUTH_BYPASS
+    
+    **Sécurité**: L'utilisateur authentifié est toujours utilisé pour la persistance DB,
+    jamais le payload client.
 
     Raises:
         HTTPException:
@@ -198,20 +200,29 @@ async def lunar_return_report(
 
     try:
         # Conversion du modèle Pydantic en dict pour l'API
-        payload = request.model_dump(exclude_none=True)
+        # Exclure user_id et month du payload provider (user_id n'existe plus, month est pour DB uniquement)
+        payload = request.model_dump(exclude_none=True, exclude={"month"})
+        # Réinsérer month si présent (utilisé par le service pour normalisation)
+        if request.month:
+            payload["month"] = request.month
 
-        logger.info(f"📝 Génération Lunar Return Report - user: {user_id}, month: {request.month}")
+        logger.info(f"📝 Génération Lunar Return Report - user_id: {user_id}, month: {request.month}")
 
         # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_lunar_return_report(payload)
 
-        # Sauvegarde en DB si user_id et month fournis
-        if request.user_id and request.month:
+        # Détecter si la réponse est un mock (pour mettre le bon provider)
+        is_mock = result.get("_mock", False)
+        provider = "mock" if is_mock else "rapidapi"
+
+        # Sauvegarde en DB si month fourni
+        # security: never trust request.user_id - always use authenticated user_id snapshot
+        if request.month:
             try:
                 # Vérifier si un rapport existe déjà pour ce mois
                 stmt = select(LunarReport).where(
                     and_(
-                        LunarReport.user_id == request.user_id,
+                        LunarReport.user_id == user_id,  # security: never trust request.user_id
                         LunarReport.month == request.month
                     )
                 )
@@ -221,16 +232,16 @@ async def lunar_return_report(
                 if existing_report:
                     # Mise à jour du rapport existant
                     existing_report.report = result
-                    logger.info(f"♻️  Rapport existant mis à jour pour {request.month}")
+                    logger.info(f"♻️  Rapport existant mis à jour - user_id: {user_id}, month: {request.month}")
                 else:
                     # Création d'un nouveau rapport
                     lunar_report = LunarReport(
-                        user_id=request.user_id,
+                        user_id=user_id,  # security: never trust request.user_id
                         month=request.month,
                         report=result
                     )
                     db.add(lunar_report)
-                    logger.info(f"💾 Nouveau rapport sauvegardé pour {request.month}")
+                    logger.info(f"💾 Nouveau rapport sauvegardé - user_id: {user_id}, month: {request.month}")
 
                 await db.commit()
 
@@ -240,7 +251,7 @@ async def lunar_return_report(
                 # On continue malgré l'erreur DB, on retourne quand même les données
 
         return LunarResponse(
-            provider="rapidapi",
+            provider=provider,
             kind="lunar_return_report",
             data=result,
             cached=False
@@ -304,7 +315,11 @@ async def void_of_course(
 
         # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_void_of_course_status(payload)
-        
+
+        # Détecter si la réponse est un mock (pour mettre le bon provider)
+        is_mock = result.get("_mock", False)
+        provider = "mock" if is_mock else "rapidapi"
+
         # Option: Sauvegarder les fenêtres VoC actives en DB
         # (uniquement si le provider retourne start_at/end_at)
         if "void_of_course" in result and isinstance(result["void_of_course"], dict):
@@ -329,9 +344,9 @@ async def void_of_course(
                 except Exception as e:
                     logger.warning(f"⚠️  Impossible de sauvegarder la fenêtre VoC: {str(e)}")
                     await db.rollback()
-        
+
         return LunarResponse(
-            provider="rapidapi",
+            provider=provider,
             kind="void_of_course",
             data=result,
             cached=False
@@ -389,6 +404,10 @@ async def lunar_mansion(
 
         # Appel au service RapidAPI
         result = await lunar_services.get_lunar_mansions(payload)
+
+        # Détecter si la réponse est un mock (pour mettre le bon provider)
+        is_mock = result.get("_mock", False)
+        provider = "mock" if is_mock else "rapidapi"
 
         # Dédupliquer upcoming_changes et calendar_summary.significant_periods
         result = _deduplicate_mansion_response(result)
@@ -453,7 +472,7 @@ async def lunar_mansion(
                 # Continue malgré erreur DB, on retourne quand même les données
 
         return LunarResponse(
-            provider="rapidapi",
+            provider=provider,
             kind="lunar_mansion",
             data=result,
             cached=False

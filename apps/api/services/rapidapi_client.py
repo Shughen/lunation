@@ -2,6 +2,10 @@
 Client HTTP générique pour RapidAPI - Best Astrology API
 Permet d'appeler tous les endpoints de l'API de manière unifiée
 Avec retries, exponential backoff, timeouts, et gestion robuste des erreurs
+
+Mode DEV_MOCK_RAPIDAPI:
+- Si DEV_MOCK_RAPIDAPI=true OU si RapidAPI retourne 403 "not subscribed"
+- Utilise des mocks déterministes au lieu d'appeler l'API
 """
 
 import httpx
@@ -38,12 +42,16 @@ async def post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Effectue un POST JSON sur un endpoint RapidAPI avec retries et exponential backoff.
 
+    Mode DEV_MOCK_RAPIDAPI:
+    - Si settings.DEV_MOCK_RAPIDAPI=true, retourne directement un mock
+    - Si RapidAPI retourne 403 "not subscribed", fallback sur mock
+
     Args:
         path: Chemin de l'endpoint (ex: /api/v3/charts/lunar_return)
         payload: Données JSON à envoyer
 
     Returns:
-        Réponse JSON de l'API
+        Réponse JSON de l'API ou mock déterministe
 
     Raises:
         HTTPException:
@@ -53,6 +61,11 @@ async def post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             - 502 si erreur provider 5xx après retries
             - 504 si timeout après retries
     """
+    # Mode DEV_MOCK_RAPIDAPI: bypass RapidAPI et retourner mock directement
+    if settings.DEV_MOCK_RAPIDAPI:
+        logger.warning(f"🎭 DEV_MOCK_RAPIDAPI enabled -> using mock for {path}")
+        return _get_mock_response(path, payload)
+
     # Construction de l'URL complète
     url = f"{settings.BASE_RAPID_URL}{path}"
 
@@ -120,16 +133,26 @@ async def post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 )
 
             elif status == 403:
-                # Forbidden - quota/permissions
-                logger.error(f"❌ Forbidden (403) de RapidAPI sur {path}: {error_details}")
-                raise HTTPException(
-                    status_code=502,  # 502 car c'est une erreur côté provider
-                    detail={
-                        "code": "PROVIDER_FORBIDDEN",
-                        "message": "Accès refusé par le fournisseur astrologique (quota ou permissions)",
-                        "provider_error": error_details
-                    }
-                )
+                # Forbidden - quota/permissions ou not subscribed
+                # Détecter si c'est un problème de subscription
+                error_message = error_details.get("message", "") if isinstance(error_details, dict) else str(error_details)
+                is_not_subscribed = "not subscribed" in error_message.lower()
+
+                if is_not_subscribed:
+                    # Not subscribed - fallback sur mock pour éviter de bloquer l'app en dev
+                    logger.warning(f"⚠️  RapidAPI not subscribed (403) sur {path} -> fallback sur mock")
+                    return _get_mock_response(path, payload)
+                else:
+                    # Autre erreur 403 (quota, permissions, etc.)
+                    logger.error(f"❌ Forbidden (403) de RapidAPI sur {path}: {error_details}")
+                    raise HTTPException(
+                        status_code=502,  # 502 car c'est une erreur côté provider
+                        detail={
+                            "code": "PROVIDER_FORBIDDEN",
+                            "message": "Accès refusé par le fournisseur astrologique (quota ou permissions)",
+                            "provider_error": error_details
+                        }
+                    )
 
             elif status == 404:
                 # Not Found - endpoint invalide
@@ -173,14 +196,27 @@ async def post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     # Dernière tentative échouée
                     logger.error(f"❌ Échec définitif après {MAX_RETRIES} tentatives: {status} - {error_details}")
-                    raise HTTPException(
-                        status_code=502,
-                        detail={
-                            "code": "PROVIDER_UNAVAILABLE",
-                            "message": f"Service astrologique indisponible après {MAX_RETRIES} tentatives (HTTP {status})",
-                            "provider_error": error_details
-                        }
-                    )
+
+                    # 429 = Rate Limit après retries -> code spécifique
+                    if status == 429:
+                        raise HTTPException(
+                            status_code=429,
+                            detail={
+                                "code": "RAPIDAPI_RATE_LIMIT",
+                                "message": "Rate limit reached. Try later.",
+                                "provider_error": error_details
+                            }
+                        )
+                    else:
+                        # Autres erreurs 5xx
+                        raise HTTPException(
+                            status_code=502,
+                            detail={
+                                "code": "PROVIDER_UNAVAILABLE",
+                                "message": f"Service astrologique indisponible après {MAX_RETRIES} tentatives (HTTP {status})",
+                                "provider_error": error_details
+                            }
+                        )
             else:
                 # Autre erreur 4xx non gérée explicitement
                 logger.error(f"❌ Erreur HTTP {status} inattendue de RapidAPI sur {path}: {error_details}")
@@ -231,6 +267,47 @@ async def post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     
     # Normalement inaccessible (pour mypy)
     raise HTTPException(status_code=502, detail="Erreur provider inattendue")
+
+
+def _get_mock_response(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Retourne un mock déterministe basé sur le path de l'endpoint.
+    Utilisé quand DEV_MOCK_RAPIDAPI=true ou quand RapidAPI retourne 403 "not subscribed"
+
+    Args:
+        path: Chemin de l'endpoint RapidAPI
+        payload: Payload de la requête (pour génération déterministe)
+
+    Returns:
+        Mock JSON compatible avec le schéma attendu
+
+    Raises:
+        HTTPException: 501 si l'endpoint n'a pas de mock disponible
+    """
+    from services.rapidapi_mocks import (
+        generate_lunar_mansion_mock,
+        generate_void_of_course_mock,
+        generate_lunar_return_report_mock
+    )
+
+    # Router vers le bon mock selon le path
+    if path == LUNAR_MANSIONS_PATH or "mansions" in path.lower():
+        return generate_lunar_mansion_mock(payload)
+    elif path == VOID_OF_COURSE_PATH or "void-of-course" in path.lower() or "voc" in path.lower():
+        return generate_void_of_course_mock(payload)
+    elif path == LUNAR_RETURN_REPORT_PATH or "lunar-return-report" in path.lower():
+        return generate_lunar_return_report_mock(payload)
+    else:
+        # Endpoint non mocké - retourner une erreur
+        logger.error(f"❌ Aucun mock disponible pour {path}")
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "code": "MOCK_NOT_IMPLEMENTED",
+                "message": f"Mock non disponible pour l'endpoint {path}",
+                "hint": "Contactez l'équipe dev ou activez RapidAPI subscription"
+            }
+        )
 
 
 async def close_client():

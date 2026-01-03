@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     # Mode DEV Mock (pour tester sans clé API)
     DEV_MOCK_EPHEMERIS: bool = Field(default=False, description="Mode mock DEV : génère des données fake si clé API manquante")
     DEV_MOCK_NATAL: bool = Field(default=False, description="Mode mock DEV : génère un thème natal fake sans appeler RapidAPI (uniquement en development)")
+    DEV_MOCK_RAPIDAPI: bool = Field(default=False, description="Mode mock DEV : génère des données mock pour Luna Pack (Mansion, VoC, Return Report) au lieu d'appeler RapidAPI")
     DEV_AUTH_BYPASS: bool = Field(default=False, description="Mode DEV: bypass JWT avec header X-Dev-User-Id (uniquement en development)")
     DEV_USER_ID: Optional[str] = Field(default=None, description="Mode DEV: ID utilisateur par défaut si X-Dev-User-Id absent (UUID ou integer)")
     LUNAR_RETURNS_DEV_DELAY_MS: int = Field(default=0, description="Délai DEV (ms) pour ralentir la génération lazy des lunar returns (tests de concurrence)")
