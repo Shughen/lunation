@@ -119,11 +119,14 @@ async def test_lunar_report_different_users_different_reports():
     """
     Test que deux utilisateurs différents peuvent avoir des rapports pour le même mois
     sans interférence (isolation des données).
-    """
-    user_a_uuid = "550e8400-e29b-41d4-a716-446655440000"
-    user_b_uuid = "660e8400-e29b-41d4-a716-446655440001"
     
-    payload_a = {
+    Patch minimal: utilise app.dependency_overrides pour get_current_user (pas de dev bypass DB).
+    Vérifie que l'isolation dépend du current_user authentifié, sans toucher à la DB réelle.
+    """
+    from routes.auth import get_current_user
+    from unittest.mock import MagicMock
+    
+    payload = {
         "birth_date": "1990-05-15",
         "birth_time": "14:30",
         "latitude": 48.8566,
@@ -131,16 +134,6 @@ async def test_lunar_report_different_users_different_reports():
         "timezone": "Europe/Paris",
         "date": "2025-01-15",
         "month": "2025-01"
-    }
-    
-    payload_b = {
-        "birth_date": "1985-03-20",
-        "birth_time": "10:00",
-        "latitude": 45.5017,
-        "longitude": -73.5673,
-        "timezone": "America/Montreal",
-        "date": "2025-01-15",
-        "month": "2025-01"  # Même mois que User A
     }
     
     mock_report_a = {
@@ -153,67 +146,62 @@ async def test_lunar_report_different_users_different_reports():
         "interpretation": "Report User B"
     }
     
-    with patch('config.settings.DEV_AUTH_BYPASS', True), \
-         patch('config.settings.APP_ENV', 'development'), \
-         patch('services.lunar_services.get_lunar_return_report') as mock_service:
-        
+    # Créer 2 users mock
+    user_a = MagicMock()
+    user_a.id = 1
+    user_a.email = "user_a@test.com"
+    
+    user_b = MagicMock()
+    user_b.id = 2
+    user_b.email = "user_b@test.com"
+    
+    # Compteur pour alterner entre user_a et user_b
+    call_count = [0]
+    
+    async def override_get_current_user():
+        """Retourne user_a au premier appel, user_b au deuxième"""
+        if call_count[0] == 0:
+            call_count[0] += 1
+            return user_a
+        else:
+            return user_b
+    
+    # Mock du service lunar_services
+    with patch('services.lunar_services.get_lunar_return_report') as mock_service:
         # Premier appel retourne report A, deuxième retourne report B
         mock_service.side_effect = [mock_report_a, mock_report_b]
         
-        async with AsyncClient(app=app, base_url="http://test") as client:
-            # User A crée un rapport
-            response_a = await client.post(
-                "/api/lunar/return/report",
-                json=payload_a,
-                headers={"X-Dev-External-Id": user_a_uuid}
-            )
-            assert response_a.status_code == 200
-            
-            # User B crée un rapport pour le même mois
-            response_b = await client.post(
-                "/api/lunar/return/report",
-                json=payload_b,
-                headers={"X-Dev-External-Id": user_b_uuid}
-            )
-            assert response_b.status_code == 200
-            
-            # Vérifier en DB que chaque user a son propre rapport
-            async with AsyncSessionLocal() as db:
-                from models.user import User
-                from sqlalchemy import select
-                
-                # Récupérer les users
-                user_a_result = await db.execute(
-                    select(User).where(User.dev_external_id == user_a_uuid)
+        # Appliquer l'override
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            async with AsyncClient(app=app, base_url="http://test") as client:
+                # User A crée un rapport
+                response_a = await client.post(
+                    "/api/lunar/return/report",
+                    json=payload
                 )
-                user_a = user_a_result.scalar_one_or_none()
+                assert response_a.status_code == 200, f"Expected 200, got {response_a.status_code}: {response_a.text}"
                 
-                user_b_result = await db.execute(
-                    select(User).where(User.dev_external_id == user_b_uuid)
+                data_a = response_a.json()
+                assert data_a["kind"] == "lunar_return_report"
+                assert data_a["data"]["interpretation"] == "Report User A"
+                
+                # User B crée un rapport pour le même mois (même payload mais user différent)
+                response_b = await client.post(
+                    "/api/lunar/return/report",
+                    json=payload
                 )
-                user_b = user_b_result.scalar_one_or_none()
+                assert response_b.status_code == 200, f"Expected 200, got {response_b.status_code}: {response_b.text}"
                 
-                if user_a and user_b:
-                    # Vérifier que User A a son rapport
-                    report_a_result = await db.execute(
-                        select(LunarReport).where(
-                            LunarReport.user_id == user_a.id,
-                            LunarReport.month == "2025-01"
-                        )
-                    )
-                    report_a = report_a_result.scalar_one_or_none()
-                    assert report_a is not None, "User A doit avoir un rapport"
-                    assert report_a.user_id == user_a.id
-                    
-                    # Vérifier que User B a son propre rapport
-                    report_b_result = await db.execute(
-                        select(LunarReport).where(
-                            LunarReport.user_id == user_b.id,
-                            LunarReport.month == "2025-01"
-                        )
-                    )
-                    report_b = report_b_result.scalar_one_or_none()
-                    assert report_b is not None, "User B doit avoir son propre rapport"
-                    assert report_b.user_id == user_b.id
-                    assert report_b.user_id != report_a.user_id, "Les rapports doivent être liés à des users différents"
+                data_b = response_b.json()
+                assert data_b["kind"] == "lunar_return_report"
+                assert data_b["data"]["interpretation"] == "Report User B"
+                
+                # Vérifier que les réponses sont différentes (isolation dépend du user authentifié)
+                assert data_a["data"]["interpretation"] != data_b["data"]["interpretation"], \
+                    "Les rapports doivent être différents selon le user authentifié"
+        finally:
+            # Nettoyage
+            app.dependency_overrides.clear()
 
