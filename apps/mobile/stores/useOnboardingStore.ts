@@ -39,6 +39,9 @@ interface OnboardingState {
   setDisclaimerSeen: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   reset: () => Promise<void>;
+  
+  // Action pour réinitialiser uniquement le flag profile (self-heal)
+  resetProfileFlag: () => Promise<void>;
 
   // Helper de navigation
   getNextOnboardingStep: () => string;
@@ -123,6 +126,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       hasCompletedOnboarding: state.hasCompletedOnboarding,
     };
     return getNextStep(flowState);
+  },
+
+  resetProfileFlag: async () => {
+    console.log('[OnboardingStore] [SELF_HEAL] Réinitialisation du flag hasCompletedProfile');
+    
+    // Supprimer uniquement le flag depuis AsyncStorage
+    // On ne supprime pas ONBOARDING_PROFILE car il peut être réutilisé si l'utilisateur complète à nouveau
+    // On met juste hasCompletedProfile à false dans le state
+    set({ hasCompletedProfile: false });
+    
+    console.log('[OnboardingStore] [SELF_HEAL] Flag hasCompletedProfile réinitialisé à false');
   },
 
   reset: async () => {

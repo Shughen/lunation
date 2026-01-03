@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { STORAGE_KEYS } from '../types/storage';
+import { isProfileComplete } from '../utils/onboardingHelpers';
 
 describe('useOnboardingStore - Reset & Re-hydration', () => {
   beforeEach(async () => {
@@ -183,5 +184,128 @@ describe('useOnboardingStore - Reset & Re-hydration', () => {
     expect(state.hasCompletedOnboarding).toBe(false);
     expect(state.profileData).toBeNull();
     expect(state.hydrated).toBe(false);
+  });
+});
+
+describe('useOnboardingStore - Self-heal (resetProfileFlag)', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    useOnboardingStore.setState({
+      hasSeenWelcomeScreen: false,
+      hasCompletedProfile: false,
+      hasAcceptedConsent: false,
+      hasSeenDisclaimer: false,
+      hasCompletedOnboarding: false,
+      profileData: null,
+      hydrated: false,
+    });
+  });
+
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('devrait réinitialiser uniquement hasCompletedProfile à false', async () => {
+    // Setup: État avec profil incomplet mais flag à true (état incohérent)
+    useOnboardingStore.setState({
+      hasSeenWelcomeScreen: true,
+      hasCompletedProfile: true, // ⚠️ Flag à true
+      hasAcceptedConsent: true,
+      hasSeenDisclaimer: true,
+      hasCompletedOnboarding: false,
+      profileData: null, // ⚠️ Mais profileData est null (incohérence)
+      hydrated: true,
+    });
+
+    // Exécuter resetProfileFlag
+    await useOnboardingStore.getState().resetProfileFlag();
+
+    // Vérifier que seul hasCompletedProfile a changé
+    const state = useOnboardingStore.getState();
+    expect(state.hasCompletedProfile).toBe(false);
+    expect(state.hasSeenWelcomeScreen).toBe(true); // Non modifié
+    expect(state.hasAcceptedConsent).toBe(true); // Non modifié
+    expect(state.hasSeenDisclaimer).toBe(true); // Non modifié
+    expect(state.hasCompletedOnboarding).toBe(false); // Non modifié
+    expect(state.profileData).toBeNull(); // Non modifié
+    expect(state.hydrated).toBe(true); // Non modifié
+  });
+
+  it('devrait permettre de détecter incohérence hasCompletedProfile=true mais profil incomplet', async () => {
+    // Setup: État incohérent
+    const incompleteProfile = {
+      birthDate: new Date('1990-01-15'),
+      // Manque birthTime, birthPlace, lat/lon
+    };
+    
+    useOnboardingStore.setState({
+      hasCompletedProfile: true, // Flag à true
+      profileData: incompleteProfile, // Mais profil incomplet
+      hydrated: true,
+    });
+
+    const state = useOnboardingStore.getState();
+    const profileIsComplete = isProfileComplete(state.profileData);
+
+    // Vérifier détection de l'incohérence
+    expect(state.hasCompletedProfile).toBe(true);
+    expect(profileIsComplete).toBe(false); // Le profil est bien incomplet
+  });
+
+  it('devrait permettre de corriger incohérence avec resetProfileFlag', async () => {
+    // Setup: État incohérent
+    const incompleteProfile = {
+      birthDate: new Date('1990-01-15'),
+      // Manque birthTime, birthPlace, lat/lon
+    };
+    
+    useOnboardingStore.setState({
+      hasCompletedProfile: true,
+      profileData: incompleteProfile,
+      hydrated: true,
+    });
+
+    // Vérifier incohérence
+    const beforeState = useOnboardingStore.getState();
+    expect(beforeState.hasCompletedProfile).toBe(true);
+    expect(isProfileComplete(beforeState.profileData)).toBe(false);
+
+    // Corriger avec resetProfileFlag
+    await useOnboardingStore.getState().resetProfileFlag();
+
+    // Vérifier correction
+    const afterState = useOnboardingStore.getState();
+    expect(afterState.hasCompletedProfile).toBe(false);
+    expect(isProfileComplete(afterState.profileData)).toBe(false); // Toujours incomplet, mais cohérent maintenant
+  });
+
+  it('devrait gérer le cas hasCompletedOnboarding=true mais profil incomplet', async () => {
+    // Setup: Onboarding complété mais profil incomplet (cas problématique)
+    const incompleteProfile = {
+      birthDate: new Date('1990-01-15'),
+      // Manque birthTime, birthPlace, lat/lon
+    };
+    
+    useOnboardingStore.setState({
+      hasCompletedProfile: true,
+      hasCompletedOnboarding: true, // ⚠️ Onboarding complété
+      profileData: incompleteProfile, // Mais profil incomplet
+      hydrated: true,
+    });
+
+    const state = useOnboardingStore.getState();
+    const profileIsComplete = isProfileComplete(state.profileData);
+
+    // Vérifier que l'incohérence est détectée
+    expect(state.hasCompletedOnboarding).toBe(true);
+    expect(state.hasCompletedProfile).toBe(true);
+    expect(profileIsComplete).toBe(false);
+
+    // Le self-heal devrait réinitialiser hasCompletedProfile
+    await useOnboardingStore.getState().resetProfileFlag();
+
+    const afterState = useOnboardingStore.getState();
+    expect(afterState.hasCompletedProfile).toBe(false);
+    // Note: hasCompletedOnboarding reste à true (on ne le reset pas, on force juste profile-setup)
   });
 });
