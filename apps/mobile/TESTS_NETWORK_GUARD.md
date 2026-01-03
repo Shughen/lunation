@@ -14,9 +14,11 @@ Le système `requestGuard` implémente 2 mécanismes pour éviter le spam résea
 | Endpoint | TTL | Dédup | Raison |
 |----------|-----|-------|--------|
 | `lunar-returns/current` | 60s | ✅ | Peu changeant, appelé au mount de plusieurs écrans |
-| `lunar/voc` | 2min | ✅ | Peut changer rapidement (fenêtres VoC) |
+| `lunar/voc` | 5min | ✅ | Peut changer rapidement (fenêtres VoC) |
 | `lunar/mansion` | 5min | ✅ | Données peu changeantes (1 mansion/jour) |
 | `lunar/return/report` | 5min | ✅ | Données stables (rapport mensuel) |
+
+**Note importante** : Les endpoints `lunar/voc` et `lunar/mansion` utilisent uniquement `date` dans la cache key (le paramètre `time` est exclu). Cela garantit une cache key stable tout au long de la journée, évitant les refetch inutiles chaque minute. Le payload complet (incluant `time`) est toujours envoyé au backend, mais le cache ignore ce paramètre.
 
 ---
 
