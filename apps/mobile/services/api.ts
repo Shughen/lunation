@@ -539,7 +539,7 @@ export const getLunarReturnReport = async (payload: {
 
 /**
  * Fonction standalone pour obtenir le statut Void of Course
- * Avec requestGuard: dédup + cache 2min (peut changer rapidement)
+ * Avec requestGuard: dédup + cache 5min
  */
 export const getVoidOfCourse = async (payload: {
   date: string;
@@ -549,20 +549,21 @@ export const getVoidOfCourse = async (payload: {
   timezone: string;
   [key: string]: any;
 }) => {
-  const params = { date: payload.date, time: payload.time };
+  // cache key stable: time excluded to prevent minute-by-minute refetch
+  const params = { date: payload.date };
   return guardedRequest(
     'lunar/voc',
     async () => {
       const response = await apiClient.post('/api/lunar/voc', payload);
       return response.data;
     },
-    { ttl: 120000, params } // Cache 2min avec params pour clé stable
+    { ttl: 300000, params } // Cache 5min
   );
 };
 
 /**
  * Fonction standalone pour obtenir la mansion lunaire
- * Avec requestGuard: dédup + cache 5min (données peu changeantes)
+ * Avec requestGuard: dédup + cache 5min
  */
 export const getLunarMansion = async (payload: {
   date: string;
@@ -572,14 +573,15 @@ export const getLunarMansion = async (payload: {
   timezone: string;
   [key: string]: any;
 }) => {
-  const params = { date: payload.date, time: payload.time };
+  // cache key stable: time excluded to prevent minute-by-minute refetch
+  const params = { date: payload.date };
   return guardedRequest(
     'lunar/mansion',
     async () => {
       const response = await apiClient.post('/api/lunar/mansion', payload);
       return response.data;
     },
-    { ttl: 300000, params } // Cache 5min avec params pour clé stable
+    { ttl: 300000, params } // Cache 5min
   );
 };
 
