@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 
 const LinearGradientComponent = LinearGradient || (({ colors, style, children, ...props }: any) => {
@@ -33,6 +33,7 @@ const STORAGE_KEY = 'journal_entries';
 
 export default function JournalScreen() {
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
+  const router = useRouter();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [currentText, setCurrentText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -106,7 +107,16 @@ export default function JournalScreen() {
       setEntries(trimmed);
       setCurrentText('');
 
-      Alert.alert('✅ Sauvegardé', 'Votre entrée a été enregistrée avec succès');
+      Alert.alert(
+        '✅ Sauvegardé',
+        'Votre entrée a été enregistrée avec succès',
+        [
+          {
+            text: '🌙 Retour au rituel',
+            onPress: () => router.replace('/'),
+          },
+        ]
+      );
     } catch (error) {
       console.error('[JOURNAL] Erreur sauvegarde:', error);
       Alert.alert('Erreur', 'Impossible de sauvegarder votre entrée');
