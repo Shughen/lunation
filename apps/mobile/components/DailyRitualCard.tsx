@@ -128,9 +128,8 @@ export function DailyRitualCard() {
   };
 
   const handleCtaPress = () => {
-    // Navigation vers page climat lunaire (future)
-    // Pour l'instant, on peut naviguer vers /lunar ou créer /lunar/daily-climate
-    router.push('/lunar');
+    // Navigation vers page climat lunaire avec focus sur Daily Climate
+    router.push('/lunar?focus=daily_climate');
   };
 
   const handleJournalPress = () => {
