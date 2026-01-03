@@ -30,7 +30,7 @@ class LunarRequestBase(BaseModel):
 
 class LunarReturnReportRequest(LunarRequestBase):
     """Requête spécifique pour le Lunar Return Report"""
-    user_id: Optional[int] = Field(None, description="ID utilisateur pour sauvegarde en DB")
+    # Note: user_id supprimé pour sécurité - toujours utiliser l'utilisateur authentifié
     month: Optional[str] = Field(None, description="Mois au format YYYY-MM pour indexation")
 
 
