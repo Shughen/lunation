@@ -34,6 +34,7 @@ import { DailyRitualCard } from '../components/DailyRitualCard';
 import { setupNotificationTapListener, shouldReschedule } from '../services/notificationScheduler';
 import { cleanupGhostFlags } from '../services/onboardingMigration';
 import { trackEvent } from '../utils/analytics';
+import { isProfileComplete } from '../utils/onboardingHelpers';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -47,6 +48,8 @@ export default function HomeScreen() {
   const hasSeenDisclaimer = useOnboardingStore((state) => state.hasSeenDisclaimer);
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
   const hydrateOnboarding = useOnboardingStore((state) => state.hydrate);
+  const resetProfileFlag = useOnboardingStore((state) => state.resetProfileFlag);
+  const profileData = useOnboardingStore((state) => state.profileData);
 
   const { notificationsEnabled, hydrated, loadPreferences, scheduleAllNotifications } = useNotificationsStore();
   const { isResetting } = useResetStore();
@@ -54,6 +57,7 @@ export default function HomeScreen() {
   const [isCheckingRouting, setIsCheckingRouting] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const routingInFlightRef = useRef(false);
+  const selfHealExecutedRef = useRef(false); // Guard anti-boucle pour self-heal
   const [dailyClimate, setDailyClimate] = useState<{
     date: string;
     moon: { sign: string; degree: number; phase: string };
@@ -104,6 +108,52 @@ export default function HomeScreen() {
           hasSeenDisclaimer,
           hasCompletedOnboarding,
         });
+
+        // SELF-HEAL: Vérifier et corriger incohérences profil/flags
+        // Exécuter une seule fois par session pour éviter boucles infinies
+        if (!selfHealExecutedRef.current) {
+          const profileIsComplete = isProfileComplete(profileData);
+          
+          // Cas A: hasCompletedProfile=true mais profil incomplet
+          if (hasCompletedProfile && !profileIsComplete) {
+            console.log('[SELF_HEAL] ⚠️ Incohérence détectée: hasCompletedProfile=true mais profil incomplet');
+            console.log('[SELF_HEAL] Profil actuel:', {
+              hasProfileData: !!profileData,
+              birthDate: profileData?.birthDate ? 'présent' : 'manquant',
+              birthTime: profileData?.birthTime || 'manquant',
+              birthPlace: profileData?.birthPlace || 'manquant',
+              lat: profileData?.birthLatitude,
+              lon: profileData?.birthLongitude,
+            });
+            console.log('[SELF_HEAL] → Réinitialisation du flag hasCompletedProfile');
+            
+            await resetProfileFlag();
+            selfHealExecutedRef.current = true; // Marquer comme exécuté
+            
+            // Forcer redirection vers profile-setup
+            console.log('[SELF_HEAL] → Redirection vers /onboarding/profile-setup');
+            router.replace('/onboarding/profile-setup');
+            return;
+          }
+          
+          // Cas B: hasCompletedOnboarding=true mais profil incomplet
+          // Ne pas toucher hasCompletedOnboarding mais forcer profile-setup
+          if (hasCompletedOnboarding && !profileIsComplete) {
+            console.log('[SELF_HEAL] ⚠️ Incohérence détectée: hasCompletedOnboarding=true mais profil incomplet');
+            console.log('[SELF_HEAL] → Réinitialisation du flag hasCompletedProfile et redirection');
+            
+            await resetProfileFlag();
+            selfHealExecutedRef.current = true; // Marquer comme exécuté
+            
+            // Forcer redirection vers profile-setup
+            console.log('[SELF_HEAL] → Redirection vers /onboarding/profile-setup');
+            router.replace('/onboarding/profile-setup');
+            return;
+          }
+          
+          // Si tout est cohérent, marquer comme vérifié pour éviter re-vérifications
+          selfHealExecutedRef.current = true;
+        }
 
         // En mode DEV_AUTH_BYPASS, log clair et skip uniquement auth
         const isBypassActive = isDevAuthBypassActive();
@@ -178,8 +228,17 @@ export default function HomeScreen() {
     hasSeenDisclaimer,
     hasCompletedOnboarding,
     hydrateOnboarding,
+    resetProfileFlag,
+    profileData,
     router,
   ]);
+
+  // Réinitialiser le guard self-heal quand l'hydratation change (pour permettre re-vérification après reset)
+  useEffect(() => {
+    if (!isOnboardingHydrated) {
+      selfHealExecutedRef.current = false;
+    }
+  }, [isOnboardingHydrated]);
 
   // Hydratation store notifications au mount
   useEffect(() => {
