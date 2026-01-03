@@ -21,10 +21,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd="pg_isready -U postgres -d astro_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/astro_test
@@ -57,14 +57,41 @@ jobs:
           echo "❌ PostgreSQL failed to start after 30 attempts"
           exit 1
       
+      - name: Debug DB connection
+        env:
+          PGPASSWORD: "postgres"
+        run: |
+          echo "🔍 Checking DB connection and user..."
+          psql -h 127.0.0.1 -p 5432 -U postgres -d astro_test -c "SELECT current_user, current_database();"
+          echo "✅ DB connection successful"
+      
       - name: Run migrations
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd apps/api
+          echo "📊 Checking Alembic state before migration..."
+          alembic heads
+          echo "📊 Current revision:"
+          alembic current || echo "No current revision (fresh DB)"
+          echo "🔄 Running migrations..."
           alembic upgrade head
+          echo "✅ Migrations completed"
+          echo "📊 Checking Alembic state after migration..."
+          alembic current
+      
+      - name: Verify schema
+        env:
+          PGPASSWORD: "postgres"
+        run: |
+          echo "🔍 Verifying users table schema..."
+          psql -h 127.0.0.1 -p 5432 -U postgres -d astro_test -c "\d users" || echo "psql \d failed, trying alternative query..."
+          psql -h 127.0.0.1 -p 5432 -U postgres -d astro_test -c "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name='users' AND column_name='dev_external_id';"
+          echo "✅ Schema verification completed"
           
       - name: Run tests
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd apps/api
           pytest -q --tb=short
