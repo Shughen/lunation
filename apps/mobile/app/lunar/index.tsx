@@ -109,6 +109,15 @@ export default function LunaPackScreen() {
     }, [checkAlreadyViewedToday])
   );
 
+  // Auto-charger Daily Climate si déjà consulté aujourd'hui et pas encore chargé
+  useEffect(() => {
+    if (alreadyViewedToday && !dailyClimate && !dailyClimateLoading) {
+      // Charger automatiquement (skipStorageUpdate = true car déjà vu, pas besoin de réécrire ni tracker)
+      loadDailyClimate(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alreadyViewedToday, dailyClimate, dailyClimateLoading]);
+
   // Scroll automatique vers Daily Climate section
   useEffect(() => {
     if (focus === 'daily_climate' && dailyClimateSectionY !== null && scrollViewRef.current) {
@@ -125,12 +134,32 @@ export default function LunaPackScreen() {
   };
 
   // Charger Daily Climate
-  const loadDailyClimate = async () => {
+  const loadDailyClimate = async (skipStorageUpdate = false) => {
     if (dailyClimateLoading || dailyClimate) return;
     setDailyClimateLoading(true);
     try {
       const data = await lunaPack.getDailyClimate();
       setDailyClimate(data);
+      
+      // Si ce n'est pas un rechargement automatique, mettre à jour AsyncStorage et tracker
+      if (!skipStorageUpdate) {
+        // Lire lastViewedDate avant écriture pour calculer firstOfDay
+        const lastViewedDate = await AsyncStorage.getItem('dailyClimate:lastViewedDate');
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        // Déterminer firstOfDay
+        const firstOfDay = lastViewedDate !== today;
+        
+        // Écrire lastViewedDate = aujourd'hui
+        await AsyncStorage.setItem('dailyClimate:lastViewedDate', today);
+        setAlreadyViewedToday(true);
+        
+        // Track event
+        trackEvent({
+          name: 'daily_climate_view',
+          properties: { firstOfDay, source: 'lunar' },
+        });
+      }
     } catch (error) {
       console.error('[LUNAR] Erreur chargement Daily Climate:', error);
     } finally {
