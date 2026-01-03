@@ -196,7 +196,22 @@ async def lunar_return_report(
             - 502 si erreur provider RapidAPI
     """
     # 🔒 CRITIQUE: Extraire user_id IMMÉDIATEMENT pour éviter MissingGreenlet
-    user_id = int(current_user.id)
+    # Validation explicite: garantir que current_user a un id valide
+    if not current_user or not hasattr(current_user, 'id') or current_user.id is None:
+        logger.error("❌ Authentification invalide: current_user ou current_user.id manquant")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentification invalide: utilisateur non identifié"
+        )
+    
+    try:
+        user_id = int(current_user.id)
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.error(f"❌ Erreur extraction user_id: {e}, current_user={current_user}")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentification invalide: impossible d'identifier l'utilisateur"
+        )
 
     try:
         # Conversion du modèle Pydantic en dict pour l'API

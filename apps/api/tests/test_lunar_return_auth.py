@@ -76,3 +76,46 @@ async def test_lunar_return_report_with_dev_bypass_succeeds():
             data = response.json()
             assert data["provider"] == "rapidapi"
             assert data["kind"] == "lunar_return_report"
+
+
+@pytest.mark.asyncio
+async def test_lunar_return_report_with_invalid_user_id_returns_401():
+    """
+    Test: Si current_user est présent mais id=None, doit retourner 401.
+    
+    Scénario: get_current_user retourne un objet sans id valide
+    """
+    from routes.auth import get_current_user
+    from unittest.mock import MagicMock
+    from types import SimpleNamespace
+    
+    valid_payload = {
+        "birth_date": "1989-04-15",
+        "birth_time": "17:55",
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "timezone": "Europe/Paris",
+        "date": "2025-01-15",
+        "month": "2025-01"
+    }
+    
+    # Créer un user avec id=None
+    invalid_user = SimpleNamespace(id=None, email="test@test.com")
+    
+    # Override get_current_user pour retourner un user avec id=None
+    async def override_get_current_user_invalid():
+        return invalid_user
+    
+    app.dependency_overrides[get_current_user] = override_get_current_user_invalid
+    
+    try:
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await client.post("/api/lunar/return/report", json=valid_payload)
+            
+            # Doit retourner 401 Unauthorized
+            assert response.status_code == 401, f"Expected 401, got {response.status_code}: {response.text}"
+            data = response.json()
+            assert "Authentification invalide" in data["detail"]
+    finally:
+        # Nettoyage
+        app.dependency_overrides.clear()
