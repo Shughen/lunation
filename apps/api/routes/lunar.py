@@ -241,8 +241,8 @@ async def lunar_return_report(
                         LunarReport.month == request.month
                     )
                 )
-                existing = await db.execute(stmt)
-                existing_report = existing.scalar_one_or_none()
+                result_db = await db.execute(stmt)
+                existing_report = result_db.scalar_one_or_none()
 
                 if existing_report:
                     # Mise à jour du rapport existant
@@ -258,11 +258,17 @@ async def lunar_return_report(
                     db.add(lunar_report)
                     logger.info(f"💾 Nouveau rapport sauvegardé - user_id: {user_id}, month: {request.month}")
 
+                # FIX: flush avant commit pour détecter les erreurs de contrainte AVANT commit
+                await db.flush()
                 await db.commit()
 
             except Exception as e:
                 logger.error(f"❌ Erreur sauvegarde DB: {str(e)}")
-                await db.rollback()
+                # FIX: rollback explicite pour libérer proprement la session
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass  # Si rollback échoue, on ignore (session peut être déjà fermée)
                 # On continue malgré l'erreur DB, on retourne quand même les données
 
         return LunarResponse(
@@ -353,12 +359,18 @@ async def void_of_course(
                         source=result
                     )
                     db.add(voc_window)
+                    # FIX: flush avant commit pour détecter les erreurs de contrainte AVANT commit
+                    await db.flush()
                     await db.commit()
                     logger.info(f"💾 Fenêtre VoC sauvegardée: {start_at} -> {end_at}")
-                    
+
                 except Exception as e:
                     logger.warning(f"⚠️  Impossible de sauvegarder la fenêtre VoC: {str(e)}")
-                    await db.rollback()
+                    # FIX: rollback explicite pour libérer proprement la session
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass  # Si rollback échoue, on ignore
 
         return LunarResponse(
             provider=provider,
@@ -461,15 +473,13 @@ async def lunar_mansion(
 
                 # Upsert: vérifier si existe déjà pour cette date
                 stmt = select(LunarMansionDaily).where(LunarMansionDaily.date == target_date)
-                existing = await db.execute(stmt)
-                existing_mansion = existing.scalar_one_or_none()
+                result_db = await db.execute(stmt)
+                existing_mansion = result_db.scalar_one_or_none()
 
                 if existing_mansion:
                     # Mise à jour
                     existing_mansion.mansion_id = mansion_id
                     existing_mansion.data = result
-                    await db.commit()
-                    logger.info(f"♻️  Mansion #{mansion_id} mise à jour pour {target_date}")
                 else:
                     # Création
                     mansion_entry = LunarMansionDaily(
@@ -478,12 +488,23 @@ async def lunar_mansion(
                         data=result
                     )
                     db.add(mansion_entry)
-                    await db.commit()
+
+                # FIX: flush avant commit pour détecter les erreurs de contrainte AVANT commit
+                await db.flush()
+                await db.commit()
+
+                if existing_mansion:
+                    logger.info(f"♻️  Mansion #{mansion_id} mise à jour pour {target_date}")
+                else:
                     logger.info(f"💾 Mansion #{mansion_id} sauvegardée pour {target_date}")
 
             except Exception as e:
                 logger.error(f"❌ Erreur sauvegarde DB mansion: {str(e)}")
-                await db.rollback()
+                # FIX: rollback explicite pour libérer proprement la session
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass  # Si rollback échoue, on ignore (session peut être déjà fermée)
                 # Continue malgré erreur DB, on retourne quand même les données
 
         return LunarResponse(

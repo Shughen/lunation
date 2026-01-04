@@ -62,25 +62,35 @@ def pytest_runtest_teardown(item):
         time.sleep(1.0)
 
 
+# Store global partagé pour les objets persistés (UNIQUEMENT pour tests)
+# Permet de partager les données entre FakeAsyncSession sans partager la session
+_FAKE_DB_STORAGE = {
+    "objects": []  # Liste d'objets committés (partagés entre sessions)
+}
+
 class FakeAsyncSession:
     """
     Stub AsyncSession minimal pour les tests.
     Ne crée pas de vraie connection DB (évite greenlet).
-    
+
     Supporte:
     - execute(query) -> FakeResult
     - scalar_one_or_none() -> objet mocké ou None
     - commit(), rollback(), close()
     - add(), refresh()
+
+    IMPORTANT: Chaque instance est indépendante (pas de session partagée),
+    mais les données committées sont persistées dans _FAKE_DB_STORAGE pour
+    permettre la persistence entre requêtes HTTP.
     """
-    
+
     def __init__(self, scenario: Optional[str] = None):
         """
         Args:
             scenario: "natal_exists" | "natal_missing" | None (default: natal_exists)
         """
         self.scenario = scenario or "natal_exists"
-        self._added_objects = []
+        self._added_objects = []  # Objets non-committés (propres à cette session)
         self._committed = False
         
     async def execute(self, query):
@@ -121,13 +131,35 @@ class FakeAsyncSession:
             else:  # natal_missing
                 fake_result._scalar = None
         elif "LunarReturn" in query_str or "lunar_returns" in query_str:
-            # Si c'est un DELETE, retourner un FakeResult avec rowcount
+            # Si c'est un DELETE, supprimer depuis le storage global
             if "DELETE" in query_str.upper() or "delete" in query_str:
-                fake_result._rowcount = 0  # Pas de suppression dans les tests
+                # Extraire user_id si présent dans la query (pour filter le DELETE)
+                initial_count = len([o for o in _FAKE_DB_STORAGE["objects"] if isinstance(o, LunarReturn)])
+
+                if "user_id" in query_str:
+                    # DELETE avec filtre user_id
+                    _FAKE_DB_STORAGE["objects"] = [
+                        o for o in _FAKE_DB_STORAGE["objects"]
+                        if not (isinstance(o, LunarReturn) and hasattr(o, 'user_id') and o.user_id == 1)
+                    ]
+                else:
+                    # DELETE sans filtre (tous les LunarReturn)
+                    _FAKE_DB_STORAGE["objects"] = [
+                        o for o in _FAKE_DB_STORAGE["objects"]
+                        if not isinstance(o, LunarReturn)
+                    ]
+
+                final_count = len([o for o in _FAKE_DB_STORAGE["objects"] if isinstance(o, LunarReturn)])
+                fake_result._rowcount = initial_count - final_count
                 return fake_result
             
-            # Si c'est un SELECT, filtrer les objets ajoutés selon les conditions
-            lunar_returns = [obj for obj in self._added_objects if isinstance(obj, LunarReturn)]
+            # Si c'est un SELECT, filtrer depuis le storage global (objets committés)
+            # PLUS les objets de cette session (non encore committés)
+            all_returns = (
+                [obj for obj in _FAKE_DB_STORAGE["objects"] if isinstance(obj, LunarReturn)] +
+                [obj for obj in self._added_objects if isinstance(obj, LunarReturn)]
+            )
+            lunar_returns = all_returns
             
             # Filtrer par user_id si présent dans la query
             if "user_id" in query_str:
@@ -176,7 +208,19 @@ class FakeAsyncSession:
         return fake_result
     
     async def commit(self):
+        """Commit les objets ajoutés dans le storage global partagé"""
         self._committed = True
+        # Persister les objets ajoutés dans le storage global
+        for obj in self._added_objects:
+            # Éviter les doublons (check par id si présent)
+            if hasattr(obj, 'id') and obj.id:
+                # Supprimer ancien objet avec même id si existe
+                _FAKE_DB_STORAGE["objects"] = [
+                    o for o in _FAKE_DB_STORAGE["objects"]
+                    if not (hasattr(o, 'id') and o.id == obj.id)
+                ]
+            _FAKE_DB_STORAGE["objects"].append(obj)
+        self._added_objects = []  # Clear après commit
     
     async def flush(self):
         """No-op pour les tests"""
@@ -264,7 +308,7 @@ def override_dependencies(fake_user):
     """
     Fixture qui override oauth2_scheme, get_current_user, et get_db.
     Scenario par défaut: "natal_exists"
-    
+
     Usage:
         @pytest.mark.asyncio
         async def test_something(override_dependencies):
@@ -275,38 +319,40 @@ def override_dependencies(fake_user):
     """
     from routes.auth import oauth2_scheme, get_current_user
     from database import get_db
-    
+
+    # IMPORTANT: Clear le storage global AVANT chaque test pour isolation
+    _FAKE_DB_STORAGE["objects"].clear()
+
     # Override oauth2_scheme pour retourner un token factice
     async def override_oauth2_scheme():
         return "test-token"
-    
+
     # Override get_current_user pour retourner fake_user
     async def override_get_current_user():
         return fake_user
-    
-    # Créer une seule instance de FakeAsyncSession partagée pour toutes les requêtes
-    shared_session = FakeAsyncSession(scenario="natal_exists")
-    
-    # Override get_db pour retourner la même FakeAsyncSession (partagée entre requêtes)
+
+    # Override get_db pour créer une NOUVELLE session par requête (éviter "another operation is in progress")
     async def override_get_db():
-        yield shared_session
-    
+        session = FakeAsyncSession(scenario="natal_exists")
+        yield session
+
     # Appliquer les overrides
     app.dependency_overrides[oauth2_scheme] = override_oauth2_scheme
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_db] = override_get_db
-    
+
     yield
-    
+
     # Nettoyage
     app.dependency_overrides.clear()
+    _FAKE_DB_STORAGE["objects"].clear()  # Clean storage après test
 
 
 @pytest.fixture
 def override_dependencies_no_natal(fake_user):
     """
     Fixture similaire mais avec scenario "natal_missing"
-    
+
     Usage:
         @pytest.mark.asyncio
         async def test_error(override_dependencies_no_natal):
@@ -316,22 +362,71 @@ def override_dependencies_no_natal(fake_user):
     """
     from routes.auth import oauth2_scheme, get_current_user
     from database import get_db
-    
+
+    # IMPORTANT: Clear le storage global AVANT chaque test pour isolation
+    _FAKE_DB_STORAGE["objects"].clear()
+
     async def override_oauth2_scheme():
         return "test-token"
-    
+
     async def override_get_current_user():
         return fake_user
-    
+
     async def override_get_db():
         async_session = FakeAsyncSession(scenario="natal_missing")
         yield async_session
-    
+
     app.dependency_overrides[oauth2_scheme] = override_oauth2_scheme
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_db] = override_get_db
-    
+
     yield
-    
+
     app.dependency_overrides.clear()
+    _FAKE_DB_STORAGE["objects"].clear()  # Clean storage après test
+
+
+@pytest.fixture(autouse=True)
+async def real_db_isolation(request):
+    """
+    Fixture autouse qui isole les tests marqués real_db via TRUNCATE.
+    
+    Exécute TRUNCATE ... RESTART IDENTITY CASCADE avant ET après chaque test
+    pour garantir une isolation complète des données.
+    
+    Utilise un engine dédié avec NullPool pour éviter toute collision avec
+    l'engine global de l'app.
+    """
+    # Ne s'applique que si le test est marqué real_db
+    if not request.node.get_closest_marker("real_db"):
+        yield
+        return
+    
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy import text
+    from config import settings
+    
+    # Créer un engine dédié avec NullPool uniquement pour les TRUNCATE
+    # Convertir postgresql:// en postgresql+asyncpg://
+    database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    truncate_engine = create_async_engine(database_url, poolclass=NullPool)
+    
+    try:
+        # TRUNCATE avant le test (un seul statement multi-tables)
+        async with truncate_engine.begin() as conn:
+            await conn.execute(
+                text("TRUNCATE TABLE lunar_reports, lunar_returns, users RESTART IDENTITY CASCADE")
+            )
+        
+        yield
+        
+        # TRUNCATE après le test (un seul statement multi-tables)
+        async with truncate_engine.begin() as conn:
+            await conn.execute(
+                text("TRUNCATE TABLE lunar_reports, lunar_returns, users RESTART IDENTITY CASCADE")
+            )
+    finally:
+        # Fermer proprement les connexions
+        await truncate_engine.dispose()
 
