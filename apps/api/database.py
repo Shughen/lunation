@@ -4,7 +4,10 @@ Configuration SQLAlchemy (async)
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 from config import settings
+import os
+import sys
 
 # Convertir postgresql:// en postgresql+asyncpg://
 DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
@@ -18,13 +21,24 @@ logger.info(f"🔗 Database URL: postgresql://{parsed.username}:***@{parsed.host
 logger.info(f"🔗 Database host: {parsed.hostname}")
 logger.info(f"🔗 Database port: {parsed.port}")
 
+# Détection environnement test: APP_ENV == "test" OU pytest est importé
+# Utilise sys.modules pour détecter pytest de manière fiable à l'import
+IS_PYTEST = "pytest" in sys.modules
+IS_TEST_ENV = os.getenv("APP_ENV", "").lower() == "test" or IS_PYTEST
+
 # Engine async
-engine = create_async_engine(
-    DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    echo=True if settings.APP_ENV == "development" else False
-)
+# En test: NullPool pour éviter les problèmes de pool/isolement DB
+# En prod/dev: pool normal
+engine_kwargs = {
+    "echo": True if settings.APP_ENV == "development" else False
+}
+if IS_TEST_ENV:
+    engine_kwargs["poolclass"] = NullPool
+else:
+    engine_kwargs["pool_size"] = settings.DATABASE_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
+
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 # Session factory
 AsyncSessionLocal = async_sessionmaker(

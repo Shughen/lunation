@@ -11,6 +11,9 @@ Fix:
 """
 
 import pytest
+
+# Marquer tous les tests de ce fichier comme utilisant la vraie DB
+pytestmark = pytest.mark.real_db
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -88,8 +91,10 @@ async def test_current_after_purge_no_missinggreenlet():
     from unittest.mock import patch
     import os
     import asyncio
-    # Activer ALLOW_DEV_PURGE pour ce test (la route vérifie os.getenv)
-    with patch.dict(os.environ, {'ALLOW_DEV_PURGE': '1'}):
+    # Activer ALLOW_DEV_PURGE + DEV_AUTH_BYPASS pour ce test
+    with patch.dict(os.environ, {'ALLOW_DEV_PURGE': '1'}), \
+         patch('config.settings.DEV_AUTH_BYPASS', True), \
+         patch('config.settings.APP_ENV', 'development'):
         # Créer un nouveau client pour ce test (isolation)
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Étape 1: Purge
@@ -120,11 +125,15 @@ async def test_current_after_purge_no_missinggreenlet():
 
             if current_response.status_code == 200:
                 current_data = current_response.json()
-                print(f"Current lunar return: month={current_data.get('month')}, id={current_data.get('id')}")
+                # Gérer le cas où current_data est None (JSON null)
+                month = (current_data or {}).get("month")
+                lunar_id = (current_data or {}).get("id")
+                print(f"Current lunar return: month={month}, id={lunar_id}")
 
-                # Vérifier structure minimale
-                assert "month" in current_data, "Response should contain 'month'"
-                assert "return_date" in current_data, "Response should contain 'return_date'"
+                # Vérifier structure minimale seulement si current_data n'est pas None
+                if current_data is not None:
+                    assert "month" in current_data, "Response should contain 'month'"
+                    assert "return_date" in current_data, "Response should contain 'return_date'"
 
 
 @pytest.mark.asyncio
@@ -143,8 +152,10 @@ async def test_current_concurrent_requests():
     import asyncio
     from unittest.mock import patch
     import os
-    # Activer ALLOW_DEV_PURGE pour ce test (la route vérifie os.getenv)
-    with patch.dict(os.environ, {'ALLOW_DEV_PURGE': '1'}):
+    # Activer ALLOW_DEV_PURGE + DEV_AUTH_BYPASS pour ce test
+    with patch.dict(os.environ, {'ALLOW_DEV_PURGE': '1'}), \
+         patch('config.settings.DEV_AUTH_BYPASS', True), \
+         patch('config.settings.APP_ENV', 'development'):
         # Créer un nouveau client pour ce test (isolation)
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Purge

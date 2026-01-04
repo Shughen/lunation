@@ -17,6 +17,7 @@ from database import AsyncSessionLocal
 
 
 @pytest.mark.asyncio
+@pytest.mark.real_db
 async def test_lunar_report_uses_authenticated_user_not_request_userid():
     """
     Test de sécurité: même si le payload contient des données falsifiées,
