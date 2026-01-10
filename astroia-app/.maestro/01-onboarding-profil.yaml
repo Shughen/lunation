@@ -1,0 +1,45 @@
+# Flow E2E : Onboarding complet et création de profil
+appId: com.remibeaurain.astroiaapp
+---
+- launchApp
+- tapOn: "Commencer"
+- assertVisible: "Créez votre profil astral"
+
+# Étape 1 : Saisie du nom
+- tapOn: "Votre prénom"
+- inputText: "TestUser"
+- tapOn: "Suivant"
+
+# Étape 2 : Date de naissance
+- assertVisible: "Date de naissance"
+- tapOn: "Sélectionner la date"
+# Note: La sélection de date nécessite des actions spécifiques selon la plateforme
+- tapOn: "14"  # Jour
+- tapOn: "Avril"  # Mois
+- tapOn: "1989"  # Année
+- tapOn: "Confirmer"
+- tapOn: "Suivant"
+
+# Étape 3 : Heure de naissance
+- assertVisible: "Heure de naissance"
+- tapOn: "Sélectionner l'heure"
+- tapOn: "16"  # Heure
+- tapOn: "55"  # Minutes
+- tapOn: "Confirmer"
+- tapOn: "Suivant"
+
+# Étape 4 : Lieu de naissance
+- assertVisible: "Lieu de naissance"
+- tapOn: "Rechercher votre ville"
+- inputText: "Livry-Gargan"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Livry-Gargan"
+    index: 0
+- tapOn: "Terminer"
+
+# Vérification : Profil créé
+- assertVisible: "TestUser"
+- assertVisible: "Bélier"
+- takeScreenshot: "profil-complete"
+

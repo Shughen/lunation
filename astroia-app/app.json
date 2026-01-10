@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "LUNA - Cycle & Cosmos",
+    "slug": "astroia-app",
+    "version": "2.0.0",
+    "scheme": "luna",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121128"
+    },
+    "ios": {
+      "bundleIdentifier": "com.astroia.luna",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "LUNA a besoin d'accéder à vos données de cycle menstruel pour fournir des recommandations personnalisées basées sur votre phase actuelle.",
+        "NSHealthUpdateUsageDescription": "LUNA enregistre vos données de cycle pour le suivi, l'analyse et la génération d'insights personnalisés."
+      }
+    },
+    "android": {
+      "package": "com.astroia.luna",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#121128"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "astroia",
+          "project": "luna-app"
+        }
+      ]
+    ],
+    "extra": {
+      "supabaseUrl": "https://tirfwrwgyzsfrdhtidug.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpcmZ3cndneXpzZnJkaHRpZHVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyNjYyNTksImV4cCI6MjA3Nzg0MjI1OX0.yiK9pYX8_KXKVDAa6mDp7fV-aMCSuq9gEWHbVpRLrnQ",
+      "aiApiUrl": "https://astro-ia-niei71xao-remibeaurain-4057s-projects.vercel.app/api/ai/chat",
+      "parentChildApiUrl": "https://astro-ia-niei71xao-remibeaurain-4057s-projects.vercel.app/api/ml/parent-child",
+      "fastApiUrl": "http://192.168.0.150:8000",
+      "sentryDsn": "https://YOUR_SENTRY_DSN@o0.ingest.sentry.io/YOUR_PROJECT_ID",
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

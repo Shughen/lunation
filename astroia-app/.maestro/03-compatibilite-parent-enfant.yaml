@@ -1,0 +1,70 @@
+# Flow E2E : Analyse de compatibilité parent-enfant
+appId: com.remibeaurain.astroiaapp
+---
+- launchApp
+
+# Navigation vers Parent-Enfant
+- tapOn: "Parent-Enfant IA"
+- assertVisible: "Analyse Compatibilité"
+- takeScreenshot: "parent-enfant-formulaire"
+
+# Vérifier que le profil parent est pré-rempli
+- assertVisible: "👤 Parent (Vous)"
+- assertVisible: "Pré-rempli"
+
+# Remplir les données de l'enfant
+- scroll
+- assertVisible: "👶 Enfant"
+
+# Signe solaire enfant
+- tapOn:
+    text: "Signe solaire"
+    index: 1  # Deuxième occurrence (enfant)
+- scroll
+- tapOn: "Lion"
+- tapOn: "Confirmer"
+
+# Ascendant enfant
+- tapOn:
+    text: "Ascendant"
+    index: 1
+- scroll
+- tapOn: "Balance"
+- tapOn: "Confirmer"
+
+# Signe lunaire enfant
+- tapOn:
+    text: "Signe lunaire"
+    index: 1
+- scroll
+- tapOn: "Poissons"
+- tapOn: "Confirmer"
+
+# Lancer l'analyse
+- scroll
+- tapOn: "Analyser la compatibilité"
+- waitForAnimationToEnd
+- wait: 2000  # Attendre le calcul
+
+# Vérification des résultats
+- assertVisible: ".*%.*"  # Score de compatibilité
+- assertVisible: 
+    text: "(Excellente|Très bonne|Bonne|Moyenne|Faible)"
+    regex: true
+- takeScreenshot: "parent-enfant-resultats"
+
+# Vérifier les recommandations
+- scroll
+- assertVisible: "Conseils"
+- takeScreenshot: "parent-enfant-conseils"
+
+# Partager le résultat
+- scroll
+- tapOn: "Partager ce résultat"
+- wait: 1000
+- assertVisible: "Partager"
+
+# Retour au menu
+- tapOn: "Retour au menu"
+- assertVisible: "Bienvenue"
+

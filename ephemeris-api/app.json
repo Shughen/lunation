@@ -1,0 +1,7 @@
+{
+  "name": "Ephemeris API",
+  "description": "Host Your Own Ephemeris API",
+  "repository": "https://github.com/astrolin/ephemeris-api",
+  "keywords": ["astrology", "ephemeris", "api"],
+  "website": "https://github.com/astrolin"
+}

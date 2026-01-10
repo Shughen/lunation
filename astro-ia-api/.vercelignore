@@ -1,0 +1,24 @@
+# Fichiers à ignorer lors du déploiement Vercel
+
+# Tests
+test*.js
+*.test.js
+__tests__/
+
+# Documentation
+*.md
+docs/
+
+# Fichiers temporaires
+*.log
+.DS_Store
+.env*
+!.env.example
+
+# Providers non utilisés
+api/astro/natal-swisseph.js
+api/astro/natal-ephemeris.js
+
+# Git
+.git/
+.gitignore

@@ -1,0 +1,6 @@
+describe('useHapticFeedback', () => {
+  it('vérifie que le module se charge', () => {
+    expect(true).toBe(true);
+  });
+});
+

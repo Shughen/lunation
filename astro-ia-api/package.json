@@ -1,0 +1,17 @@
+{
+  "name": "astro-ia-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.79.0",
+    "openai": "^4.20.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}

@@ -1,0 +1,40 @@
+# Flow E2E : Chat IA répond à une question
+appId: com.remibeaurain.astroiaapp
+---
+- launchApp
+
+# Navigation vers le Chat IA
+- tapOn: "Assistant Astral"
+- assertVisible: "Posez-moi vos questions astrologiques"
+- takeScreenshot: "chat-initial"
+
+# Envoi d'une question
+- tapOn: "Écrivez votre message"
+- inputText: "Quel est mon signe astrologique?"
+- tapOn: "Envoyer"
+
+# Attendre la réponse de l'IA
+- waitForAnimationToEnd
+- wait: 3000  # Attendre la génération GPT
+
+# Vérification de la réponse
+- assertVisible: 
+    text: ".*[Bb]élier.*"
+    regex: true
+- takeScreenshot: "chat-reponse-ia"
+
+# Envoyer une seconde question
+- tapOn: "Écrivez votre message"
+- inputText: "Quelle est ma compatibilité avec le Lion?"
+- tapOn: "Envoyer"
+- wait: 3000
+
+# Vérification de la seconde réponse
+- assertVisible: ".*compatibilit.*"
+- takeScreenshot: "chat-question-2"
+
+# Vérification de l'historique
+- scroll
+- assertVisible: "Quel est mon signe"
+- assertVisible: "compatibilité avec le Lion"
+

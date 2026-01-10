@@ -1,0 +1,30 @@
+# Python
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Data (ne pas commit les datasets sensibles)
+data/*.csv
+!data/dataset_example.csv
+
+# Outputs
+outputs/models/*.pkl
+outputs/logs/*.log
+outputs/reports/*.png
+outputs/metrics.json
+outputs/best_params.json
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+

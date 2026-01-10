@@ -1,0 +1,523 @@
+import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { profileService } from '@/lib/api/profileService';
+import { useAuthStore } from './authStore';
+
+// Clé de stockage
+const PROFILE_STORAGE_KEY = '@astroia_user_profile';
+
+// Store Zustand avec persistance AsyncStorage pour le profil utilisateur
+export const useProfileStore = create((set, get) => ({
+  profile: {
+    name: '',
+    birthDate: null,
+    birthTime: null,
+    birthPlace: '',
+    latitude: null,
+    longitude: null,
+    timezone: null,
+    // Données astrologiques calculées
+    sunSign: null,      // { id, name, emoji }
+    moonSign: null,     // { id, name, emoji }
+    ascendant: null,    // { id, name, emoji }
+    // Gestion cycles menstruels
+    gender: null,       // 'female' | 'male' | 'other' | null
+    hasCycles: false,   // boolean - détermine l'affichage des fonctionnalités cycles
+  },
+  isLoading: false,
+  hasProfile: false,
+  
+  // Charger le profil depuis Supabase si connecté, sinon depuis AsyncStorage (mode local)
+  // TEMPORAIREMENT : Mode local désactivé pour éviter les incohérences avec Supabase
+  loadProfile: async () => {
+    try {
+      set({ isLoading: true });
+      
+      const { isAuthenticated, user } = useAuthStore.getState();
+      
+      // MODIFICATION : Si utilisateur connecté, charger uniquement depuis Supabase (pas de mode local)
+      if (isAuthenticated && user) {
+        console.log('[ProfileStore] Utilisateur connecté, chargement depuis Supabase uniquement');
+        
+        // Charger depuis Supabase
+        const supabaseProfile = await profileService.loadProfileFromSupabase();
+        
+        if (supabaseProfile) {
+          // Profil trouvé dans Supabase
+          set({
+            profile: supabaseProfile,
+            hasProfile: isProfileComplete(supabaseProfile),
+            isLoading: false,
+          });
+          
+          // Sauvegarder localement pour cache (avec userId pour vérification)
+          const profileWithUserId = {
+            ...supabaseProfile,
+            _userId: user.id, // Stocker l'userId pour vérification
+          };
+          await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profileWithUserId));
+        } else {
+          // Aucun profil dans Supabase, reset
+          console.log('[ProfileStore] Aucun profil Supabase trouvé, reset du profil');
+          set({
+            profile: {
+              name: '',
+              birthDate: null,
+              birthTime: null,
+              birthPlace: '',
+              latitude: null,
+              longitude: null,
+              timezone: null,
+              sunSign: null,
+              moonSign: null,
+              ascendant: null,
+              gender: null,
+              hasCycles: false,
+            },
+            hasProfile: false,
+            isLoading: false,
+          });
+        }
+        return;
+      }
+
+      // MODIFICATION : Mode local désactivé temporairement pour éviter les incohérences
+      // Si utilisateur non connecté, reset du profil
+      console.log('[ProfileStore] Utilisateur non connecté, mode local désactivé temporairement');
+      set({
+        profile: {
+          name: '',
+          birthDate: null,
+          birthTime: null,
+          birthPlace: '',
+          latitude: null,
+          longitude: null,
+          timezone: null,
+          sunSign: null,
+          moonSign: null,
+          ascendant: null,
+          gender: null,
+          hasCycles: false,
+        },
+        hasProfile: false,
+        isLoading: false,
+      });
+      
+      // Nettoyer le profil local si présent
+      await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
+    } catch (error) {
+      console.error('Erreur lors du chargement du profil:', error);
+      set({ isLoading: false });
+    }
+  },
+  
+  // Sauvegarder le profil
+  // MODIFICATION : Si connecté, sauvegarder dans Supabase uniquement (pas de mode local)
+  saveProfile: async (profileData) => {
+    try {
+      const { isAuthenticated, user } = useAuthStore.getState();
+      let updatedProfile = { ...get().profile, ...profileData };
+      
+      // Calculer automatiquement le signe solaire si birthDate est fourni
+      if (updatedProfile.birthDate && !updatedProfile.sunSign) {
+        const calculatedSign = calculateZodiacFromDate(updatedProfile.birthDate);
+        if (calculatedSign) {
+          updatedProfile.sunSign = {
+            id: getSignId(calculatedSign.sign),
+            name: calculatedSign.sign,
+            emoji: calculatedSign.emoji,
+            element: calculatedSign.element,
+          };
+          console.log('[ProfileStore] Signe solaire calculé automatiquement:', updatedProfile.sunSign);
+        }
+      }
+
+      // MODIFICATION : Si connecté, sauvegarder uniquement dans Supabase
+      if (isAuthenticated && user) {
+        // Mettre à jour le state d'abord
+        set({
+          profile: updatedProfile,
+          hasProfile: isProfileComplete(updatedProfile),
+        });
+        
+        // Synchroniser avec Supabase (source de vérité)
+        const success = await get().syncProfileToSupabase();
+        if (success) {
+          // Recharger depuis Supabase pour avoir la version à jour
+          const syncedProfile = await get().loadProfileFromSupabase();
+          if (syncedProfile) {
+            set({
+              profile: syncedProfile,
+              hasProfile: isProfileComplete(syncedProfile),
+            });
+            
+            // Sauvegarder localement pour cache (avec userId)
+            const profileWithUserId = {
+              ...syncedProfile,
+              _userId: user.id,
+            };
+            await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profileWithUserId));
+          }
+          return true;
+        }
+        return false;
+      }
+      
+      // MODIFICATION : Mode local désactivé temporairement
+      // Si non connecté, ne pas sauvegarder localement
+      console.log('[ProfileStore] Utilisateur non connecté, sauvegarde locale désactivée temporairement');
+      return false;
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du profil:', error);
+      return false;
+    }
+  },
+  
+  // Mettre à jour un champ du profil
+  updateField: (field, value) => {
+    set((state) => ({
+      profile: { ...state.profile, [field]: value }
+    }));
+  },
+  
+  // Réinitialiser le profil
+  resetProfile: async () => {
+    try {
+      await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
+      set({
+        profile: {
+          name: '',
+          birthDate: null,
+          birthTime: null,
+          birthPlace: '',
+          latitude: null,
+          longitude: null,
+          timezone: null,
+          sunSign: null,
+          moonSign: null,
+          ascendant: null,
+          gender: null,
+          hasCycles: false,
+        },
+        hasProfile: false,
+      });
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la réinitialisation du profil:', error);
+      return false;
+    }
+  },
+  
+  // Obtenir le pourcentage de complétion
+  getCompletionPercentage: () => {
+    const profile = get().profile;
+    let completed = 0;
+    let total = 4;
+    
+    if (profile.name && profile.name.trim().length > 0) completed++;
+    if (profile.birthDate) completed++;
+    if (profile.birthTime) completed++;
+    if (profile.birthPlace && profile.birthPlace.trim().length > 0) completed++;
+    
+    return Math.round((completed / total) * 100);
+  },
+  
+  // Obtenir le signe solaire (calculé ou stocké)
+  getSunSign: () => {
+    const profile = get().profile;
+    // Si déjà stocké, le retourner
+    if (profile.sunSign) return profile.sunSign;
+    // Sinon calculer depuis la date de naissance
+    return get().getZodiacSign();
+  },
+
+  // Obtenir l'ascendant (stocké)
+  getAscendant: () => {
+    const profile = get().profile;
+    return profile.ascendant || null;
+  },
+
+  // Obtenir le signe lunaire (stocké)
+  getMoonSign: () => {
+    const profile = get().profile;
+    return profile.moonSign || null;
+  },
+
+  // Vérifier si le thème natal complet existe
+  hasNatal: () => {
+    const profile = get().profile;
+    return !!(profile.sunSign && profile.moonSign && profile.ascendant);
+  },
+
+  // Obtenir les données du thème natal (IDs uniquement)
+  getNatal: () => {
+    const profile = get().profile;
+    if (!profile.sunSign || !profile.moonSign || !profile.ascendant) {
+      return null;
+    }
+    return {
+      sun: profile.sunSign.id,
+      moon: profile.moonSign.id,
+      asc: profile.ascendant.id,
+    };
+  },
+
+  // Sauvegarder les données astrologiques du thème natal
+  saveAstrologicalData: async (astroData) => {
+    try {
+      const profile = get().profile;
+      const updatedProfile = {
+        ...profile,
+        sunSign: astroData.sunSign,
+        moonSign: astroData.moonSign,
+        ascendant: astroData.ascendant,
+      };
+      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
+      set({ profile: updatedProfile });
+      
+      // Synchroniser avec Supabase si connecté
+      const { isAuthenticated } = useAuthStore.getState();
+      if (isAuthenticated) {
+        try {
+          await get().syncProfileToSupabase();
+        } catch (error) {
+          console.error('[ProfileStore] Erreur sync après saveAstrologicalData:', error);
+          // Ne pas bloquer si la sync échoue
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Erreur sauvegarde données astro:', error);
+      return false;
+    }
+  },
+
+  // Synchroniser le profil vers Supabase
+  // MODIFICATION : Utilise le profil actuel du store (qui contient les mises à jour)
+  syncProfileToSupabase: async () => {
+    try {
+      const { isAuthenticated, user } = useAuthStore.getState();
+      if (!isAuthenticated || !user) {
+        console.log('[ProfileStore] Utilisateur non connecté, pas de sync Supabase');
+        return false;
+      }
+
+      const profile = get().profile;
+      if (!profile || !profile.name) {
+        console.log('[ProfileStore] Profil vide, pas de sync');
+        return false;
+      }
+
+      console.log('[ProfileStore] Synchronisation du profil vers Supabase...');
+      await profileService.syncLocalProfile(profile);
+      console.log('[ProfileStore] ✅ Profil synchronisé avec Supabase');
+      return true;
+    } catch (error) {
+      console.error('[ProfileStore] Erreur syncProfileToSupabase:', error);
+      return false;
+    }
+  },
+
+  // Charger le profil depuis Supabase (utilisé uniquement depuis loadProfile maintenant)
+  // MODIFICATION : Plus de fusion avec le local, Supabase est la source de vérité
+  loadProfileFromSupabase: async () => {
+    try {
+      const { isAuthenticated, user } = useAuthStore.getState();
+      if (!isAuthenticated || !user) {
+        console.log('[ProfileStore] Utilisateur non connecté, pas de chargement Supabase');
+        return null;
+      }
+
+      console.log('[ProfileStore] Chargement du profil depuis Supabase...');
+      const supabaseProfile = await profileService.loadProfileFromSupabase();
+      
+      if (!supabaseProfile) {
+        console.log('[ProfileStore] Aucun profil Supabase trouvé');
+        return null;
+      }
+
+      // MODIFICATION : Pas de fusion, utiliser directement le profil Supabase
+      // C'est maintenant la source de vérité unique quand l'utilisateur est connecté
+      console.log('[ProfileStore] ✅ Profil chargé depuis Supabase');
+      return supabaseProfile;
+    } catch (error) {
+      console.error('[ProfileStore] Erreur loadProfileFromSupabase:', error);
+      return null;
+    }
+  },
+
+  // Migration: synchroniser le profil local vers Supabase lors de la première connexion
+  migrateLocalProfileToSupabase: async () => {
+    try {
+      const profile = get().profile;
+      const { isAuthenticated } = useAuthStore.getState();
+      
+      if (!isAuthenticated || !profile || !profile.name) {
+        return false;
+      }
+
+      // Vérifier si une migration a déjà été faite
+      const migrationDone = await AsyncStorage.getItem('@profile_migrated_to_supabase');
+      if (migrationDone === 'true') {
+        console.log('[ProfileStore] Migration déjà effectuée');
+        return false;
+      }
+
+      console.log('[ProfileStore] Migration du profil local vers Supabase...');
+      const success = await get().syncProfileToSupabase();
+      
+      if (success) {
+        await AsyncStorage.setItem('@profile_migrated_to_supabase', 'true');
+        console.log('[ProfileStore] ✅ Migration effectuée');
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('[ProfileStore] Erreur migration:', error);
+      return false;
+    }
+  },
+
+  // Mettre à jour le genre et hasCycles
+  updateGenderAndCycles: async (gender, hasCycles) => {
+    try {
+      const profile = get().profile;
+      const updatedProfile = {
+        ...profile,
+        gender: gender,
+        hasCycles: hasCycles,
+      };
+      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
+      set({ profile: updatedProfile });
+      return true;
+    } catch (error) {
+      console.error('Erreur mise à jour gender/hasCycles:', error);
+      return false;
+    }
+  },
+
+  // Helper : déterminer si les cycles doivent être affichés
+  shouldShowCycles: () => {
+    const profile = get().profile;
+    return profile.gender === 'female' && profile.hasCycles === true;
+  },
+
+  // Calculer le signe astrologique
+  getZodiacSign: () => {
+    const profile = get().profile;
+    // Si déjà stocké, le retourner
+    if (profile.sunSign) return profile.sunSign;
+    // Sinon calculer depuis la date de naissance
+    if (!profile.birthDate) return null;
+    
+    const date = new Date(profile.birthDate);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return { sign: 'Bélier', emoji: '♈', element: 'Feu' };
+    if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return { sign: 'Taureau', emoji: '♉', element: 'Terre' };
+    if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return { sign: 'Gémeaux', emoji: '♊', element: 'Air' };
+    if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return { sign: 'Cancer', emoji: '♋', element: 'Eau' };
+    if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return { sign: 'Lion', emoji: '♌', element: 'Feu' };
+    if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return { sign: 'Vierge', emoji: '♍', element: 'Terre' };
+    if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return { sign: 'Balance', emoji: '♎', element: 'Air' };
+    if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return { sign: 'Scorpion', emoji: '♏', element: 'Eau' };
+    if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return { sign: 'Sagittaire', emoji: '♐', element: 'Feu' };
+    if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return { sign: 'Capricorne', emoji: '♑', element: 'Terre' };
+    if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return { sign: 'Verseau', emoji: '♒', element: 'Air' };
+    if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return { sign: 'Poissons', emoji: '♓', element: 'Eau' };
+    
+    return null;
+  },
+}));
+
+// Helper pour calculer le signe zodiacal depuis une date
+function calculateZodiacFromDate(birthDate) {
+  if (!birthDate) return null;
+  
+  const date = new Date(birthDate);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  
+  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return { sign: 'Bélier', emoji: '♈', element: 'Feu' };
+  if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return { sign: 'Taureau', emoji: '♉', element: 'Terre' };
+  if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return { sign: 'Gémeaux', emoji: '♊', element: 'Air' };
+  if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return { sign: 'Cancer', emoji: '♋', element: 'Eau' };
+  if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return { sign: 'Lion', emoji: '♌', element: 'Feu' };
+  if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return { sign: 'Vierge', emoji: '♍', element: 'Terre' };
+  if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return { sign: 'Balance', emoji: '♎', element: 'Air' };
+  if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return { sign: 'Scorpion', emoji: '♏', element: 'Eau' };
+  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return { sign: 'Sagittaire', emoji: '♐', element: 'Feu' };
+  if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return { sign: 'Capricorne', emoji: '♑', element: 'Terre' };
+  if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return { sign: 'Verseau', emoji: '♒', element: 'Air' };
+  if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return { sign: 'Poissons', emoji: '♓', element: 'Eau' };
+  
+  return null;
+}
+
+// Helper pour mapper un nom de signe vers son ID
+function getSignId(signName) {
+  const mapping = {
+    'Bélier': 1, 'Taureau': 2, 'Gémeaux': 3, 'Cancer': 4,
+    'Lion': 5, 'Vierge': 6, 'Balance': 7, 'Scorpion': 8,
+    'Sagittaire': 9, 'Capricorne': 10, 'Verseau': 11, 'Poissons': 12
+  };
+  return mapping[signName] || 1;
+}
+
+// Helper pour vérifier si le profil est complet
+function isProfileComplete(profile) {
+  return !!(
+    profile.name &&
+    profile.name.trim().length > 0 &&
+    profile.birthDate &&
+    profile.birthTime &&
+    profile.birthPlace &&
+    profile.birthPlace.trim().length > 0
+  );
+}
+
+// Validation du profil
+export const validateProfile = (profile) => {
+  const errors = {};
+  
+  // Nom
+  if (!profile.name || profile.name.trim().length === 0) {
+    errors.name = 'Le nom est requis';
+  } else if (profile.name.trim().length < 2) {
+    errors.name = 'Le nom doit contenir au moins 2 caractères';
+  }
+  
+  // Date de naissance
+  if (!profile.birthDate) {
+    errors.birthDate = 'La date de naissance est requise';
+  } else {
+    const date = new Date(profile.birthDate);
+    const now = new Date();
+    if (date > now) {
+      errors.birthDate = 'La date ne peut pas être dans le futur';
+    }
+    if (date.getFullYear() < 1900) {
+      errors.birthDate = 'Date invalide';
+    }
+  }
+  
+  // Heure de naissance
+  if (!profile.birthTime) {
+    errors.birthTime = 'L\'heure de naissance est requise';
+  }
+  
+  // Lieu de naissance
+  if (!profile.birthPlace || profile.birthPlace.trim().length === 0) {
+    errors.birthPlace = 'Le lieu de naissance est requis';
+  } else if (profile.birthPlace.trim().length < 2) {
+    errors.birthPlace = 'Le lieu doit contenir au moins 2 caractères';
+  }
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+};
+

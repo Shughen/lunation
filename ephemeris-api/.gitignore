@@ -1,0 +1,26 @@
+.DS_Store
+*~
+.#*
+*.log
+*.pid
+
+/logs
+
+pom.xml*
+*.jar
+/lib/
+/out/
+/target/
+/classes/
+/checkouts/
+
+# Leiningen
+/.lein-*
+/.nrepl-*
+
+# clj-kondo
+/.clj-kondo/.cache
+
+# Node.js
+node_modules/
+npm-debug.log*

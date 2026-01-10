@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support & Contact - LUNA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">🌙 LUNA</div>
+      <nav>
+        <a href="index.html">Accueil</a>
+        <a href="privacy.html">Confidentialité</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="support-content">
+    <div class="container">
+      <h1>Support & Contact</h1>
+      <p class="subtitle">Nous sommes là pour t'aider ! 🌸</p>
+
+      <div class="support-grid">
+        <div class="support-card">
+          <div class="support-icon">📧</div>
+          <h3>Email Support</h3>
+          <p>Pour toute question, bug ou feedback :</p>
+          <a href="mailto:support@luna-app.fr" class="btn-contact">support@luna-app.fr</a>
+          <p class="response-time">Réponse sous 48h ouvrées</p>
+        </div>
+
+        <div class="support-card">
+          <div class="support-icon">🐛</div>
+          <h3>Signaler un Bug</h3>
+          <p>Tu as trouvé un bug ? Aide-nous à l'améliorer :</p>
+          <a href="mailto:support@luna-app.fr?subject=Bug%20LUNA%20-%20[décris%20brièvement]" class="btn-contact">Signaler un bug</a>
+          <p class="response-time">Merci d'inclure : OS, version app, étapes de reproduction</p>
+        </div>
+
+        <div class="support-card">
+          <div class="support-icon">💡</div>
+          <h3>Suggestion</h3>
+          <p>Une idée pour améliorer LUNA ?</p>
+          <a href="mailto:support@luna-app.fr?subject=Suggestion%20LUNA" class="btn-contact">Partager une idée</a>
+          <p class="response-time">Ton feedback compte !</p>
+        </div>
+
+        <div class="support-card">
+          <div class="support-icon">🔐</div>
+          <h3>Confidentialité</h3>
+          <p>Questions sur tes données personnelles ?</p>
+          <a href="mailto:privacy@luna-app.fr" class="btn-contact">privacy@luna-app.fr</a>
+          <p class="response-time">Délai légal : 30 jours (Art. 12 RGPD)</p>
+        </div>
+      </div>
+
+      <div class="faq-section">
+        <h2>Questions Fréquentes (FAQ)</h2>
+
+        <div class="faq-item">
+          <h3>🤔 Comment configurer mon cycle ?</h3>
+          <p>
+            1. Ouvre LUNA<br>
+            2. Va dans Settings > Confidentialité<br>
+            3. Active "Données de cycle (santé)"<br>
+            4. Retourne sur l'accueil<br>
+            5. Tape "Mon cycle aujourd'hui" → Configure
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>🔒 Mes données sont-elles sécurisées ?</h3>
+          <p>
+            Oui ! Tes données de cycle sont stockées <strong>exclusivement dans l'UE</strong> (Allemagne) et 
+            chiffrées. Elles ne sont jamais partagées avec des tiers. Conformité RGPD garantie.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>🤖 L'IA a-t-elle accès à mes données ?</h3>
+          <p>
+            L'IA (GPT-3.5) reçoit uniquement le <strong>contexte nécessaire</strong> (ta phase actuelle, ton signe) 
+            pour générer des recommandations. Aucune donnée personnelle identifiable n'est envoyée.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>⚕️ LUNA est-elle une app médicale ?</h3>
+          <p>
+            <strong>Non.</strong> LUNA est un outil de bien-être et développement personnel, 
+            pas un dispositif médical. Consulte toujours un·e professionnel·le pour avis médical.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>💰 LUNA est-elle gratuite ?</h3>
+          <p>
+            Oui ! La version beta est 100% gratuite. Une offre Premium arrivera plus tard (optionnelle).
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>📱 Sur quelles plateformes ?</h3>
+          <p>
+            LUNA est disponible sur iOS (via TestFlight) et Android (via Play Store Internal). 
+            iOS 13+ et Android 8+ requis.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3>🗑️ Comment supprimer mon compte ?</h3>
+          <p>
+            Settings → Confidentialité → Supprimer mon compte.<br>
+            Toutes tes données seront effacées sous 30 jours (Art. 17 RGPD).
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p style="text-align: center;">
+        <a href="index.html">← Retour à l'accueil</a> |
+        <a href="privacy.html">Politique de confidentialité</a> |
+        <a href="mailto:support@luna-app.fr">Contact</a>
+      </p>
+      <p style="text-align: center; margin-top: 20px; opacity: 0.6;">© 2025 Astroia. Tous droits réservés.</p>
+    </div>
+  </footer>
+
+  <style>
+    .support-content {
+      padding: 60px 20px 100px;
+    }
+
+    .support-content h1 {
+      font-size: 42px;
+      text-align: center;
+      margin-bottom: 10px;
+      color: var(--color-primary);
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 20px;
+      color: var(--color-text-muted);
+      margin-bottom: 60px;
+    }
+
+    .support-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+      margin-bottom: 80px;
+    }
+
+    .support-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .support-icon {
+      font-size: 50px;
+      margin-bottom: 15px;
+    }
+
+    .support-card h3 {
+      font-size: 22px;
+      margin-bottom: 15px;
+      color: var(--color-text);
+    }
+
+    .support-card p {
+      color: var(--color-text-muted);
+      margin-bottom: 20px;
+    }
+
+    .btn-contact {
+      display: inline-block;
+      background: var(--color-primary);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .btn-contact:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(192, 132, 252, 0.4);
+    }
+
+    .response-time {
+      margin-top: 15px;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-style: italic;
+    }
+
+    .faq-section {
+      margin-top: 80px;
+    }
+
+    .faq-section h2 {
+      font-size: 36px;
+      text-align: center;
+      margin-bottom: 40px;
+      color: var(--color-secondary);
+    }
+
+    .faq-item {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 3px solid var(--color-primary);
+      border-radius: 10px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .faq-item h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: var(--color-text);
+    }
+
+    .faq-item p {
+      color: var(--color-text-muted);
+      line-height: 1.8;
+    }
+
+    .legal-content table {
+      width: 100%;
+      margin: 30px 0;
+      border-collapse: collapse;
+    }
+
+    .legal-content th,
+    .legal-content td {
+      padding: 15px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+    }
+
+    .legal-content th {
+      background: rgba(192, 132, 252, 0.15);
+      font-weight: 600;
+    }
+  </style>
+</body>
+</html>
+

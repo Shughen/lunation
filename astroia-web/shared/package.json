@@ -1,0 +1,21 @@
+{
+  "name": "@astroia/shared",
+  "version": "1.0.0",
+  "description": "Types, constantes et utilitaires partagés entre frontend et backend",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "shared",
+    "types",
+    "utils"
+  ],
+  "author": "Astro.IA Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}
+
