@@ -703,5 +703,69 @@ export const natalInterpretations = {
   },
 };
 
+// === JOURNAL ===
+export const journal = {
+  /**
+   * Crée ou met à jour une entrée de journal
+   * @param data - date (YYYY-MM-DD), note, mood optionnel, month optionnel
+   * @returns L'entrée créée ou mise à jour
+   */
+  createEntry: async (data: {
+    date: string;
+    note: string;
+    mood?: string;
+    month?: string;
+  }) => {
+    const response = await apiClient.post('/api/journal/entry', data);
+    return response.data;
+  },
+
+  /**
+   * Récupère les entrées de journal avec filtres optionnels
+   * @param params - month (YYYY-MM), year, limit, offset
+   * @returns Liste d'entrées avec total
+   */
+  getEntries: async (params?: {
+    month?: string;
+    year?: number;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.month) queryParams.append('month', params.month);
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await apiClient.get(`/api/journal/entries?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Récupère l'entrée de journal du jour (si elle existe)
+   * @returns Entrée du jour ou null
+   */
+  getTodayEntry: async () => {
+    try {
+      const response = await apiClient.get('/api/journal/today');
+      return response.data;
+    } catch (error: any) {
+      // Si 404 ou null, retourner null (pas d'entrée aujourd'hui)
+      if (error.response?.status === 404 || !error.response) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Supprime une entrée de journal
+   * @param entryId - ID de l'entrée à supprimer
+   */
+  deleteEntry: async (entryId: number) => {
+    await apiClient.delete(`/api/journal/entry/${entryId}`);
+  },
+};
+
 export default apiClient;
 

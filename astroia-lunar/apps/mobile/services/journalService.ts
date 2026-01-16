@@ -1,22 +1,29 @@
 /**
  * Service de stockage du Journal Lunaire
- * CRUD simple avec AsyncStorage
+ * CRUD via API backend
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   JournalEntry,
   CreateJournalEntryPayload,
   GetJournalEntryResult,
 } from '../types/journal';
-
-const JOURNAL_ENTRY_PREFIX = 'journal_entry_';
+import { journal as journalApi } from './api';
 
 /**
- * Génère la clé AsyncStorage pour une date donnée
+ * Convertit une entrée backend vers le format frontend
  */
-function getEntryKey(date: string): string {
-  return `${JOURNAL_ENTRY_PREFIX}${date}`;
+function mapBackendEntryToFrontend(backendEntry: any): JournalEntry {
+  return {
+    date: backendEntry.date,
+    text: backendEntry.note || '',
+    createdAt: new Date(backendEntry.created_at).getTime(),
+    updatedAt: backendEntry.updated_at ? new Date(backendEntry.updated_at).getTime() : new Date(backendEntry.created_at).getTime(),
+    moonContext: {
+      phase: 'New Moon', // Valeur par défaut, à recalculer côté frontend si besoin
+      sign: 'Unknown',
+    },
+  };
 }
 
 /**
@@ -26,14 +33,18 @@ export async function getJournalEntry(
   date: string
 ): Promise<GetJournalEntryResult> {
   try {
-    const key = getEntryKey(date);
-    const raw = await AsyncStorage.getItem(key);
+    // Récupérer toutes les entrées et filtrer par date
+    // Note: L'API ne fournit pas d'endpoint GET /entry/{date}, on passe par /entries
+    const response = await journalApi.getEntries({ limit: 1000 });
+    const entries = response.entries || [];
 
-    if (!raw) {
+    const matchingEntry = entries.find((e: any) => e.date === date);
+
+    if (!matchingEntry) {
       return { exists: false, entry: null };
     }
 
-    const entry: JournalEntry = JSON.parse(raw);
+    const entry = mapBackendEntryToFrontend(matchingEntry);
     return { exists: true, entry };
   } catch (error) {
     console.error('[JournalService] Error reading entry:', error);
@@ -48,22 +59,16 @@ export async function saveJournalEntry(
   payload: CreateJournalEntryPayload
 ): Promise<JournalEntry> {
   try {
-    const key = getEntryKey(payload.date);
-    const now = Date.now();
-
-    // Vérifier si entrée existe déjà
-    const existing = await getJournalEntry(payload.date);
-
-    const entry: JournalEntry = {
+    // Appel API pour créer/mettre à jour
+    const backendEntry = await journalApi.createEntry({
       date: payload.date,
-      text: payload.text,
-      moonContext: payload.moonContext,
-      createdAt: existing.entry?.createdAt || now,
-      updatedAt: now,
-    };
+      note: payload.text,
+      // Le backend peut gérer le champ month si besoin (format YYYY-MM)
+      month: payload.date.substring(0, 7), // Ex: "2026-01-16" -> "2026-01"
+    });
 
-    await AsyncStorage.setItem(key, JSON.stringify(entry));
-    return entry;
+    // Convertir en format frontend
+    return mapBackendEntryToFrontend(backendEntry);
   } catch (error) {
     console.error('[JournalService] Error saving entry:', error);
     throw error;
@@ -75,8 +80,22 @@ export async function saveJournalEntry(
  */
 export async function deleteJournalEntry(date: string): Promise<void> {
   try {
-    const key = getEntryKey(date);
-    await AsyncStorage.removeItem(key);
+    // D'abord récupérer l'entrée pour obtenir son ID backend
+    const result = await getJournalEntry(date);
+
+    if (!result.exists || !result.entry) {
+      console.warn('[JournalService] No entry found to delete for date:', date);
+      return;
+    }
+
+    // Récupérer l'ID backend via l'API
+    const response = await journalApi.getEntries({ limit: 1000 });
+    const entries = response.entries || [];
+    const matchingEntry = entries.find((e: any) => e.date === date);
+
+    if (matchingEntry && matchingEntry.id) {
+      await journalApi.deleteEntry(matchingEntry.id);
+    }
   } catch (error) {
     console.error('[JournalService] Error deleting entry:', error);
     throw error;
@@ -92,37 +111,18 @@ export async function hasJournalEntry(date: string): Promise<boolean> {
 }
 
 /**
- * Récupère toutes les entrées de journal (Phase 2)
- * Note: Scan toutes les clés AsyncStorage avec prefix
- * Performance acceptable pour < 1000 entrées
+ * Récupère toutes les entrées de journal
  */
 export async function getAllJournalEntries(): Promise<JournalEntry[]> {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const journalKeys = allKeys.filter((key) =>
-      key.startsWith(JOURNAL_ENTRY_PREFIX)
-    );
+    const response = await journalApi.getEntries({ limit: 1000 });
+    const entries = response.entries || [];
 
-    if (journalKeys.length === 0) {
-      return [];
-    }
-
-    const entries = await AsyncStorage.multiGet(journalKeys);
-    const parsed: JournalEntry[] = entries
-      .map(([_, value]) => {
-        if (value) {
-          try {
-            return JSON.parse(value) as JournalEntry;
-          } catch {
-            return null;
-          }
-        }
-        return null;
-      })
-      .filter((entry): entry is JournalEntry => entry !== null);
+    // Convertir toutes les entrées backend vers format frontend
+    const frontendEntries = entries.map(mapBackendEntryToFrontend);
 
     // Trier par date décroissante (plus récent en premier)
-    return parsed.sort((a, b) => b.date.localeCompare(a.date));
+    return frontendEntries.sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.error('[JournalService] Error reading all entries:', error);
     return [];
@@ -134,11 +134,8 @@ export async function getAllJournalEntries(): Promise<JournalEntry[]> {
  */
 export async function getJournalEntriesCount(): Promise<number> {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const journalKeys = allKeys.filter((key) =>
-      key.startsWith(JOURNAL_ENTRY_PREFIX)
-    );
-    return journalKeys.length;
+    const response = await journalApi.getEntries({ limit: 1 });
+    return response.total || 0;
   } catch (error) {
     console.error('[JournalService] Error counting entries:', error);
     return 0;

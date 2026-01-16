@@ -1,6 +1,6 @@
 /**
- * Écran Journal Quotidien (MVP Local - AsyncStorage)
- * Permet un rituel quotidien simple avec sauvegarde locale
+ * Écran Journal Quotidien (MVP - Backend API)
+ * Permet un rituel quotidien simple avec sauvegarde backend
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,18 +16,20 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
-import { JOURNAL_STORAGE_KEY } from '../constants/storageKeys';
+import { getAllJournalEntries, saveJournalEntry, getJournalEntry } from '../services/journalService';
+import { JournalEntry as JournalEntryType } from '../types/journal';
 
 const LinearGradientComponent = LinearGradient || (({ colors, style, children, ...props }: any) => {
   return <View style={[{ backgroundColor: colors?.[0] || '#1a0b2e' }, style]} {...props}>{children}</View>;
 });
 
-interface JournalEntry {
+// Interface locale pour l'affichage (conversion depuis JournalEntryType)
+interface DisplayJournalEntry {
   id: string;
+  date: string;
   createdAtISO: string;
   text: string;
 }
@@ -39,7 +41,7 @@ export default function JournalScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
   const inputCardRef = useRef<View | null>(null);
   const savingLockRef = useRef(false);
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [entries, setEntries] = useState<DisplayJournalEntry[]>([]);
   const [currentText, setCurrentText] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,19 +87,23 @@ export default function JournalScreen() {
   const loadEntries = async () => {
     try {
       setLoading(true);
-      const stored = await AsyncStorage.getItem(JOURNAL_STORAGE_KEY);
+      // Récupérer toutes les entrées depuis l'API
+      const apiEntries = await getAllJournalEntries();
 
-      if (stored) {
-        const parsed: JournalEntry[] = JSON.parse(stored);
-        // Trier par date décroissante et garder les 7 dernières
-        const sorted = parsed
-          .sort((a, b) => new Date(b.createdAtISO).getTime() - new Date(a.createdAtISO).getTime())
-          .slice(0, 7);
-        setEntries(sorted);
-      }
+      // Convertir en format d'affichage et garder les 7 dernières
+      const displayEntries: DisplayJournalEntry[] = apiEntries
+        .slice(0, 7)
+        .map((entry) => ({
+          id: entry.date, // Utiliser la date comme ID pour la clé React
+          date: entry.date,
+          createdAtISO: new Date(entry.createdAt).toISOString(),
+          text: entry.text,
+        }));
+
+      setEntries(displayEntries);
     } catch (error) {
       console.error('[JOURNAL] Erreur chargement:', error);
-      Alert.alert('Erreur', 'Impossible de charger vos entrées');
+      Alert.alert('Erreur', 'Impossible de charger vos entrées. Vérifiez votre connexion.');
     } finally {
       setLoading(false);
     }
@@ -118,23 +124,20 @@ export default function JournalScreen() {
     setSaving(true);
 
     try {
-      const newEntry: JournalEntry = {
-        id: Date.now().toString(),
-        createdAtISO: new Date().toISOString(),
+      const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+      // Sauvegarder via l'API (crée ou met à jour)
+      await saveJournalEntry({
+        date: today,
         text: currentText.trim(),
-      };
+        moonContext: {
+          phase: 'New Moon', // Valeur par défaut, sera calculé côté backend si nécessaire
+          sign: 'Unknown',
+        },
+      });
 
-      // Ajouter la nouvelle entrée au début
-      const updated = [newEntry, ...entries];
-
-      // Garder uniquement les 7 dernières
-      const trimmed = updated.slice(0, 7);
-
-      // Sauvegarder
-      await AsyncStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(trimmed));
-
-      // Mettre à jour l'état
-      setEntries(trimmed);
+      // Recharger les entrées
+      await loadEntries();
       setCurrentText('');
 
       Alert.alert(
@@ -158,14 +161,14 @@ export default function JournalScreen() {
       );
     } catch (error) {
       console.error('[JOURNAL] Erreur sauvegarde:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder votre entrée');
+      Alert.alert('Erreur', 'Impossible de sauvegarder votre entrée. Vérifiez votre connexion.');
     } finally {
       savingLockRef.current = false;
       setSaving(false);
     }
   };
 
-  const deleteEntry = async (id: string) => {
+  const deleteEntry = async (dateId: string) => {
     Alert.alert(
       'Confirmer la suppression',
       'Voulez-vous vraiment supprimer cette entrée ?',
@@ -179,12 +182,15 @@ export default function JournalScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const filtered = entries.filter((e) => e.id !== id);
-              await AsyncStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(filtered));
-              setEntries(filtered);
+              // Supprimer via l'API en utilisant la date
+              const { deleteJournalEntry } = await import('../services/journalService');
+              await deleteJournalEntry(dateId);
+
+              // Recharger les entrées
+              await loadEntries();
             } catch (error) {
               console.error('[JOURNAL] Erreur suppression:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer cette entrée');
+              Alert.alert('Erreur', 'Impossible de supprimer cette entrée. Vérifiez votre connexion.');
             }
           },
         },
