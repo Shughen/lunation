@@ -21,6 +21,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import apiClient from '../../services/api';
 import { AspectDetailSheet } from '../../components/AspectDetailSheet';
 import { Skeleton, SkeletonCard } from '../../components/Skeleton';
+import { MarkdownText } from '../../components/MarkdownText';
 import { showNetworkErrorAlert, getHumanErrorMessage } from '../../utils/errorHandler';
 import type { AspectV4 } from '../../types/api';
 
@@ -115,7 +116,7 @@ export default function LunarReportScreen() {
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🌙 Climat général du mois</Text>
-        <Text style={styles.climateText}>{report.general_climate}</Text>
+        <MarkdownText style={styles.climateText}>{report.general_climate}</MarkdownText>
       </View>
     );
   };
@@ -131,7 +132,7 @@ export default function LunarReportScreen() {
         {report.dominant_axes.map((axis, index) => (
           <View key={index} style={styles.axisItem}>
             <Text style={styles.axisBullet}>•</Text>
-            <Text style={styles.axisText}>{axis}</Text>
+            <MarkdownText style={styles.axisText}>{axis}</MarkdownText>
           </View>
         ))}
       </View>
