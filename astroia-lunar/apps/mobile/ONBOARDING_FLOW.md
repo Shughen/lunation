@@ -70,32 +70,11 @@ Le flow d'onboarding guide l'utilisateur à travers 6 étapes avant d'accéder �
 - **Action**:
   ```typescript
   await setDisclaimerSeen();
-  router.push('/onboarding/cycle-setup');
+  router.push('/onboarding');
   ```
 - **Store**: `hasSeenDisclaimer = true`
 
-### 5. Cycle Setup (Optionnel) (`/onboarding/cycle-setup`)
-**Fichier**: `app/onboarding/cycle-setup.tsx`
-**Étape**: 4/4
-
-- **Objectif**: Setup cycle menstruel (optionnel)
-- **Contenu**:
-  - Explication: Révolutions Lunaires = prioritaire
-  - Cycles menstruels = secondaire
-  - Bouton "Passer cette étape"
-  - Bouton "Configurer mon cycle"
-- **Actions**:
-  ```typescript
-  // Skip
-  router.push('/onboarding'); // → slides
-
-  // Configure (TODO: implement)
-  // Pour l'instant, même chose que skip
-  router.push('/onboarding');
-  ```
-- **Store**: Aucun changement (feature secondaire)
-
-### 6. Value Proposition Slides (`/onboarding`)
+### 5. Value Proposition Slides (`/onboarding`)
 **Fichier**: `app/onboarding/index.tsx`
 **Dernière étape**
 
@@ -204,9 +183,7 @@ Le flow a été adapté depuis `astroia-app` avec les changements suivants:
 
 ### Modifications de contenu
 - **Priorité**: Révolutions Lunaires (pas parentalité)
-- **Secondaire**: Cycles menstruels (optionnel)
 - **Slides**: Adapté pour focus lunar returns
-- **Cycle Setup**: Skippable, mention claire que c'est secondaire
 
 ### Modifications techniques
 - Utilisation de `useOnboardingStore` (Zustand)
@@ -253,13 +230,6 @@ Le flow a été adapté depuis `astroia-app` avec les changements suivants:
       │ Yes
       v
 ┌─────────────────────────┐
-│                         │
-│ /onboarding/cycle-setup │ (Optionnel, peut skip)
-│                         │
-└─────┬───────────────────┘
-      │
-      v
-┌─────────────────────────┐
 │ hasCompletedOnboarding? │──No──> /onboarding (slides)
 └─────┬───────────────────┘
       │ Yes
@@ -284,7 +254,6 @@ Le flow a été adapté depuis `astroia-app` avec les changements suivants:
 - [ ] Profile setup validation fonctionne
 - [ ] Consent checkbox requis
 - [ ] Disclaimer checkbox requis
-- [ ] Cycle setup skippable
 - [ ] Slides navigation fluide
 - [ ] Redirection vers home après dernier slide
 - [ ] DEV_AUTH_BYPASS skip onboarding après welcome

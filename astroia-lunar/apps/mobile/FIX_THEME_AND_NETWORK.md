@@ -2,9 +2,8 @@
 
 ## 🎯 Problèmes corrigés
 
-1. **Crash `fonts.size.md` undefined** dans `app/cycle/index.tsx` et `app/cycle/history.tsx`
-2. **Crash `fonts.sizes.xxl` undefined** dans `app/debug/selftest.tsx`
-3. **Documentation réseau** pour device réel (Expo Go)
+1. **Crash `fonts.sizes.xxl` undefined** dans `app/debug/selftest.tsx`
+2. **Documentation réseau** pour device réel (Expo Go)
 
 ---
 
@@ -38,7 +37,6 @@ export const fonts = {
 ```
 
 **Résultat :**
-- ✅ `fonts.size.*` fonctionne (utilisé dans cycle/index.tsx, cycle/history.tsx)
 - ✅ `fonts.sizes.*` fonctionne (utilisé dans debug/selftest.tsx)
 - ✅ Toutes les tailles attendues existent : xs, sm, md, lg, xl, xxl
 - ✅ Les styles existants (h1, h2, body, etc.) sont conservés
@@ -108,8 +106,6 @@ rm -rf .expo .expo-shared && npx expo start -c
 - Ajout de `fonts.size = fontSizes` (alias)
 
 **Impact :**
-- ✅ Corrige les crashes dans `cycle/index.tsx` (fonts.size.*)
-- ✅ Corrige les crashes dans `cycle/history.tsx` (fonts.size.*)
 - ✅ Corrige les crashes dans `debug/selftest.tsx` (fonts.sizes.*)
 - ✅ Compatible avec le code existant (pas de breaking changes)
 
@@ -138,16 +134,12 @@ rm -rf .expo .expo-shared && npx expo start -c
 
 ## 🔍 Vérifications
 
-### Utilisation de `fonts.size.*` et `fonts.sizes.*`
-
-**Fichiers utilisant `fonts.size.*` :**
-- `app/cycle/index.tsx` : md, sm, xl, lg (8 occurrences)
-- `app/cycle/history.tsx` : md, sm, xs, xl (12 occurrences)
+### Utilisation de `fonts.sizes.*`
 
 **Fichiers utilisant `fonts.sizes.*` :**
 - `app/debug/selftest.tsx` : xxl, sm, lg, md (7 occurrences)
 
-**Résultat :** ✅ Toutes les tailles utilisées existent maintenant dans `fonts.sizes` et `fonts.size`.
+**Résultat :** ✅ Toutes les tailles utilisées existent maintenant dans `fonts.sizes`.
 
 ---
 

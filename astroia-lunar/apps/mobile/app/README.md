@@ -12,8 +12,6 @@ Routes Expo Router.
 - `natal-chart.tsx` - Thème natal
 - `/lunar-returns/` - Révolutions lunaires
 - `/transits/` - Transits
-- `/calendar/` - Calendrier
-- `/cycle/` - Cycles menstruels
 - `/settings/` - Réglages
 - `/debug/` - Debug/selftest
 

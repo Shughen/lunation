@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Application React Native (Expo) pour le suivi des révolutions lunaires et cycles menstruels.
+Application React Native (Expo) pour le suivi des révolutions lunaires.
 
 ## Structure du projet
 
@@ -18,19 +18,15 @@ apps/mobile/
 │   │   ├── index.tsx        # Slides de value proposition
 │   │   ├── profile-setup.tsx # Prénom + date de naissance
 │   │   ├── consent.tsx      # Consentement RGPD
-│   │   ├── disclaimer.tsx   # Disclaimer médical
-│   │   └── cycle-setup.tsx  # Setup cycle (optionnel)
+│   │   └── disclaimer.tsx   # Disclaimer médical
 │   ├── natal-chart.tsx      # Calcul thème natal
 │   ├── lunar-returns/       # Révolutions lunaires
-│   ├── cycle/               # Cycles menstruels
 │   ├── transits/            # Transits planétaires
-│   ├── calendar/            # Calendrier lunaire
 │   └── settings/            # Paramètres
 ├── stores/                   # Zustand state management
 │   ├── useAuthStore.ts      # Authentification
 │   ├── useOnboardingStore.ts # État onboarding
-│   ├── useNatalStore.ts     # Thème natal
-│   └── useCycleStore.ts     # Cycles menstruels
+│   └── useNatalStore.ts     # Thème natal
 ├── services/                 # API clients
 │   └── api.ts               # Axios client + endpoints
 ├── types/                    # TypeScript interfaces
@@ -204,11 +200,6 @@ Guards s'arrêtent après welcome screen quand activé.
    - Timeline des 12 prochains retours
    - Interprétations détaillées
    - Aspects et positions
-
-2. **Cycles Menstruels** (feature secondaire)
-   - Optionnel dans onboarding
-   - Corrélation avec phases lunaires
-   - Peut être skippé
 
 ## Prochaines étapes
 

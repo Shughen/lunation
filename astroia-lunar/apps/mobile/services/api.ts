@@ -425,47 +425,6 @@ export const lunarReturns = {
   },
 };
 
-// === MENSTRUAL CYCLE ===
-export const menstrualCycle = {
-  start: async (data: {
-    start_date: string;
-    end_date?: string;
-    cycle_length?: number;
-    period_length?: number;
-    notes?: string;
-    symptoms?: string;
-  }) => {
-    const response = await apiClient.post('/api/menstrual-cycle/start', data);
-    return response.data;
-  },
-
-  getCurrent: async () => {
-    const response = await apiClient.get('/api/menstrual-cycle/current');
-    return response.data;
-  },
-
-  getHistory: async (limit: number = 12) => {
-    const response = await apiClient.get(`/api/menstrual-cycle/history?limit=${limit}`);
-    return response.data;
-  },
-
-  update: async (cycleId: number, data: {
-    end_date?: string;
-    cycle_length?: number;
-    period_length?: number;
-    notes?: string;
-    symptoms?: string;
-  }) => {
-    const response = await apiClient.put(`/api/menstrual-cycle/${cycleId}`, data);
-    return response.data;
-  },
-
-  getCorrelation: async () => {
-    const response = await apiClient.get('/api/menstrual-cycle/correlation');
-    return response.data;
-  },
-};
-
 // === TRANSITS ===
 export const transits = {
   /**

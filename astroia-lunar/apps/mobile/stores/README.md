@@ -6,8 +6,6 @@ Zustand stores pour state management.
 
 - `useAuthStore.ts` - Authentification
 - `useNatalStore.ts` - Thème natal
-- `useCycleStore.ts` - Cycle menstruel
-- `useCalendarStore.ts` - Calendrier lunaire
 - `useVocStore.ts` - Void of Course
 
 ## Fichiers à ajouter (Phase B)

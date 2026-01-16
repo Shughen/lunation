@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../types/storage';
 import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useCycleStore } from '../stores/useCycleStore';
 import { useNatalStore } from '../stores/useNatalStore';
 import { useResetStore } from '../stores/useResetStore';
 import { clearAllLunarCache } from './lunarCache';
@@ -21,7 +20,7 @@ import { cancelAllNotifications } from './notificationScheduler';
  * - Données de profil (birth_date, birth_time, birth_place, etc.)
  * - Journal (toutes les entrées journal_entry_*)
  * - Cache lunaire (lunar_day_*)
- * - Stores (onboarding, auth, cycle, natal)
+ * - Stores (onboarding, auth, natal)
  * - Notifications planifiées
  * - Token d'authentification
  * 
@@ -65,28 +64,22 @@ export async function resetAllUserData(): Promise<void> {
     await onboardingStore.reset();
     console.log('[ResetService] ✅ Store onboarding reset');
 
-    // 5. Clear cycle store
-    console.log('[ResetService] Step 5: Clear du store cycle...');
-    const cycleStore = useCycleStore.getState();
-    cycleStore.clear();
-    console.log('[ResetService] ✅ Store cycle cleared');
-
-    // 6. Clear natal store
-    console.log('[ResetService] Step 6: Clear du store natal...');
+    // 5. Clear natal store
+    console.log('[ResetService] Step 5: Clear du store natal...');
     const natalStore = useNatalStore.getState();
     natalStore.clearChart();
     console.log('[ResetService] ✅ Store natal cleared');
 
-    // 7. Logout (supprime token + user state)
-    console.log('[ResetService] Step 7: Logout (suppression token auth)...');
+    // 6. Logout (supprime token + user state)
+    console.log('[ResetService] Step 6: Logout (suppression token auth)...');
     const authStore = useAuthStore.getState();
     authStore.logout();
     // Supprimer aussi le token depuis AsyncStorage explicitement
     await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     console.log('[ResetService] ✅ Auth cleared (token supprimé)');
 
-    // 8. Supprimer les données de profil restantes (si stockées séparément)
-    console.log('[ResetService] Step 8: Suppression des données de profil...');
+    // 7. Supprimer les données de profil restantes (si stockées séparément)
+    console.log('[ResetService] Step 7: Suppression des données de profil...');
     const profileKeys = [
       STORAGE_KEYS.BIRTH_DATE,
       STORAGE_KEYS.BIRTH_TIME,
@@ -101,7 +94,7 @@ export async function resetAllUserData(): Promise<void> {
       // Ancienne clé pour migration
       'hasSeenWelcome',
     ];
-    
+
     const existingProfileKeys = profileKeys.filter((key) => allKeys.includes(key));
     if (existingProfileKeys.length > 0) {
       await AsyncStorage.multiRemove(existingProfileKeys);
@@ -110,8 +103,8 @@ export async function resetAllUserData(): Promise<void> {
       console.log('[ResetService] ✅ Aucune donnée de profil à supprimer');
     }
 
-    // 9. Supprimer toutes les clés fantômes (menstrual_*, onboarding_step)
-    console.log('[ResetService] Step 9: Suppression des clés fantômes...');
+    // 8. Supprimer toutes les clés fantômes (menstrual_*, onboarding_step)
+    console.log('[ResetService] Step 8: Suppression des clés fantômes...');
     const ghostKeys = allKeys.filter((key) =>
       key.startsWith('menstrual_') ||
       key === 'onboarding_step' ||
