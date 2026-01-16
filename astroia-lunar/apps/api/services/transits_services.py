@@ -142,15 +142,43 @@ async def get_lunar_return_transits(payload: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def generate_transit_insights(transits_data: Dict[str, Any]) -> Dict[str, Any]:
+def filter_major_aspects_only(events: list, major_only: bool = False) -> list:
+    """
+    Filtre les aspects pour ne garder que les majeurs (conjonction, opposition, carré, trigone).
+
+    Args:
+        events: Liste des aspects/événements de transit
+        major_only: Si True, ne garde que les aspects majeurs
+
+    Returns:
+        Liste filtrée des événements
+    """
+    if not major_only:
+        return events
+
+    # Aspects majeurs à garder
+    major_aspect_types = ["conjunction", "opposition", "square", "trine"]
+
+    filtered = []
+    for event in events:
+        aspect_type = event.get("aspect_type") or event.get("aspect", "")
+        if aspect_type.lower() in major_aspect_types:
+            filtered.append(event)
+
+    return filtered
+
+
+def generate_transit_insights(transits_data: Dict[str, Any], major_only: bool = False) -> Dict[str, Any]:
     """
     Génère des insights lisibles à partir des données brutes de transits.
-    
+
     Extrait les 3-5 aspects les plus significatifs et génère des bullet points.
-    
+    Peut filtrer pour ne garder que les aspects majeurs (conjonction, opposition, carré, trigone).
+
     Args:
         transits_data: Données brutes retournées par le provider (format RapidAPI: {"events": [...]})
-        
+        major_only: Si True, filtre uniquement les aspects majeurs (conjonction, opposition, carré, trigone)
+
     Returns:
         {
             "insights": ["Insight 1", "Insight 2", ...],
@@ -170,7 +198,7 @@ def generate_transit_insights(transits_data: Dict[str, Any]) -> Dict[str, Any]:
     insights = []
     major_aspects = []
     themes = []
-    
+
     # RapidAPI retourne {"events": [...]} où chaque événement est un transit
     events = []
     if "events" in transits_data and isinstance(transits_data["events"], list):
@@ -178,7 +206,10 @@ def generate_transit_insights(transits_data: Dict[str, Any]) -> Dict[str, Any]:
     elif "aspects" in transits_data and isinstance(transits_data["aspects"], list):
         # Fallback pour l'ancien format
         events = transits_data["aspects"]
-    
+
+    # Filtrer pour ne garder que les aspects majeurs si demandé
+    events = filter_major_aspects_only(events, major_only)
+
     if events:
         # Trier par importance (orbe le plus serré en valeur absolue)
         sorted_events = sorted(
@@ -221,15 +252,50 @@ def generate_transit_insights(transits_data: Dict[str, Any]) -> Dict[str, Any]:
             # Générer une interprétation basique si absente
             interpretation = event.get("interpretation", "")
             if not interpretation:
-                # Générer une interprétation basique selon l'aspect
+                # Générer une interprétation factuelle et concrète selon l'aspect
+                # Format: "Quoi + Comment ça se manifeste concrètement"
                 aspect_interpretations = {
-                    "conjunction": f"Fusion puissante entre {transit_planet} et votre {natal_planet} natal",
-                    "opposition": f"Tension dynamique entre {transit_planet} et votre {natal_planet} natal",
-                    "trine": f"Harmonie et facilité entre {transit_planet} et votre {natal_planet} natal",
-                    "square": f"Challenge et croissance entre {transit_planet} et votre {natal_planet} natal",
-                    "sextile": f"Opportunité et soutien entre {transit_planet} et votre {natal_planet} natal"
+                    "conjunction": {
+                        "Sun": f"{transit_planet} fusionne avec votre identité. Vous ressentez une amplification de votre énergie personnelle dans les domaines liés à {transit_planet}.",
+                        "Moon": f"{transit_planet} influence directement vos émotions. Période d'intensité émotionnelle et de sensibilité accrue.",
+                        "Mercury": f"{transit_planet} affecte votre mental et communication. Pensées, échanges et décisions colorés par l'énergie de {transit_planet}.",
+                        "Venus": f"{transit_planet} touche vos relations et valeurs. Relations, argent et plaisirs influencés par {transit_planet}.",
+                        "Mars": f"{transit_planet} active votre énergie et action. Votre façon d'agir et de vous affirmer est renforcée.",
+                        "default": f"{transit_planet} fusionne avec votre {natal_planet} natal. Influence directe et puissante sur ce domaine de vie."
+                    },
+                    "opposition": {
+                        "Sun": f"{transit_planet} vous confronte. Tension entre ce que vous êtes et ce que {transit_planet} demande. Besoin d'équilibre.",
+                        "Moon": f"{transit_planet} crée une polarité émotionnelle. Tiraillements entre vos besoins et les exigences extérieures.",
+                        "Mercury": f"{transit_planet} oppose votre mental. Tensions dans la communication, décisions à prendre entre deux pôles.",
+                        "Venus": f"{transit_planet} challenge vos relations. Conflits possibles, nécessité de trouver un équilibre relationnel.",
+                        "Mars": f"{transit_planet} s'oppose à votre action. Résistances, confrontations, besoin de canaliser l'énergie.",
+                        "default": f"{transit_planet} s'oppose à votre {natal_planet} natal. Tension dynamique nécessitant des ajustements."
+                    },
+                    "trine": {
+                        "Sun": f"{transit_planet} soutient votre identité. Facilité naturelle, opportunités fluides dans les domaines liés à {transit_planet}.",
+                        "Moon": f"{transit_planet} harmonise vos émotions. Sentiment de fluidité, bien-être émotionnel, connexions faciles.",
+                        "Mercury": f"{transit_planet} favorise votre mental. Pensées claires, communications aisées, décisions facilitées.",
+                        "Venus": f"{transit_planet} adoucit vos relations. Relations harmonieuses, plaisirs, valeurs alignées.",
+                        "Mars": f"{transit_planet} canalise votre action. Énergie bien dirigée, réalisations fluides, efficacité.",
+                        "default": f"{transit_planet} harmonise votre {natal_planet} natal. Fluidité et facilité dans ce domaine."
+                    },
+                    "square": {
+                        "Sun": f"{transit_planet} vous défie. Friction entre votre identité et les exigences de {transit_planet}. Croissance par l'inconfort.",
+                        "Moon": f"{transit_planet} brusque vos émotions. Tensions intérieures, besoin d'ajustements émotionnels.",
+                        "Mercury": f"{transit_planet} bloque votre mental. Difficultés de communication, décisions complexes, mental sollicité.",
+                        "Venus": f"{transit_planet} complique vos relations. Frictions relationnelles, ajustements nécessaires.",
+                        "Mars": f"{transit_planet} freine votre action. Obstacles, frustrations, énergie à rediriger.",
+                        "default": f"{transit_planet} crée une friction avec votre {natal_planet} natal. Tension motrice de changement."
+                    }
                 }
-                interpretation = aspect_interpretations.get(aspect_normalized, f"{transit_planet} en aspect avec votre {natal_planet} natal")
+
+                # Récupérer l'interprétation selon le type d'aspect et la planète natale
+                aspect_dict = aspect_interpretations.get(aspect_normalized, {})
+                if isinstance(aspect_dict, dict):
+                    interpretation = aspect_dict.get(natal_planet, aspect_dict.get("default", f"{transit_planet} en {aspect_normalized} avec votre {natal_planet} natal"))
+                else:
+                    # Fallback pour sextile ou autres aspects non majeurs
+                    interpretation = f"{transit_planet} en {aspect_normalized} avec votre {natal_planet} natal"
             
             major_aspects.append({
                 "transit_planet": transit_planet,

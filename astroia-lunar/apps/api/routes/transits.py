@@ -32,32 +32,34 @@ router = APIRouter(prefix="/api/transits", tags=["Transits"])
 @router.post("/natal", response_model=TransitsResponse, status_code=200)
 async def natal_transits(
     request: NatalTransitsRequest,
+    major_only: bool = False,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Calcule les transits planétaires actuels croisés avec le thème natal.
-    
+
     Analyse les aspects formés par les planètes en transit avec les positions natales,
     permettant de comprendre les influences astrologiques du moment.
-    
+
     - **user_id**: (Optionnel) ID utilisateur pour sauvegarde en DB
     - **birth_date**: Date de naissance
     - **transit_date**: Date du transit à calculer
+    - **major_only**: Si True, ne retourne que les aspects majeurs (conjonction, opposition, carré, trigone)
     """
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
-        
+
         logger.info(
             f"🔄 Calcul Natal Transits - user: {request.user_id}, "
-            f"transit_date: {request.transit_date}"
+            f"transit_date: {request.transit_date}, major_only: {major_only}"
         )
-        
+
         # Appel au service RapidAPI
         result = await transits_services.get_natal_transits(payload)
-        
-        # Générer des insights
-        insights = transits_services.generate_transit_insights(result)
+
+        # Générer des insights avec filtrage optionnel des aspects majeurs
+        insights = transits_services.generate_transit_insights(result, major_only=major_only)
         
         # Sauvegarde optionnelle en DB si user_id fourni
         if request.user_id:
@@ -121,33 +123,35 @@ async def natal_transits(
 @router.post("/lunar_return", response_model=TransitsResponse, status_code=200)
 async def lunar_return_transits(
     request: LunarReturnTransitsRequest,
+    major_only: bool = False,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Calcule les transits planétaires sur une révolution lunaire.
-    
+
     Analyse comment les planètes en transit interagissent avec la carte
     de révolution lunaire du mois, pour affiner les prévisions mensuelles.
-    
+
     - **user_id**: (Optionnel) ID utilisateur pour sauvegarde en DB
     - **month**: (Optionnel) Mois au format YYYY-MM pour indexation
     - **lunar_return_date**: Date de la révolution lunaire
     - **transit_date**: Date actuelle
+    - **major_only**: Si True, ne retourne que les aspects majeurs (conjonction, opposition, carré, trigone)
     """
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         payload = request.model_dump(exclude_none=True)
-        
+
         logger.info(
             f"🌙 Calcul Lunar Return Transits - user: {request.user_id}, "
-            f"LR date: {request.lunar_return_date}, transit: {request.transit_date}"
+            f"LR date: {request.lunar_return_date}, transit: {request.transit_date}, major_only: {major_only}"
         )
-        
+
         # Appel au service RapidAPI
         result = await transits_services.get_lunar_return_transits(payload)
-        
-        # Générer des insights
-        insights = transits_services.generate_transit_insights(result)
+
+        # Générer des insights avec filtrage optionnel des aspects majeurs
+        insights = transits_services.generate_transit_insights(result, major_only=major_only)
         
         # Sauvegarde optionnelle en DB si user_id et month fournis
         if request.user_id and request.month:
@@ -211,18 +215,21 @@ async def lunar_return_transits(
 async def get_transits_overview(
     user_id: UUID,
     month: str,
+    major_only: bool = False,
     current_user: User = Depends(get_current_user),
     x_dev_user_id: Optional[str] = Header(default=None, alias="X-Dev-User-Id"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Récupère la vue d'ensemble des transits pour un utilisateur et un mois donnés.
-    
+
     Retourne les données en cache incluant les transits natals et LR du mois.
-    
+    Peut filtrer pour ne retourner que les aspects majeurs.
+
     - **user_id**: ID de l'utilisateur (UUID dans l'URL)
     - **month**: Mois au format YYYY-MM
-    
+    - **major_only**: Si True, filtre uniquement les aspects majeurs (conjonction, opposition, carré, trigone)
+
     En mode DEV_AUTH_BYPASS, utilise l'UUID du header X-Dev-User-Id au lieu de l'UUID de l'URL.
     """
     try:
@@ -244,13 +251,32 @@ async def get_transits_overview(
         )
         result = await db.execute(stmt)
         overview = result.scalar_one_or_none()
-        
+
         if not overview:
             raise HTTPException(
                 status_code=404,
                 detail=f"Aucun transits overview trouvé pour user {user_id} et mois {month}"
             )
-        
+
+        # Si major_only=True, filtrer les aspects dans les données avant de retourner
+        if major_only and overview.overview:
+            # Recalculer les insights avec filtrage pour natal_transits
+            if "natal_transits" in overview.overview:
+                natal_data = overview.overview["natal_transits"]
+                filtered_insights = transits_services.generate_transit_insights(natal_data, major_only=True)
+                overview.overview["insights"] = filtered_insights
+
+            # Recalculer les insights avec filtrage pour lunar_return_transits
+            if "lunar_return_transits" in overview.overview:
+                lr_data = overview.overview["lunar_return_transits"]
+                filtered_lr_insights = transits_services.generate_transit_insights(lr_data, major_only=True)
+                # Fusionner ou remplacer selon la logique métier
+                if "insights" not in overview.overview:
+                    overview.overview["insights"] = filtered_lr_insights
+                else:
+                    # Combiner les insights natal + LR
+                    overview.overview["lr_insights"] = filtered_lr_insights
+
         return overview
         
     except HTTPException:
