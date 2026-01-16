@@ -16,23 +16,25 @@ export default function TransitsDetails() {
   const params = useLocalSearchParams();
 
   // TODO: Récupérer les vraies données depuis le store ou l'API
+  // Les interprétations ci-dessous reflètent le nouveau format factuel + manifestations concrètes
+  // Format API backend: "Quoi + Comment ça se manifeste concrètement"
   const aspectDetails = {
     transit_planet: 'Jupiter',
     natal_planet: 'Sun',
     aspect: 'trine',
     orb: 1.2,
     interpretation:
-      "Période d'expansion et de confiance en soi. Jupiter amplifie votre vitalité solaire, favorisant la croissance personnelle et les opportunités.",
+      "Jupiter soutient votre identité. Facilité naturelle, opportunités fluides dans les domaines liés à Jupiter. Sentiment d'expansion sans forcer, confiance en soi amplifiée, visibilité accrue.",
     timing: {
       exact_date: '2025-11-15T14:30:00',
       orb_range: '2025-11-12 → 2025-11-18',
     },
-    themes: ['expansion', 'optimisme', 'opportunités', 'croissance'],
+    themes: ['expansion', 'opportunités', 'confiance', 'fluidité'],
     recommendations: [
-      'Excellent moment pour lancer de nouveaux projets',
-      'Confiance en soi au sommet',
-      'Opportunités professionnelles favorables',
-      'Bonne période pour prendre des risques calculés',
+      'Période propice aux projets à long terme : les démarches se font naturellement',
+      'Votre rayonnement personnel attire des opportunités sans effort',
+      'Bon moment pour élargir votre champ d\'action (formations, voyages, nouveaux contacts)',
+      'Attention à ne pas disperser l\'énergie : choisir 1-2 priorités',
     ],
   };
 
@@ -67,7 +69,7 @@ export default function TransitsDetails() {
 
           {/* Interpretation */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🔮 Interprétation</Text>
+            <Text style={styles.sectionTitle}>🔍 Ce qui se passe</Text>
             <Text style={styles.interpretation}>
               {aspectDetails.interpretation}
             </Text>
@@ -106,7 +108,7 @@ export default function TransitsDetails() {
 
           {/* Recommendations */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>✨ Recommandations</Text>
+            <Text style={styles.sectionTitle}>💡 Comment utiliser cette énergie</Text>
             {aspectDetails.recommendations.map((rec, index) => (
               <View key={index} style={styles.recCard}>
                 <Text style={styles.recBullet}>•</Text>
