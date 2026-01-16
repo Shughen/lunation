@@ -15,6 +15,7 @@ from database import get_db
 from services import lunar_services
 from services.moon_position import get_current_moon_position
 from services.daily_climate import get_daily_climate
+from services import voc_cache_service
 from schemas.lunar import (
     LunarReturnReportRequest,
     VoidOfCourseRequest,
@@ -341,36 +342,27 @@ async def void_of_course(
         is_mock = result.get("_mock", False)
         provider = "mock" if is_mock else "rapidapi"
 
-        # Option: Sauvegarder les fenêtres VoC actives en DB
+        # Option: Sauvegarder les fenêtres VoC actives en DB (avec anti-doublons)
         # (uniquement si le provider retourne start_at/end_at)
         if "void_of_course" in result and isinstance(result["void_of_course"], dict):
             voc_data = result["void_of_course"]
-            
+
             # Vérifier si des fenêtres sont présentes
             if "start" in voc_data and "end" in voc_data:
                 try:
                     start_at = datetime.fromisoformat(voc_data["start"])
                     end_at = datetime.fromisoformat(voc_data["end"])
-                    
-                    # Insérer la fenêtre VoC en DB
-                    voc_window = LunarVocWindow(
+
+                    # Sauvegarder avec protection anti-doublons et retry logic
+                    await voc_cache_service.save_voc_window_safe(
+                        db=db,
                         start_at=start_at,
                         end_at=end_at,
                         source=result
                     )
-                    db.add(voc_window)
-                    # FIX: flush avant commit pour détecter les erreurs de contrainte AVANT commit
-                    await db.flush()
-                    await db.commit()
-                    logger.info(f"💾 Fenêtre VoC sauvegardée: {start_at} -> {end_at}")
 
                 except Exception as e:
                     logger.warning(f"⚠️  Impossible de sauvegarder la fenêtre VoC: {str(e)}")
-                    # FIX: rollback explicite pour libérer proprement la session
-                    try:
-                        await db.rollback()
-                    except Exception:
-                        pass  # Si rollback échoue, on ignore
 
         return LunarResponse(
             provider=provider,
@@ -576,30 +568,16 @@ async def get_user_lunar_reports(
 @router.get("/voc/current", response_model=Dict[str, Any])
 async def get_current_voc_status(db: AsyncSession = Depends(get_db)):
     """
-    Vérifie s'il y a une fenêtre VoC active actuellement.
+    Vérifie s'il y a une fenêtre VoC active actuellement avec cache (TTL: 1 min).
+
+    Optimisations:
+    - Cache en mémoire (1 minute)
+    - Retry logic pour requêtes DB
+    - Fallback sur cache expiré en cas d'erreur DB
     """
     try:
-        now = datetime.now()
-        
-        stmt = select(LunarVocWindow).where(
-            and_(
-                LunarVocWindow.start_at <= now,
-                LunarVocWindow.end_at >= now
-            )
-        )
-        result = await db.execute(stmt)
-        active_voc = result.scalar_one_or_none()
-        
-        if active_voc:
-            return {
-                "is_active": True,
-                "start_at": active_voc.start_at.isoformat(),
-                "end_at": active_voc.end_at.isoformat(),
-                "source": active_voc.source
-            }
-        else:
-            return {"is_active": False}
-            
+        return await voc_cache_service.get_current_voc_cached(db)
+
     except Exception as e:
         logger.error(f"❌ Erreur vérification VoC actif: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -658,77 +636,42 @@ async def get_next_voc_window():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/voc/cache_stats", response_model=Dict[str, Any])
+async def get_voc_cache_stats():
+    """
+    Retourne les statistiques des caches VoC (pour monitoring et debug).
+
+    Utile pour:
+    - Vérifier que le cache fonctionne correctement
+    - Monitorer la performance
+    - Debugging en cas de problème
+    """
+    try:
+        return voc_cache_service.get_cache_stats()
+
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération cache stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/voc/status", response_model=Dict[str, Any])
 async def get_voc_status(db: AsyncSession = Depends(get_db)):
     """
-    Endpoint unifié pour l'écran VoC MVP (Phase 1.3).
+    Endpoint unifié pour l'écran VoC MVP (Phase 1.3) avec cache optimisé.
 
     Retourne :
     - now : fenêtre VoC active maintenant (ou null)
     - next : prochaine fenêtre VoC à venir
     - upcoming : liste 2-3 prochaines fenêtres (24-48h)
+
+    Optimisations:
+    - Cache en mémoire (TTL: 2 minutes)
+    - Retry logic pour requêtes DB (3 retries avec exponential backoff)
+    - Requêtes DB parallélisées (current, next, upcoming en parallèle)
+    - Fallback sur cache expiré en cas d'erreur DB
     """
     try:
-        now = datetime.now()
-
-        # 1. VoC actif maintenant ?
-        stmt_current = select(LunarVocWindow).where(
-            and_(
-                LunarVocWindow.start_at <= now,
-                LunarVocWindow.end_at >= now
-            )
-        )
-        result_current = await db.execute(stmt_current)
-        active_voc = result_current.scalar_one_or_none()
-
-        current_window = None
-        if active_voc:
-            current_window = {
-                "is_active": True,
-                "start_at": active_voc.start_at.isoformat(),
-                "end_at": active_voc.end_at.isoformat()
-            }
-
-        # 2. Prochaine fenêtre VoC
-        stmt_next = select(LunarVocWindow).where(
-            LunarVocWindow.start_at > now
-        ).order_by(LunarVocWindow.start_at.asc()).limit(1)
-
-        result_next = await db.execute(stmt_next)
-        next_voc = result_next.scalar_one_or_none()
-
-        next_window = None
-        if next_voc:
-            next_window = {
-                "start_at": next_voc.start_at.isoformat(),
-                "end_at": next_voc.end_at.isoformat()
-            }
-
-        # 3. Upcoming (2-3 prochaines fenêtres dans les 48h)
-        hours_48 = now + timedelta(hours=48)
-        stmt_upcoming = select(LunarVocWindow).where(
-            and_(
-                LunarVocWindow.start_at > now,
-                LunarVocWindow.start_at <= hours_48
-            )
-        ).order_by(LunarVocWindow.start_at.asc()).limit(3)
-
-        result_upcoming = await db.execute(stmt_upcoming)
-        upcoming_vocs = result_upcoming.scalars().all()
-
-        upcoming_windows = [
-            {
-                "start_at": voc.start_at.isoformat(),
-                "end_at": voc.end_at.isoformat()
-            }
-            for voc in upcoming_vocs
-        ]
-
-        return {
-            "now": current_window,
-            "next": next_window,
-            "upcoming": upcoming_windows
-        }
+        return await voc_cache_service.get_voc_status_cached(db)
 
     except Exception as e:
         logger.error(f"❌ Erreur récupération VoC status: {str(e)}")
