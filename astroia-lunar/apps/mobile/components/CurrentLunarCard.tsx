@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 import { LunarReturn } from '../services/api';
 import { Skeleton } from './Skeleton';
+import { translateZodiacSign } from '../utils/astrologyTranslations';
 
 interface CurrentLunarCardProps {
   lunarReturn: LunarReturn | null;
@@ -35,7 +36,9 @@ interface CurrentLunarCardProps {
  */
 const formatMonthName = (returnDate: string): string => {
   const date = new Date(returnDate);
-  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const formatted = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  // Capitaliser la première lettre
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
 /**
@@ -92,8 +95,8 @@ export function CurrentLunarCard({ lunarReturn, loading, onRefresh }: CurrentLun
   // Derive display data
   const monthName = formatMonthName(lunarReturn.return_date);
   const dateRange = formatDateRange(lunarReturn.return_date);
-  const moonSign = lunarReturn.moon_sign || 'Non disponible';
-  const lunarAscendant = lunarReturn.lunar_ascendant || 'Non disponible';
+  const moonSign = lunarReturn.moon_sign ? translateZodiacSign(lunarReturn.moon_sign) : 'Non disponible';
+  const lunarAscendant = lunarReturn.lunar_ascendant ? translateZodiacSign(lunarReturn.lunar_ascendant) : 'Non disponible';
 
   return (
     <Animated.View
