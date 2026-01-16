@@ -60,6 +60,19 @@ export default function HomeScreen() {
   const routingInFlightRef = useRef(false);
   const selfHealExecutedRef = useRef(false); // Guard anti-boucle pour self-heal
 
+  // Fonction pour charger la révolution lunaire en cours
+  const loadCurrentLunarReturn = useCallback(async () => {
+    try {
+      const current = await lunarReturns.getCurrent();
+      setCurrentLunarReturn(current);
+    } catch (error: any) {
+      // Silencieux si 404 (pas de retour pour le mois en cours)
+      if (error.response?.status !== 404) {
+        console.error('[INDEX] Erreur chargement cycle lunaire:', error);
+      }
+    }
+  }, []);
+
   // Guards de routing : vérifier auth, onboarding et profil complet
   useEffect(() => {
     const checkRouting = async () => {
@@ -265,13 +278,16 @@ export default function HomeScreen() {
     if ((isAuthenticated || isDevAuthBypassActive()) && !isCheckingRouting) {
       loadCurrentLunarReturn();
     }
-  }, [isAuthenticated, isCheckingRouting]);
+  }, [isAuthenticated, isCheckingRouting, loadCurrentLunarReturn]);
 
 
   // Re-scheduler notifications au focus si nécessaire
   useFocusEffect(
     useCallback(() => {
       if ((isAuthenticated || isDevAuthBypassActive()) && !isCheckingRouting) {
+        // Charger révolution lunaire
+        loadCurrentLunarReturn();
+
         // Re-scheduler notifications si nécessaire (max 1x/24h)
         if (notificationsEnabled && hydrated) {
           (async () => {
@@ -283,20 +299,8 @@ export default function HomeScreen() {
           })();
         }
       }
-    }, [isAuthenticated, isCheckingRouting, notificationsEnabled, hydrated, scheduleAllNotifications])
+    }, [isAuthenticated, isCheckingRouting, notificationsEnabled, hydrated, scheduleAllNotifications, loadCurrentLunarReturn])
   );
-
-  const loadCurrentLunarReturn = async () => {
-    try {
-      const current = await lunarReturns.getCurrent();
-      setCurrentLunarReturn(current);
-    } catch (error: any) {
-      // Silencieux si 404 (pas de retour pour le mois en cours)
-      if (error.response?.status !== 404) {
-        console.error('[INDEX] Erreur chargement cycle lunaire:', error);
-      }
-    }
-  };
 
   // Afficher un loader pendant la vérification du routing
   if (isCheckingRouting && !isDevAuthBypassActive()) {
