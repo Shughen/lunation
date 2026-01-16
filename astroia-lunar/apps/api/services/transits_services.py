@@ -168,6 +168,70 @@ def filter_major_aspects_only(events: list, major_only: bool = False) -> list:
     return filtered
 
 
+def filter_non_planetary_points(events: list) -> list:
+    """
+    Filtre les points non-planétaires pour ne garder que les planètes réelles.
+
+    Exclut : nœuds lunaires, Chiron, Lilith, Part de Fortune, etc.
+    Garde : Soleil, Lune, Mercure, Vénus, Mars, Jupiter, Saturne, Uranus, Neptune, Pluton
+
+    Args:
+        events: Liste des aspects/événements de transit
+
+    Returns:
+        Liste filtrée sans les points non-planétaires
+    """
+    # Planètes et luminaires à GARDER (liste blanche)
+    PLANETARY_BODIES = [
+        "sun", "moon", "mercury", "venus", "mars",
+        "jupiter", "saturn", "uranus", "neptune", "pluto"
+    ]
+
+    # Points à EXCLURE (noms courants dans les APIs astro)
+    EXCLUDED_POINTS = [
+        "mean_node", "true_node", "north_node", "south_node",  # Nœuds lunaires
+        "chiron",  # Astéroïde
+        "lilith", "mean_lilith", "true_lilith", "black_moon",  # Lune noire
+        "part_of_fortune", "vertex", "ascendant", "midheaven",  # Points fictifs
+        "juno", "vesta", "pallas", "ceres"  # Autres astéroïdes
+    ]
+
+    filtered = []
+    for event in events:
+        # Récupérer le nom de la planète en transit
+        transit_planet = (
+            event.get("transiting_planet") or
+            event.get("planet1") or
+            event.get("transit_planet") or
+            "unknown"
+        ).lower().replace(" ", "_")
+
+        # Récupérer la planète natale
+        natal_planet = (
+            event.get("stationed_planet") or
+            event.get("planet2") or
+            event.get("natal_point") or
+            event.get("natal_planet") or
+            "unknown"
+        ).lower().replace(" ", "_")
+
+        # Vérifier si les deux corps sont des planètes valides
+        transit_is_planet = transit_planet in PLANETARY_BODIES
+        natal_is_planet = natal_planet in PLANETARY_BODIES
+
+        # Exclure si l'un des deux est dans la liste d'exclusion
+        transit_excluded = any(excluded in transit_planet for excluded in EXCLUDED_POINTS)
+        natal_excluded = any(excluded in natal_planet for excluded in EXCLUDED_POINTS)
+
+        # Garder seulement si les deux sont des planètes ET aucun n'est exclu
+        if (transit_is_planet or not transit_excluded) and (natal_is_planet or not natal_excluded):
+            # Double vérification : exclure si contient un mot-clé exclu
+            if not transit_excluded and not natal_excluded:
+                filtered.append(event)
+
+    return filtered
+
+
 def generate_transit_insights(transits_data: Dict[str, Any], major_only: bool = False) -> Dict[str, Any]:
     """
     Génère des insights lisibles à partir des données brutes de transits.
@@ -207,6 +271,9 @@ def generate_transit_insights(transits_data: Dict[str, Any], major_only: bool = 
         # Fallback pour l'ancien format
         events = transits_data["aspects"]
 
+    # TOUJOURS filtrer les points non-planétaires (nœuds, Chiron, etc.)
+    events = filter_non_planetary_points(events)
+
     # Filtrer pour ne garder que les aspects majeurs si demandé
     events = filter_major_aspects_only(events, major_only)
 
@@ -230,21 +297,34 @@ def generate_transit_insights(transits_data: Dict[str, Any], major_only: bool = 
             # Support multiple formats:
             # - RapidAPI: transiting_planet, aspect_type, stationed_planet, orb
             # - Test format: planet1, planet2, aspect, orb
-            transit_planet = (
-                event.get("transiting_planet") or 
-                event.get("planet1") or 
-                event.get("transit_planet") or 
+            transit_planet_raw = (
+                event.get("transiting_planet") or
+                event.get("planet1") or
+                event.get("transit_planet") or
                 "Unknown"
             )
             aspect_type = event.get("aspect_type") or event.get("aspect", "unknown")
-            natal_planet = (
-                event.get("stationed_planet") or 
-                event.get("planet2") or 
-                event.get("natal_point") or 
-                event.get("natal_planet") or 
+            natal_planet_raw = (
+                event.get("stationed_planet") or
+                event.get("planet2") or
+                event.get("natal_point") or
+                event.get("natal_planet") or
                 "Unknown"
             )
             orb = abs(event.get("orb", 0))  # Orbe en valeur absolue
+
+            # Normaliser les noms de planètes pour affichage (capitalize first letter)
+            def normalize_planet_name(planet_name: str) -> str:
+                """Normalise le nom d'une planète pour l'affichage."""
+                # Convertir en title case et nettoyer
+                name = str(planet_name).replace("_", " ").title()
+                # Cas spéciaux
+                if "Mean" in name or "True" in name:
+                    name = name.replace("Mean ", "").replace("True ", "")
+                return name
+
+            transit_planet = normalize_planet_name(transit_planet_raw)
+            natal_planet = normalize_planet_name(natal_planet_raw)
             
             # Normaliser le nom de l'aspect
             aspect_normalized = aspect_name_mapping.get(aspect_type.lower(), aspect_type.lower())
