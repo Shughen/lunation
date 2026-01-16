@@ -472,13 +472,16 @@ export const transits = {
    * Récupère la vue d'ensemble des transits pour un utilisateur et un mois
    * @param userId ID de l'utilisateur (UUID string)
    * @param month Mois au format YYYY-MM (ex: "2025-01")
+   * @param majorOnly Si true, filtre uniquement les aspects majeurs (conjonction, opposition, carré, trigone)
    * @param token Token d'authentification (optionnel, sera ajouté automatiquement par l'intercepteur)
    */
-  getOverview: async (userId: string, month: string, token?: string) => {
+  getOverview: async (userId: string, month: string, majorOnly: boolean = true, token?: string) => {
     // Le token est géré automatiquement par l'intercepteur axios
     // On peut le passer explicitement si nécessaire, sinon l'intercepteur le récupère d'AsyncStorage
     try {
-      const response = await apiClient.get(`/api/transits/overview/${userId}/${month}`);
+      const response = await apiClient.get(`/api/transits/overview/${userId}/${month}`, {
+        params: { major_only: majorOnly }
+      });
       return response.data;
     } catch (error: any) {
       // 404 = pas de transits disponibles (cas normal, pas une erreur)

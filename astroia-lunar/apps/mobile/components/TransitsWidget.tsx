@@ -76,49 +76,17 @@ export function TransitsWidget() {
       const now = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      // Appeler l'API pour récupérer les transits
-      const response = await transits.getOverview(userId, month);
+      // Appeler l'API pour récupérer les transits avec filtrage backend (major_only=true)
+      const response = await transits.getOverview(userId, month, true);
 
       if (response) {
         const overviewData = response?.overview || response?.summary;
         const insights = overviewData?.insights || {};
         const allAspects = insights?.major_aspects || [];
 
-        // Filtrer pour ne garder que les 4 aspects majeurs MVP
-        const MAJOR_ASPECTS_MVP = ['conjunction', 'opposition', 'square', 'trine'];
-
-        // Planètes réelles uniquement (exclure nœuds, Chiron, etc.)
-        const PLANETARY_BODIES = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
-        const EXCLUDED_KEYWORDS = ['node', 'Node', 'chiron', 'Chiron', 'lilith', 'Lilith', 'Fortune', 'Vertex'];
-
-        const majorOnlyAspects = allAspects.filter((aspect: any) => {
-          // Filtrer les aspects majeurs
-          if (!MAJOR_ASPECTS_MVP.includes(aspect.aspect)) {
-            return false;
-          }
-
-          // Filtrer les points non-planétaires
-          const transitPlanet = aspect.transit_planet || '';
-          const natalPlanet = aspect.natal_planet || '';
-
-          // Exclure si contient un mot-clé interdit
-          const hasExcludedKeyword = EXCLUDED_KEYWORDS.some(keyword =>
-            transitPlanet.includes(keyword) || natalPlanet.includes(keyword)
-          );
-
-          if (hasExcludedKeyword) {
-            return false;
-          }
-
-          // Garder si les deux planètes sont dans la liste blanche
-          const transitIsValid = PLANETARY_BODIES.some(planet => transitPlanet.includes(planet));
-          const natalIsValid = PLANETARY_BODIES.some(planet => natalPlanet.includes(planet));
-
-          return transitIsValid && natalIsValid;
-        });
-
-        // Garder uniquement les 3 aspects les plus serrés (orbe le plus petit)
-        const sortedAspects = [...majorOnlyAspects]
+        // Le backend a déjà filtré les aspects majeurs et les corps planétaires
+        // On garde uniquement les 3 aspects les plus serrés (orbe le plus petit)
+        const sortedAspects = [...allAspects]
           .sort((a, b) => Math.abs(a.orb) - Math.abs(b.orb))
           .slice(0, 3);
 
