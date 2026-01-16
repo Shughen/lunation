@@ -21,7 +21,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import apiClient from '../../services/api';
 import { AspectDetailSheet } from '../../components/AspectDetailSheet';
 import { Skeleton, SkeletonCard } from '../../components/Skeleton';
+import { MarkdownText } from '../../components/MarkdownText';
 import { showNetworkErrorAlert, getHumanErrorMessage } from '../../utils/errorHandler';
+import { translateZodiacSign, translateAstrologyText } from '../../utils/astrologyTranslations';
 import type { AspectV4 } from '../../types/api';
 
 interface LunarReportHeader {
@@ -87,22 +89,27 @@ export default function LunarReportScreen() {
 
     const { month, dates, moon_sign, moon_house, lunar_ascendant } = report.header;
 
+    // Traduire le mois et les signes
+    const translatedMonth = translateAstrologyText(month);
+    const translatedMoonSign = translateZodiacSign(moon_sign);
+    const translatedAscendant = translateZodiacSign(lunar_ascendant);
+
     return (
       <View style={styles.headerCard}>
-        <Text style={styles.monthTitle}>{month}</Text>
+        <Text style={styles.monthTitle}>{translatedMonth}</Text>
         <Text style={styles.dates}>{dates}</Text>
 
         <View style={styles.headerInfoGrid}>
           <View style={styles.headerInfoItem}>
             <Text style={styles.headerLabel}>Lune en</Text>
             <Text style={styles.headerValue}>
-              {moon_sign} (Maison {moon_house})
+              {translatedMoonSign} (Maison {moon_house})
             </Text>
           </View>
 
           <View style={styles.headerInfoItem}>
             <Text style={styles.headerLabel}>Ascendant lunaire</Text>
-            <Text style={styles.headerValue}>{lunar_ascendant}</Text>
+            <Text style={styles.headerValue}>{translatedAscendant}</Text>
           </View>
         </View>
       </View>
@@ -112,10 +119,13 @@ export default function LunarReportScreen() {
   const renderClimate = () => {
     if (!report || !report.general_climate) return null;
 
+    // Traduire tous les signes et mois dans le texte
+    const translatedClimate = translateAstrologyText(report.general_climate);
+
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🌙 Climat général du mois</Text>
-        <Text style={styles.climateText}>{report.general_climate}</Text>
+        <MarkdownText style={styles.climateText}>{translatedClimate}</MarkdownText>
       </View>
     );
   };
@@ -128,12 +138,16 @@ export default function LunarReportScreen() {
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🎯 Axes dominants du cycle</Text>
-        {report.dominant_axes.map((axis, index) => (
-          <View key={index} style={styles.axisItem}>
-            <Text style={styles.axisBullet}>•</Text>
-            <Text style={styles.axisText}>{axis}</Text>
-          </View>
-        ))}
+        {report.dominant_axes.map((axis, index) => {
+          // Traduire les signes dans chaque axe
+          const translatedAxis = translateAstrologyText(axis);
+          return (
+            <View key={index} style={styles.axisItem}>
+              <Text style={styles.axisBullet}>•</Text>
+              <MarkdownText style={styles.axisText}>{translatedAxis}</MarkdownText>
+            </View>
+          );
+        })}
       </View>
     );
   };
