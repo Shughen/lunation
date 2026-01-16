@@ -399,6 +399,30 @@ export const lunarReturns = {
   generate: async (): Promise<void> => {
     await apiClient.post('/api/lunar-returns/generate');
   },
+
+  /**
+   * Récupère une révolution lunaire spécifique par mois
+   * @param month Format YYYY-MM (ex: "2025-01")
+   */
+  getByMonth: async (month: string): Promise<LunarReturn | null> => {
+    try {
+      const response = await apiClient.get(`/api/lunar-returns/${month}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.log(`[API] Aucune révolution lunaire trouvée pour ${month} (404)`);
+        return null;
+      }
+      console.error('[API] Erreur getByMonth:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+      });
+      throw error;
+    }
+  },
 };
 
 // === MENSTRUAL CYCLE ===
