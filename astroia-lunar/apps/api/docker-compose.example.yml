@@ -1,0 +1,125 @@
+# ============================================
+# 🌙 Astroia Lunar API - Docker Compose Example
+# ============================================
+# Exemple de configuration docker-compose pour dev/staging
+#
+# Usage:
+#   1. Copier ce fichier: cp docker-compose.example.yml docker-compose.yml
+#   2. Adapter les variables d'environnement
+#   3. Lancer: docker-compose up -d
+#   4. Vérifier: curl http://localhost:8000/health
+#
+# IMPORTANT: Ne jamais commiter docker-compose.yml avec des secrets
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # Database PostgreSQL
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: astroia-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme123
+      POSTGRES_DB: astroia_lunar
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persistance données
+      - postgres_data:/var/lib/postgresql/data
+      # Optionnel: scripts d'initialisation
+      # - ./scripts/sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - astroia-network
+
+  # ============================================
+  # API FastAPI
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: astroia-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:changeme123@postgres:5432/astroia_lunar
+      DATABASE_POOL_SIZE: 10
+      DATABASE_MAX_OVERFLOW: 20
+
+      # API Config
+      APP_ENV: development
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_RELOAD: "false"  # Pas de reload en container
+
+      # JWT
+      SECRET_KEY: dev-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
+
+      # RapidAPI (Best Astrology API)
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY:-your-rapidapi-key-here}
+      RAPIDAPI_HOST: best-astrology-api-natal-charts-transits-synastry.p.rapidapi.com
+      BASE_RAPID_URL: https://best-astrology-api-natal-charts-transits-synastry.p.rapidapi.com
+
+      # Anthropic (Claude AI)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-your-anthropic-key-here}
+      NATAL_LLM_MODE: off  # 'off' ou 'anthropic'
+      NATAL_INTERPRETATION_VERSION: 2
+
+      # Dev Flags
+      DEV_MOCK_NATAL: "false"
+      DEV_MOCK_RAPIDAPI: "false"
+      DEV_MOCK_EPHEMERIS: "false"
+      DEV_AUTH_BYPASS: "false"
+      ALLOW_DEV_PURGE: "false"
+      DISABLE_CHIRON: "false"
+
+      # Timezone
+      TZ: Europe/Paris
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Optionnel: mount code pour dev (hot reload)
+      # - .:/app
+      # Logs
+      - ./logs:/app/logs
+    networks:
+      - astroia-network
+    restart: unless-stopped
+
+    # ============================================
+    # Option 1: Utiliser entrypoint avec migrations auto
+    # ============================================
+    # command: ["./docker-entrypoint.sh"]
+
+    # ============================================
+    # Option 2: Uvicorn direct (migrations manuelles)
+    # ============================================
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ============================================
+# Volumes persistants
+# ============================================
+volumes:
+  postgres_data:
+    driver: local
+
+# ============================================
+# Réseaux
+# ============================================
+networks:
+  astroia-network:
+    driver: bridge

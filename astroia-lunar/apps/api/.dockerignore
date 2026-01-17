@@ -1,0 +1,106 @@
+# ============================================
+# 🌙 Astroia Lunar API - .dockerignore
+# ============================================
+# Exclut fichiers inutiles du contexte Docker
+# pour réduire taille image et build time
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environnements virtuels
+.venv/
+venv/
+ENV/
+env/
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# MyPy cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ============================================
+# Variables d'environnement et secrets
+# ============================================
+.env
+.env.*
+!.env.example
+*.key
+**/secrets*
+.env.backup
+
+# ============================================
+# IDE et OS
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Git
+# ============================================
+.git/
+.gitignore
+.gitattributes
+
+# ============================================
+# Documentation et notes
+# ============================================
+*.md
+!README.md
+docs/
+IMPLEMENTATION_SUMMARY.md
+*_SUMMARY.md
+*_NOTES.md
+*_FIX.md
+*_CHECKLIST.md
+
+# ============================================
+# Scripts de développement
+# ============================================
+scripts/
+start_api.sh
+
+# ============================================
+# Tests (optionnel - commenter si tests dans image)
+# ============================================
+tests/
+test_*.py
+*_test.py
+conftest.py
+
+# ============================================
+# Alembic (migrations déjà appliquées en prod)
+# ============================================
+# Garder alembic/ et alembic.ini pour migrations manuelles
+# Si migrations auto via entrypoint, commenter ces lignes
+# alembic/
+# alembic.ini
+
+# ============================================
+# Logs et fichiers temporaires
+# ============================================
+*.log
+*.sqlite
+*.db
+tmp/
+temp/
