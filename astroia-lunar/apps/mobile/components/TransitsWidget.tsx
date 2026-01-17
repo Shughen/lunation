@@ -5,29 +5,24 @@
  * - Top 2-3 transits majeurs du mois (aspects serrés uniquement)
  * - Planètes en transit + aspects + planètes natales
  * - Lien vers l'écran détaillé
+ *
+ * Optimisé avec SWR pour:
+ * - Cache intelligent (60 secondes)
+ * - Déduplication des requêtes
+ * - Partage du cache entre composants
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { transits } from '../services/api';
-import { useAuthStore } from '../stores/useAuthStore';
-import { isDevAuthBypassActive, getDevAuthHeader } from '../services/api';
+import { useMajorTransits } from '../hooks/useLunarData';
 import { tPlanet, tAspect } from '../i18n/astro.format';
-
-interface AspectInfo {
-  transit_planet: string;
-  natal_planet: string;
-  aspect: string;
-  orb: number;
-  interpretation?: string;
-}
+import { Skeleton } from './Skeleton';
 
 const ASPECT_COLORS: Record<string, string> = {
   conjunction: '#fbbf24',
@@ -44,68 +39,15 @@ const ASPECT_SYMBOLS: Record<string, string> = {
 };
 
 export function TransitsWidget() {
-  const { user, isAuthenticated } = useAuthStore();
-  const [majorAspects, setMajorAspects] = useState<AspectInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: majorAspects, error, isLoading } = useMajorTransits();
 
-  useEffect(() => {
-    if (isAuthenticated || isDevAuthBypassActive()) {
-      loadTransits();
-    } else {
-      setLoading(false);
-    }
-  }, [user, isAuthenticated]);
-
-  const loadTransits = async () => {
-    try {
-      setError(false);
-
-      // Récupérer userId
-      let userId: string;
-      if (isDevAuthBypassActive()) {
-        const devHeader = getDevAuthHeader();
-        userId = devHeader.value || 'dev-user-id';
-      } else if (user?.id) {
-        userId = typeof user.id === 'string' ? user.id : String(user.id);
-      } else {
-        throw new Error('Utilisateur non authentifié');
-      }
-
-      // Construire le mois au format YYYY-MM
-      const now = new Date();
-      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-      // Appeler l'API pour récupérer les transits avec filtrage backend (major_only=true)
-      const response = await transits.getOverview(userId, month, true);
-
-      if (response) {
-        const overviewData = response?.overview || response?.summary;
-        const insights = overviewData?.insights || {};
-        const allAspects = insights?.major_aspects || [];
-
-        // Le backend a déjà filtré les aspects majeurs et les corps planétaires
-        // On garde uniquement les 3 aspects les plus serrés (orbe le plus petit)
-        const sortedAspects = [...allAspects]
-          .sort((a, b) => Math.abs(a.orb) - Math.abs(b.orb))
-          .slice(0, 3);
-
-        setMajorAspects(sortedAspects);
-      } else {
-        setMajorAspects([]);
-      }
-    } catch (err) {
-      console.error('[TransitsWidget] Erreur chargement transits:', err);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.card}>
-        <ActivityIndicator size="small" color="#8B7BF7" />
+        <Skeleton width="60%" height={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={16} style={{ marginBottom: 8 }} />
+        <Skeleton width="90%" height={16} style={{ marginBottom: 8 }} />
+        <Skeleton width="85%" height={16} />
       </View>
     );
   }
@@ -118,7 +60,7 @@ export function TransitsWidget() {
     );
   }
 
-  if (majorAspects.length === 0) {
+  if (!majorAspects || majorAspects.length === 0) {
     return (
       <View style={styles.card}>
         <View style={styles.header}>

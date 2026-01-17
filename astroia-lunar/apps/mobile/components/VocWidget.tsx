@@ -5,54 +5,26 @@
  * - VoC actif maintenant ? (oui/non)
  * - Prochaine fenêtre VoC (date + heure)
  * - Lien vers l'écran détaillé
+ *
+ * Optimisé avec SWR pour:
+ * - Cache intelligent (5 minutes)
+ * - Auto-refresh toutes les 5 minutes
+ * - Déduplication des requêtes
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import apiClient from '../services/api';
-
-interface VocWindow {
-  start_at: string;
-  end_at: string;
-}
-
-interface VocStatus {
-  now: (VocWindow & { is_active: true }) | null;
-  next: VocWindow | null;
-  upcoming: VocWindow[];
-}
+import { useVocStatus } from '../hooks/useLunarData';
+import { Skeleton } from './Skeleton';
 
 export function VocWidget() {
-  const [status, setStatus] = useState<VocStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    loadVocStatus();
-    // Refresh toutes les 5 minutes
-    const interval = setInterval(loadVocStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadVocStatus = async () => {
-    try {
-      setError(false);
-      const response = await apiClient.get('/api/lunar/voc/status');
-      setStatus(response.data);
-    } catch (err) {
-      console.error('[VocWidget] Erreur chargement VoC:', err);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: status, error, isLoading } = useVocStatus();
 
   const formatDateTime = (isoString: string): string => {
     try {
@@ -69,15 +41,17 @@ export function VocWidget() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.card}>
-        <ActivityIndicator size="small" color="#8B7BF7" />
+        <Skeleton width="60%" height={20} style={{ marginBottom: 12 }} />
+        <Skeleton width="100%" height={16} style={{ marginBottom: 8 }} />
+        <Skeleton width="80%" height={14} />
       </View>
     );
   }
 
-  if (error) {
+  if (error || !status) {
     return (
       <View style={styles.card}>
         <Text style={styles.errorText}>VoC non disponible</Text>
