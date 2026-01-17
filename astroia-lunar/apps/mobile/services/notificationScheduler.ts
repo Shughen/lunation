@@ -6,6 +6,13 @@
  * - Notification début cycle lunaire
  * - Scheduling local uniquement (pas de push serveur)
  * - Re-scheduling au focus app (max 1x/24h)
+ *
+ * ⚠️ FEATURE FLAG: Notifications désactivées par défaut (Tâche 3.1)
+ * Pour activer les notifications VoC :
+ * 1. Passer ENABLE_VOC_NOTIFICATIONS = true
+ * 2. Décommenter l'intégration dans VocWidget.tsx
+ * 3. S'assurer que l'API /voc/status retourne les fenêtres VoC
+ * 4. Tester le scheduling avec expo-notifications
  */
 
 import * as Notifications from 'expo-notifications';
@@ -13,6 +20,9 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../types/storage';
 import i18n from '../i18n';
+
+// ⚠️ FEATURE FLAG: Notifications VoC désactivées par défaut
+export const ENABLE_VOC_NOTIFICATIONS = false;
 
 // Configuration par défaut des notifications
 Notifications.setNotificationHandler({
@@ -42,6 +52,11 @@ export interface LunarReturn {
  * @returns true si permission accordée, false sinon
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[Notifications] Feature désactivée (ENABLE_VOC_NOTIFICATIONS = false)');
+    return false;
+  }
+
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
@@ -76,9 +91,50 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
+ * Configure les permissions de notifications (alias de requestNotificationPermissions)
+ * @returns true si permission accordée, false sinon
+ */
+export async function setupNotificationPermissions(): Promise<boolean> {
+  return requestNotificationPermissions();
+}
+
+/**
+ * Récupère la liste des notifications VoC schedulées
+ * @returns Liste des notifications planifiées
+ */
+export async function getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[Notifications] Feature désactivée, aucune notification schedulée');
+    return [];
+  }
+
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    console.log(`[Notifications] ${scheduled.length} notifications schedulées`);
+    return scheduled;
+  } catch (error) {
+    console.error('[Notifications] ❌ Erreur récupération notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Annule toutes les notifications VoC schedulées
+ * Alias de cancelAllNotifications pour compatibilité API
+ */
+export async function cancelAllVocNotifications(): Promise<void> {
+  return cancelAllNotifications();
+}
+
+/**
  * Annule toutes les notifications schedulées
  */
 export async function cancelAllNotifications(): Promise<void> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[Notifications] Feature désactivée, aucune notification à annuler');
+    return;
+  }
+
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('[Notifications] ✅ Toutes notifications annulées');
@@ -88,10 +144,90 @@ export async function cancelAllNotifications(): Promise<void> {
 }
 
 /**
+ * Schedule une notification VoC unique (30 min avant + au début)
+ * @param vocWindow Fenêtre VoC à notifier
+ */
+export async function scheduleVocNotification(vocWindow: VocWindow): Promise<void> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[VoC Notifications] Feature désactivée (ENABLE_VOC_NOTIFICATIONS = false)');
+    return;
+  }
+
+  try {
+    const now = new Date();
+    const startDate = new Date(vocWindow.start_at);
+    const endDate = new Date(vocWindow.end_at);
+
+    // Skip si fenêtre déjà passée
+    if (startDate < now) {
+      console.log('[Notifications] Fenêtre VoC déjà passée, skip');
+      return;
+    }
+
+    let scheduledCount = 0;
+
+    // Notification 30 min avant début VoC
+    const preWarning = new Date(startDate.getTime() - 30 * 60 * 1000);
+    const preTrigger = preWarning.getTime() - now.getTime();
+
+    if (preTrigger > 0 && preWarning > now) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Void of Course approche",
+          body: "La Lune entre en VoC dans 30 minutes",
+          data: {
+            type: 'voc_pre_warning',
+            windowId: `${vocWindow.start_at}`,
+            screen: '/lunar/voc'
+          },
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: Math.floor(preTrigger / 1000),
+        },
+      });
+      scheduledCount++;
+    }
+
+    // Notification début VoC
+    const startTrigger = startDate.getTime() - now.getTime();
+    if (startTrigger > 0) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Void of Course actif",
+          body: `La Lune entre en VoC jusqu'à ${formatTime(endDate)}`,
+          data: {
+            type: 'voc_start',
+            windowId: `${vocWindow.start_at}`,
+            screen: '/lunar/voc'
+          },
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: Math.floor(startTrigger / 1000),
+        },
+      });
+      scheduledCount++;
+    }
+
+    console.log(`[Notifications] ✅ ${scheduledCount} notifications VoC schedulées pour fenêtre`);
+  } catch (error) {
+    console.error('[Notifications] ❌ Erreur scheduling VoC:', error);
+  }
+}
+
+/**
  * Schedule les notifications VoC (début + 30min avant fin)
  * @param vocWindows Liste des fenêtres VoC à venir (48h max)
  */
 export async function scheduleVocNotifications(vocWindows: VocWindow[]): Promise<void> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[VoC Notifications] Feature désactivée (ENABLE_VOC_NOTIFICATIONS = false)');
+    return;
+  }
+
   try {
     const now = new Date();
     let scheduledCount = 0;
@@ -155,6 +291,11 @@ export async function scheduleVocNotifications(vocWindows: VocWindow[]): Promise
  * @param lunarReturn Révolution lunaire en cours
  */
 export async function scheduleLunarCycleNotification(lunarReturn: LunarReturn): Promise<void> {
+  if (!ENABLE_VOC_NOTIFICATIONS) {
+    console.log('[Notifications] Feature désactivée, skip cycle lunaire notification');
+    return;
+  }
+
   try {
     const now = new Date();
     const cycleStart = new Date(lunarReturn.return_date);
