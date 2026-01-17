@@ -6,14 +6,15 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run test",
-    "check:i18n": "node scripts/check-i18n.js"
+    "check:i18n": "node scripts/check-i18n.js",
+    "e2e": "maestro test maestro/flows/"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -39,6 +40,7 @@
     "react-native-markdown-display": "^7.0.2",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "~4.16.0",
+    "swr": "^2.3.8",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

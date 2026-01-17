@@ -2,6 +2,7 @@
   "expo": {
     "name": "Lunation",
     "slug": "astroia-lunar",
+    "version": "1.0.0",
     "scheme": "astroia-lunar",
     "platforms": [
       "ios",
@@ -20,9 +21,14 @@
     "owner": "shughen85",
     "ios": {
       "bundleIdentifier": "com.shughen85.astroialunar",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
+    },
+    "android": {
+      "package": "com.shughen85.astroialunar",
+      "versionCode": 1
     }
   }
 }
