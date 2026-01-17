@@ -72,8 +72,11 @@ async def calculate_natal_chart(
     if detected_timezone != data.timezone:
         logger.info(f"🌍 Timezone auto-détectée: {data.timezone} → {detected_timezone} (lat={data.latitude}, lon={data.longitude})")
     
-    logger.info(f"📊 Calcul thème natal - user_id={current_user.id}, email={current_user.email}, date={data.date} {birth_time}, timezone={detected_timezone}")
-    
+    # LOG DÉTAILLÉ: Ce qui est reçu du mobile
+    logger.info(f"📊 Calcul thème natal - user_id={current_user.id}, email={current_user.email}")
+    logger.info(f"   📅 REÇU DU MOBILE: date={data.date} (type={type(data.date)}), time={birth_time}, timezone={data.timezone}")
+    logger.info(f"   🌍 Timezone détectée: {detected_timezone}")
+
     # Calculer via RapidAPI (Best Astrology API)
     try:
         # Construire le payload pour RapidAPI au format attendu
@@ -95,7 +98,9 @@ async def calculate_natal_chart(
             "longitude": data.longitude,
             "timezone": detected_timezone  # Utiliser la timezone détectée
         }
-        
+
+        logger.info(f"   📤 ENVOYÉ À RAPIDAPI: year={birth_data['year']}, month={birth_data['month']}, day={birth_data['day']}, hour={birth_data['hour']}, minute={birth_data['minute']}, timezone={birth_data['timezone']}")
+
         # Appel à RapidAPI via le service natal_reading_service
         rapidapi_response = await call_rapidapi_natal_chart(birth_data)
         logger.info(f"✅ Réponse RapidAPI reçue - clés disponibles: {list(rapidapi_response.keys())}")
@@ -369,6 +374,8 @@ async def calculate_natal_chart(
     # Convertir les strings en types Date/Time pour SQLAlchemy
     try:
         birth_date_obj = date.fromisoformat(data.date)  # String "YYYY-MM-DD" -> date
+        logger.info(f"   🔄 CONVERSION: '{data.date}' → {birth_date_obj} (type={type(birth_date_obj)})")
+
         # Parser time: supporte "HH:MM" et "HH:MM:SS" (utiliser birth_time avec fallback)
         time_str = birth_time
         if len(time_str.split(":")) == 2:
@@ -378,6 +385,7 @@ async def calculate_natal_chart(
         else:
             # "HH:MM:SS" -> time.fromisoformat()
             birth_time_obj = time.fromisoformat(time_str)
+        logger.info(f"   🔄 CONVERSION: '{birth_time}' → {birth_time_obj}")
     except (ValueError, AttributeError) as e:
         logger.error(f"❌ Erreur parsing date/time: date={data.date}, time={birth_time}, error={e}")
         raise HTTPException(
@@ -420,10 +428,14 @@ async def calculate_natal_chart(
     current_user.birth_timezone = detected_timezone
     
     # Log clair avant commit avec tous les champs qui vont en DB
-    logger.info(f"💾 Sauvegarde DB natal_chart - user_id={chart.user_id}, birth_date={chart.birth_date}, "
-                f"birth_time={chart.birth_time}, birth_place={chart.birth_place}, "
-                f"latitude={chart.latitude}, longitude={chart.longitude}, "
-                f"timezone={chart.timezone}, positions_keys={list(positions.keys())[:5]}...")
+    logger.info(f"💾 JUSTE AVANT SAUVEGARDE DB:")
+    logger.info(f"   user_id={chart.user_id}")
+    logger.info(f"   birth_date={chart.birth_date} (type={type(chart.birth_date)})")
+    logger.info(f"   birth_time={chart.birth_time} (type={type(chart.birth_time)})")
+    logger.info(f"   birth_place={chart.birth_place}")
+    logger.info(f"   latitude={chart.latitude}, longitude={chart.longitude}")
+    logger.info(f"   timezone={chart.timezone}")
+    logger.info(f"   positions.moon.sign={positions.get('moon', {}).get('sign', 'N/A')}")
     
     try:
         await db.commit()
