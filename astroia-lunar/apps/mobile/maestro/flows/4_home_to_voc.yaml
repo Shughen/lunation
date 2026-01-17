@@ -1,4 +1,4 @@
-appId: com.remi.astroia
+appId: com.shughen85.astroialunar
 ---
 # Test E2E: Home → VoC actuel
 # Vérifie la navigation depuis Home vers le détail VoC et l'affichage du statut

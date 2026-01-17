@@ -1,4 +1,4 @@
-appId: com.remi.astroia
+appId: com.shughen85.astroialunar
 ---
 # Test E2E: Home → Journal → Créer entrée
 # Vérifie la création d'une entrée journal avec mood et note

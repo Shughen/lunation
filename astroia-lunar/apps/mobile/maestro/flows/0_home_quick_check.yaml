@@ -1,0 +1,25 @@
+appId: com.shughen85.astroialunar
+---
+# Test E2E: Quick check Home screen (DEV_AUTH_BYPASS actif)
+# Vérifie que le Home charge correctement avec les widgets principaux
+
+# Étape 1: Lancer l'application
+- launchApp
+
+# Étape 2: Attendre que l'écran se charge
+- waitForAnimationToEnd
+
+# Étape 3: Vérifier présence du titre principal
+- assertVisible: "Rituel Lunaire"
+
+# Étape 4: Vérifier présence de la question
+- assertVisible: "Quel est mon cycle actuel"
+
+# Étape 5: Vérifier présence du mois
+- assertVisible: "Janvier 2026"
+
+# Étape 6: Vérifier présence du lien vers rapport
+- assertVisible: "Voir le rapport mensuel"
+
+# Étape 7: Screenshot de succès
+- takeScreenshot: home_loaded_successfully

@@ -1,4 +1,4 @@
-appId: com.remi.astroia
+appId: com.shughen85.astroialunar
 ---
 # Test E2E: Home → Transits majeurs
 # Vérifie la navigation depuis Home vers l'overview des transits et le filtrage major_only
