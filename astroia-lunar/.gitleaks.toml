@@ -1,0 +1,16 @@
+# Gitleaks configuration
+# Documentation: https://github.com/gitleaks/gitleaks
+
+title = "Astroia Lunar - Gitleaks Config"
+
+# Paths to exclude from scan
+[allowlist]
+paths = [
+  '''docs/archives/.*''',
+  '''\.gitleaksignore''',
+]
+
+# Regex patterns to exclude
+regexes = [
+  '''YOUR_.*_HERE''',  # Placeholder values like YOUR_JWT_TOKEN_HERE
+]
