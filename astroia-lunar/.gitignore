@@ -69,3 +69,17 @@ apps/api/.env.bak2
 *.bak
 *.save
 .schema_inspection.json
+
+# === MOBILE BUILDS ===
+apps/mobile/android/
+apps/mobile/ios/Pods/
+
+# === E2E SCREENSHOTS ===
+*.png
+!assets/**/*.png
+!docs/**/*.png
+
+# === BACKUPS & TEMP ===
+.env.backup
+*_example*.json
+apps/api/scripts/*.json
