@@ -99,8 +99,7 @@ graph TD
     J --> K
     K -->|Non| L[/onboarding/disclaimer]
     K -->|Oui| M{Onboarding slides?}
-    L --> N[/onboarding/cycle-setup]
-    N --> M
+    L --> M
     M -->|Non| O[/onboarding]
     M -->|Oui| Z[Home]
     E --> D

@@ -56,17 +56,12 @@ clearChart();
    - ✅ Checkbox "J'accepte"
    - Cocher + "Suivant"
 
-6. **Redirection `/onboarding/disclaimer`** (Étape 3/4)
+6. **Redirection `/onboarding/disclaimer`** (Étape 3/3)
    - ✅ Titre "Disclaimer Médical"
    - ✅ Checkbox "J'ai lu et compris"
    - Cocher + "Suivant"
 
-7. **Redirection `/onboarding/cycle-setup`** (Étape 4/4)
-   - ✅ Titre "Setup Cycle Menstruel"
-   - ✅ Boutons "Passer cette étape" + "Configurer"
-   - Cliquer "Passer cette étape"
-
-8. **Redirection `/onboarding`** (Slides Value Proposition)
+7. **Redirection `/onboarding`** (Slides Value Proposition)
    - ✅ 4 slides visibles
    - ✅ Bouton "Suivant" entre slides
    - ✅ Bouton "Passer" disponible

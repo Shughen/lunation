@@ -24,14 +24,7 @@ Affichage du rapport mensuel complet
 - Refresh automatique toutes les 5 minutes
 - Pull-to-refresh manuel
 
-### 5. 📅 calendar/month.tsx - Calendrier Mensuel (NOUVEAU)
-- Navigation mois précédent/suivant
-- Cards résumé (nouvelles lunes, pleines lunes, éclipses, événements)
-- Liste des événements lunaires du mois
-- Phases lunaires avec emojis
-- Bouton "Mansion du jour"
-
-### 6. 🔄 transits/overview.tsx - Vue d'Ensemble Transits (NOUVEAU)
+### 5. 🔄 transits/overview.tsx - Vue d'Ensemble Transits (NOUVEAU)
 - Badge niveau d'énergie (Élevé/Modéré/Calme)
 - 3-5 insights clés sous forme de bullet points
 - Liste des aspects majeurs avec badges colorés :
@@ -42,14 +35,14 @@ Affichage du rapport mensuel complet
   - ◉ Opposition (violet)
 - Navigation vers détails
 
-### 7. ⭐ transits/details.tsx - Détails Transit (NOUVEAU)
+### 6. ⭐ transits/details.tsx - Détails Transit (NOUVEAU)
 - Visualisation d'un aspect spécifique
 - Interprétation détaillée
 - Timing (aspect exact + période d'influence)
 - Thèmes associés (badges)
 - Recommandations pratiques
 
-### 8. ⚙️ settings/index.tsx - Paramètres (NOUVEAU)
+### 7. ⚙️ settings/index.tsx - Paramètres (NOUVEAU)
 - Toggle notifications VoC
 - Ville par défaut
 - Code pays par défaut
@@ -185,11 +178,6 @@ colors = {
 ### Transits
 - `GET /api/transits/overview/{userId}/{month}` - Vue d'ensemble
 - `POST /api/transits/natal` - Transits natals
-
-### Calendar
-- `GET /api/calendar/month?year=YYYY&month=MM` - Calendrier mensuel
-- `POST /api/calendar/phases` - Phases lunaires
-- `POST /api/calendar/events` - Événements spéciaux
 
 ### Auth & Natal
 - `POST /api/auth/login` - Connexion

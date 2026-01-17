@@ -314,7 +314,7 @@ Vérifier que la migration ghost-flags ne s'exécute qu'une seule fois.
 - Si le reset échoue, le flag est immédiatement relâché pour éviter de bloquer l'app
 - Les données serveur (si existantes) ne sont PAS supprimées, seulement les données locales
 - **PATCH V2** : L'étape "Cycles menstruels" (4/4) a été SUPPRIMÉE du flow onboarding
-- Le cycle menstruel est désormais une feature post-onboarding accessible via Settings/Profil
+- **MVP NETTOYAGE** : La fonctionnalité cycle menstruel a été complètement retirée du MVP (hors scope)
 - La migration ghost-flags utilise `MIGRATION_GHOSTFLAGS_DONE` pour ne s'exécuter qu'une fois
 - Le guard de routing utilise `routingInFlightRef` pour éviter les doubles exécutions
 - `isCheckingRouting` reste à `true` pendant les redirections (anti-flash Home)
