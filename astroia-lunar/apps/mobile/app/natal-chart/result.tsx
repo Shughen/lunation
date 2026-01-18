@@ -179,7 +179,9 @@ export default function NatalChartResultScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.statLabel}>Ascendant</Text>
-                  <Text style={styles.statEmoji}>AS</Text>
+                  <Text style={styles.statEmoji}>
+                    {ZODIAC_EMOJI[chart.ascendant || ''] || '⬆️'}
+                  </Text>
                   <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                     {tSign(chart.ascendant) || 'N/A'}
                   </Text>
