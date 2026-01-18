@@ -173,7 +173,7 @@ export async function scheduleVocNotification(vocWindow: VocWindow): Promise<voi
     if (preTrigger > 0 && preWarning > now) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Void of Course approche",
+          title: "Lune Vide de Course approche",
           body: "La Lune entre en VoC dans 30 minutes",
           data: {
             type: 'voc_pre_warning',
@@ -195,7 +195,7 @@ export async function scheduleVocNotification(vocWindow: VocWindow): Promise<voi
     if (startTrigger > 0) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Void of Course actif",
+          title: "Lune Vide de Course active",
           body: `La Lune entre en VoC jusqu'à ${formatTime(endDate)}`,
           data: {
             type: 'voc_start',

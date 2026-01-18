@@ -58,7 +58,7 @@ export default function VoidOfCourseScreen() {
       setStatus(response.data);
     } catch (err: any) {
       console.error('[VoC] Erreur chargement status:', err);
-      setError('Erreur lors du chargement du Void of Course');
+      setError('Erreur lors du chargement de la Lune Vide de Course');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,7 +100,7 @@ export default function VoidOfCourseScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#8B7BF7" />
-        <Text style={styles.loadingText}>Chargement du Void of Course...</Text>
+        <Text style={styles.loadingText}>Chargement de la Lune Vide de Course...</Text>
       </View>
     );
   }
@@ -132,7 +132,7 @@ export default function VoidOfCourseScreen() {
           <Text style={styles.backButtonText}>← Retour</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>🌑 Void of Course</Text>
+        <Text style={styles.title}>🌑 Lune Vide de Course</Text>
         <Text style={styles.subtitle}>Période lunaire sans aspects majeurs</Text>
       </View>
 

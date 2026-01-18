@@ -70,7 +70,7 @@ export function VocWidget() {
       testID="voc-widget"
     >
       <View style={styles.header}>
-        <Text style={styles.title} testID="voc-title">🌑 Void of Course</Text>
+        <Text style={styles.title} testID="voc-title">🌑 Lune Vide de Course</Text>
         {isActive && <View style={styles.activeBadge}>
           <Text style={styles.activeBadgeText} testID="voc-active-badge">ACTIF</Text>
         </View>}
@@ -78,7 +78,7 @@ export function VocWidget() {
 
       {isActive ? (
         <View style={styles.content}>
-          <Text style={styles.statusText} testID="voc-status-active">La Lune est Void of Course</Text>
+          <Text style={styles.statusText} testID="voc-status-active">La Lune est en Vide de Course</Text>
           {status?.now && (
             <Text style={styles.timeText} testID="voc-time">
               Jusqu'à {formatDateTime(status.now.end_at)}

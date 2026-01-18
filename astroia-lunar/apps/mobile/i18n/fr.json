@@ -34,7 +34,7 @@
         "body": "Chaque mois, la Lune revient à sa position natale. C'est votre révolution lunaire — un thème mensuel unique."
       },
       "slide2": {
-        "title": "🌑 Void of Course",
+        "title": "🌑 Lune Vide de Course",
         "body": "Fenêtres lunaires où la Lune ne forme aucun aspect majeur. Idéal pour observer, pas pour forcer."
       },
       "slide3": {
@@ -56,7 +56,7 @@
       "title": "Notifications",
       "lunarCycle": "Nouveau cycle lunaire",
       "lunarCycleDesc": "1 notification par mois au début de votre révolution lunaire",
-      "voidOfCourse": "Void of Course",
+      "voidOfCourse": "Lune Vide de Course",
       "voidOfCourseDesc": "Alertes optionnelles pour les fenêtres VoC à venir",
       "permissionRequired": "Permission requise",
       "permissionDesc": "Autorisez les notifications dans les réglages système.",
@@ -82,7 +82,7 @@
       "cta": "Générer mes cycles"
     },
     "noVoC": {
-      "title": "Aucun Void of Course à venir",
+      "title": "Aucune Lune Vide de Course à venir",
       "body": "Les prochaines fenêtres VoC ne sont pas encore calculées. Revenez plus tard."
     },
     "noJournal": {
@@ -117,12 +117,12 @@
       "body": "{month} — Lune en {sign}, Ascendant {ascendant}. Consultez votre rapport mensuel."
     },
     "vocStart": {
-      "title": "🌑 Void of Course",
+      "title": "🌑 Lune Vide de Course",
       "body": "La Lune entre en VoC jusqu'à {endTime}. Fenêtre d'observation."
     },
     "vocEnd": {
       "title": "🌑 Fin du VoC dans 30 min",
-      "body": "La Lune quitte le Void of Course à {endTime}."
+      "body": "La Lune quitte la phase Vide de Course à {endTime}."
     },
     "journalReminder": {
       "title": "🌙 Note hebdomadaire",
