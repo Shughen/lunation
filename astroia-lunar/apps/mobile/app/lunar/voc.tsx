@@ -58,7 +58,7 @@ export default function VoidOfCourseScreen() {
       setStatus(response.data);
     } catch (err: any) {
       console.error('[VoC] Erreur chargement status:', err);
-      setError('Erreur lors du chargement de la Lune Vide de Course');
+      setError('Erreur lors du chargement des Pauses Lunaires');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,7 +100,7 @@ export default function VoidOfCourseScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#8B7BF7" />
-        <Text style={styles.loadingText}>Chargement de la Lune Vide de Course...</Text>
+        <Text style={styles.loadingText}>Chargement des Pauses Lunaires...</Text>
       </View>
     );
   }
@@ -132,14 +132,14 @@ export default function VoidOfCourseScreen() {
           <Text style={styles.backButtonText}>← Retour</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>🌑 Lune Vide de Course</Text>
-        <Text style={styles.subtitle}>Période lunaire sans aspects majeurs</Text>
+        <Text style={styles.title}>🌑 Pause Lunaire</Text>
+        <Text style={styles.subtitle}>Période où la Lune flotte librement</Text>
       </View>
 
       {/* Status Badge */}
       <View style={[styles.statusBadge, isActive ? styles.statusBadgeActive : styles.statusBadgeInactive]}>
         <View style={[styles.statusDot, isActive ? styles.statusDotActive : styles.statusDotInactive]} />
-        <Text style={styles.statusText}>{isActive ? 'VoC EN COURS' : 'Pas de VoC actif'}</Text>
+        <Text style={styles.statusText}>{isActive ? 'PAUSE EN COURS' : 'Pas de pause active'}</Text>
       </View>
 
       {/* VoC Actif Maintenant */}
@@ -165,16 +165,16 @@ export default function VoidOfCourseScreen() {
           <View style={styles.hintBox}>
             <Text style={styles.hintEmoji}>💡</Text>
             <Text style={styles.hintText}>
-              Période peu propice aux initiatives. Privilégiez la réflexion et la consolidation.
+              Moment idéal pour l'introspection, le repos et la réflexion.
             </Text>
           </View>
         </View>
       )}
 
-      {/* Prochaine Fenêtre VoC */}
+      {/* Prochaine Pause */}
       {status.next && (
         <View style={styles.nextCard}>
-          <Text style={styles.cardTitle}>📅 Prochaine fenêtre VoC</Text>
+          <Text style={styles.cardTitle}>📅 Prochaine pause</Text>
 
           <View style={styles.timeRow}>
             <Text style={styles.timeLabel}>Début :</Text>
@@ -196,7 +196,7 @@ export default function VoidOfCourseScreen() {
       {/* Upcoming Windows (48h) */}
       {status.upcoming && status.upcoming.length > 0 && (
         <View style={styles.upcomingCard}>
-          <Text style={styles.cardTitle}>🔮 Prochaines fenêtres (48h)</Text>
+          <Text style={styles.cardTitle}>🔮 Prochaines pauses (48h)</Text>
 
           {status.upcoming.map((window, index) => (
             <View key={index} style={styles.upcomingItem}>
@@ -212,12 +212,12 @@ export default function VoidOfCourseScreen() {
         </View>
       )}
 
-      {/* Info VoC */}
+      {/* Info Pause Lunaire */}
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Qu'est-ce que le VoC ?</Text>
+        <Text style={styles.infoTitle}>Qu'est-ce que la Pause Lunaire ?</Text>
         <Text style={styles.infoText}>
-          Période où la Lune ne forme plus d'aspects majeurs avant de changer de signe. Les actions entreprises ont
-          tendance à nécessiter des ajustements ultérieurs.
+          Période où la Lune ne forme plus d'aspects majeurs avant de changer de signe. C'est un moment propice à
+          l'introspection, au repos et à la consolidation de vos projets.
         </Text>
       </View>
 

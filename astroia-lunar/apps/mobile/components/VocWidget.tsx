@@ -54,7 +54,7 @@ export function VocWidget() {
   if (error || !status) {
     return (
       <View style={styles.card}>
-        <Text style={styles.errorText}>VoC non disponible</Text>
+        <Text style={styles.errorText}>Données non disponibles</Text>
       </View>
     );
   }
@@ -70,7 +70,7 @@ export function VocWidget() {
       testID="voc-widget"
     >
       <View style={styles.header}>
-        <Text style={styles.title} testID="voc-title">🌑 Lune Vide de Course</Text>
+        <Text style={styles.title} testID="voc-title">🌑 Pause Lunaire</Text>
         {isActive && <View style={styles.activeBadge}>
           <Text style={styles.activeBadgeText} testID="voc-active-badge">ACTIF</Text>
         </View>}
@@ -78,22 +78,22 @@ export function VocWidget() {
 
       {isActive ? (
         <View style={styles.content}>
-          <Text style={styles.statusText} testID="voc-status-active">La Lune est en Vide de Course</Text>
+          <Text style={styles.statusText} testID="voc-status-active">La Lune est en pause</Text>
           {status?.now && (
             <Text style={styles.timeText} testID="voc-time">
               Jusqu'à {formatDateTime(status.now.end_at)}
             </Text>
           )}
           <Text style={styles.hintText}>
-            Période délicate pour débuter des projets importants
+            Moment idéal pour l'introspection et le repos
           </Text>
         </View>
       ) : (
         <View style={styles.content}>
-          <Text style={styles.statusText} testID="voc-status-inactive">Pas de VoC actuellement</Text>
+          <Text style={styles.statusText} testID="voc-status-inactive">Pas de pause actuellement</Text>
           {hasNext ? (
             <Text style={styles.timeText} testID="voc-next">
-              Prochaine fenêtre: {formatDateTime(status.next!.start_at)}
+              Prochaine pause: {formatDateTime(status.next!.start_at)}
             </Text>
           ) : (
             <Text style={styles.timeText}>Aucune fenêtre programmée</Text>

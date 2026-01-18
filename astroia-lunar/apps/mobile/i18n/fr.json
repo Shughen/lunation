@@ -34,8 +34,8 @@
         "body": "Chaque mois, la Lune revient à sa position natale. C'est votre révolution lunaire — un thème mensuel unique."
       },
       "slide2": {
-        "title": "🌑 Lune Vide de Course",
-        "body": "Fenêtres lunaires où la Lune ne forme aucun aspect majeur. Idéal pour observer, pas pour forcer."
+        "title": "🌑 Pause Lunaire",
+        "body": "Périodes où la Lune flotte librement. Idéal pour l'introspection et le repos."
       },
       "slide3": {
         "title": "📅 Timeline structurée",
@@ -56,8 +56,8 @@
       "title": "Notifications",
       "lunarCycle": "Nouveau cycle lunaire",
       "lunarCycleDesc": "1 notification par mois au début de votre révolution lunaire",
-      "voidOfCourse": "Lune Vide de Course",
-      "voidOfCourseDesc": "Alertes optionnelles pour les fenêtres VoC à venir",
+      "voidOfCourse": "Pause Lunaire",
+      "voidOfCourseDesc": "Alertes optionnelles pour les pauses lunaires à venir",
       "permissionRequired": "Permission requise",
       "permissionDesc": "Autorisez les notifications dans les réglages système.",
       "openSettings": "Ouvrir les réglages",
@@ -82,8 +82,8 @@
       "cta": "Générer mes cycles"
     },
     "noVoC": {
-      "title": "Aucune Lune Vide de Course à venir",
-      "body": "Les prochaines fenêtres VoC ne sont pas encore calculées. Revenez plus tard."
+      "title": "Aucune Pause Lunaire à venir",
+      "body": "Les prochaines pauses lunaires ne sont pas encore calculées. Revenez plus tard."
     },
     "noJournal": {
       "title": "Aucune note de cycle",
@@ -117,12 +117,12 @@
       "body": "{month} — Lune en {sign}, Ascendant {ascendant}. Consultez votre rapport mensuel."
     },
     "vocStart": {
-      "title": "🌑 Lune Vide de Course",
-      "body": "La Lune entre en VoC jusqu'à {endTime}. Fenêtre d'observation."
+      "title": "🌑 Pause Lunaire",
+      "body": "La Lune entre en pause jusqu'à {endTime}. Moment d'introspection."
     },
     "vocEnd": {
-      "title": "🌑 Fin du VoC dans 30 min",
-      "body": "La Lune quitte la phase Vide de Course à {endTime}."
+      "title": "🌑 Fin de pause dans 30 min",
+      "body": "La Lune reprend son cours à {endTime}."
     },
     "journalReminder": {
       "title": "🌙 Note hebdomadaire",
@@ -222,7 +222,7 @@
       "waning_crescent": "Tout ralentit en douceur. Tu peux te reposer avant le renouveau.",
       "fallback": "Écoutez votre intuition lunaire."
     },
-    "vocActive": "Lune flottante jusqu'à {{endTime}}",
+    "vocActive": "Pause lunaire jusqu'à {{endTime}}",
     "cachedData": "Données du {{date}}",
     "cta": "Voir le climat lunaire",
     "journalPrompt": "Noter mon ressenti",
@@ -236,7 +236,7 @@
     "tomorrow": "Demain",
     "daysAgo": "Il y a {{count}} jours",
     "inDays": "Dans {{count}} jours",
-    "vocBadge": "VoC",
+    "vocBadge": "Pause",
     "hasJournal": "Entrée écrite",
     "noJournal": "Aucune note",
     "tapToWrite": "Toucher pour écrire",

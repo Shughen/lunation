@@ -34,8 +34,8 @@
         "body": "Each month, the Moon returns to its natal position. This is your lunar return — a unique monthly chart."
       },
       "slide2": {
-        "title": "🌑 Void of Course",
-        "body": "Lunar windows where the Moon forms no major aspects. Ideal for observing, not forcing."
+        "title": "🌑 Lunar Pause",
+        "body": "Periods when the Moon floats freely. Ideal for introspection and rest."
       },
       "slide3": {
         "title": "📅 Structured Timeline",
@@ -56,8 +56,8 @@
       "title": "Notifications",
       "lunarCycle": "New Lunar Cycle",
       "lunarCycleDesc": "1 notification per month at the start of your lunar return",
-      "voidOfCourse": "Void of Course",
-      "voidOfCourseDesc": "Optional alerts for upcoming VoC windows",
+      "voidOfCourse": "Lunar Pause",
+      "voidOfCourseDesc": "Optional alerts for upcoming lunar pauses",
       "permissionRequired": "Permission Required",
       "permissionDesc": "Allow notifications in system settings.",
       "openSettings": "Open Settings",
@@ -82,8 +82,8 @@
       "cta": "Generate My Cycles"
     },
     "noVoC": {
-      "title": "No Upcoming Void of Course",
-      "body": "Upcoming VoC windows are not yet calculated. Check back later."
+      "title": "No Upcoming Lunar Pause",
+      "body": "Upcoming lunar pauses are not yet calculated. Check back later."
     },
     "noJournal": {
       "title": "No Cycle Notes",
@@ -117,12 +117,12 @@
       "body": "{month} — Moon in {sign}, Ascendant {ascendant}. View your monthly report."
     },
     "vocStart": {
-      "title": "🌑 Void of Course",
-      "body": "Moon enters VoC until {endTime}. Observation window."
+      "title": "🌑 Lunar Pause",
+      "body": "Moon enters pause until {endTime}. Time for introspection."
     },
     "vocEnd": {
-      "title": "🌑 VoC Ends in 30 min",
-      "body": "Moon leaves Void of Course at {endTime}."
+      "title": "🌑 Pause Ends in 30 min",
+      "body": "Moon resumes its course at {endTime}."
     },
     "journalReminder": {
       "title": "🌙 Weekly Note",
@@ -212,7 +212,7 @@
       "waning_crescent": "Gentle transition. Interiority before renewal.",
       "fallback": "Listen to your lunar intuition."
     },
-    "vocActive": "Floating Moon until {{endTime}}",
+    "vocActive": "Lunar pause until {{endTime}}",
     "cachedData": "Data from {{date}}",
     "cta": "View lunar climate",
     "journalPrompt": "Note your feelings",
@@ -226,7 +226,7 @@
     "tomorrow": "Tomorrow",
     "daysAgo": "{{count}} days ago",
     "inDays": "In {{count}} days",
-    "vocBadge": "VoC",
+    "vocBadge": "Pause",
     "hasJournal": "Entry written",
     "noJournal": "No note",
     "tapToWrite": "Tap to write",
