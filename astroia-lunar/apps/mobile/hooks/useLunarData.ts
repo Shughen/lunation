@@ -100,8 +100,11 @@ export function useVocStatus() {
         const response = await apiClient.get('/api/lunar/voc/status');
         return response.data;
       } catch (error) {
-        console.error('[useVocStatus] Erreur chargement VoC:', error);
-        throw error;
+        // Log uniquement en dev, ne pas exposer l'erreur technique
+        if (__DEV__) {
+          console.log('[useVocStatus] VoC non disponible:', error);
+        }
+        return null;
       }
     },
     {
@@ -157,8 +160,12 @@ export function useMajorTransits() {
 
         return [];
       } catch (error) {
-        console.error('[useMajorTransits] Erreur chargement transits:', error);
-        throw error;
+        // Log uniquement en dev, ne pas exposer l'erreur technique à l'utilisateur
+        if (__DEV__) {
+          console.log('[useMajorTransits] Transits non disponibles:', error);
+        }
+        // Retourner tableau vide au lieu de relancer l'erreur
+        return [];
       }
     },
     {
