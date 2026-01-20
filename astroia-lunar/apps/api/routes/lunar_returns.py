@@ -615,75 +615,53 @@ async def _generate_rolling_if_empty(
                     }
                 )
             
-            # Extraire données nécessaires depuis current_user (les données de naissance sont dans users, pas dans natal_charts)
+            # Extraire données depuis natal_chart (source unique de vérité)
             # Fallback vers raw_data si positions est NULL (pour compatibilité avec anciens enregistrements)
             positions = natal_chart.positions
             if not positions and hasattr(natal_chart, 'raw_data') and natal_chart.raw_data:
                 positions = natal_chart.raw_data
             positions = positions or {}
-            
-            # Les données de naissance sont stockées dans la table users
-            # IMPORTANT: current_user peut être un SimpleNamespace (DEV_AUTH_BYPASS), 
-            # donc on doit charger le vrai User depuis la DB
-            from models.user import User
-            user_result = await db.execute(
-                select(User).where(User.id == user_id)
-            )
-            db_user = user_result.scalar_one_or_none()
-            
-            if not db_user:
-                logger.warning(
-                    f"[corr={correlation_id}] ❌ User {user_id} introuvable en DB"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail={
-                        "detail": f"User {user_id} introuvable",
-                        "correlation_id": correlation_id,
-                        "error_code": "USER_NOT_FOUND"
-                    }
-                )
-            
+
+            # Coordonnées de naissance depuis natal_chart (pas users)
             logger.debug(
-                f"[corr={correlation_id}] 📍 Récupération coordonnées depuis users: "
-                f"birth_latitude={db_user.birth_latitude}, "
-                f"birth_longitude={db_user.birth_longitude}, "
-                f"birth_timezone={db_user.birth_timezone}"
+                f"[corr={correlation_id}] 📍 Récupération coordonnées depuis natal_chart: "
+                f"latitude={natal_chart.latitude}, "
+                f"longitude={natal_chart.longitude}, "
+                f"timezone={natal_chart.timezone}"
             )
-            
+
             birth_latitude = None
             birth_longitude = None
             birth_timezone = None
-            
-            if db_user.birth_latitude:
+
+            if natal_chart.latitude is not None:
                 try:
-                    birth_latitude = float(db_user.birth_latitude)
+                    birth_latitude = float(natal_chart.latitude)
                 except (ValueError, TypeError):
                     logger.warning(
-                        f"[corr={correlation_id}] ⚠️ birth_latitude invalide: {db_user.birth_latitude}"
+                        f"[corr={correlation_id}] ⚠️ latitude invalide: {natal_chart.latitude}"
                     )
-            
-            if db_user.birth_longitude:
+
+            if natal_chart.longitude is not None:
                 try:
-                    birth_longitude = float(db_user.birth_longitude)
+                    birth_longitude = float(natal_chart.longitude)
                 except (ValueError, TypeError):
                     logger.warning(
-                        f"[corr={correlation_id}] ⚠️ birth_longitude invalide: {db_user.birth_longitude}"
+                        f"[corr={correlation_id}] ⚠️ longitude invalide: {natal_chart.longitude}"
                     )
-            
-            if db_user.birth_timezone:
-                birth_timezone = str(db_user.birth_timezone)
-            
+
+            if natal_chart.timezone:
+                birth_timezone = str(natal_chart.timezone)
+
             if birth_latitude is None or birth_longitude is None or not birth_timezone:
                 logger.warning(
-                    f"[corr={correlation_id}] ❌ Coordonnées de naissance manquantes dans users: "
+                    f"[corr={correlation_id}] ❌ Coordonnées de naissance manquantes dans natal_chart: "
                     f"lat={birth_latitude}, lon={birth_longitude}, tz={birth_timezone}"
                 )
-                # Lever une exception HTTP 409 pour indiquer que les données de naissance sont requises
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
-                        "detail": "Coordonnées de naissance manquantes. Veuillez recalculer le thème natal.",
+                        "detail": "Coordonnées de naissance manquantes dans le thème natal. Veuillez le recalculer.",
                         "correlation_id": correlation_id,
                         "step": "birth_coordinates_required",
                         "error_code": "BIRTH_COORDINATES_REQUIRED"
@@ -1393,18 +1371,58 @@ async def get_current_lunar_report(
             lunar_return = result_future.scalar_one_or_none()
 
         if not lunar_return:
-            logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire trouvée pour user_id={user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Aucune révolution lunaire en cours. Utilisez POST /api/lunar-returns/generate pour générer les cycles."
+            # Lazy generate : si DB vide, générer automatiquement
+            logger.info(
+                f"[corr={correlation_id}] ℹ️ Aucune révolution lunaire trouvée, "
+                f"déclenchement lazy-generate..."
             )
 
-        # 2. Construire le rapport via le builder
-        from services.lunar_report_builder import build_lunar_report_v4
+            generated = await _generate_rolling_if_empty(current_user, db, correlation_id)
 
-        report = build_lunar_report_v4(lunar_return)
+            if generated:
+                # Re-chercher après génération
+                result_past = await db.execute(
+                    select(LunarReturn)
+                    .where(
+                        LunarReturn.user_id == user_id,
+                        LunarReturn.return_date <= now
+                    )
+                    .order_by(LunarReturn.return_date.desc())
+                    .limit(1)
+                )
+                lunar_return = result_past.scalar_one_or_none()
 
-        logger.info(f"[corr={correlation_id}] ✅ Rapport généré pour {lunar_return.month} - climate_len={len(report['general_climate'])}, axes={len(report['dominant_axes'])}, aspects={len(report['major_aspects'])}")
+                if not lunar_return:
+                    result_future = await db.execute(
+                        select(LunarReturn)
+                        .where(
+                            LunarReturn.user_id == user_id,
+                            LunarReturn.return_date >= now
+                        )
+                        .order_by(LunarReturn.return_date.asc())
+                        .limit(1)
+                    )
+                    lunar_return = result_future.scalar_one_or_none()
+
+            if not lunar_return:
+                logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire trouvée pour user_id={user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Aucune révolution lunaire en cours. Utilisez POST /api/lunar-returns/generate pour générer les cycles."
+                )
+
+        # 2. Construire le rapport via le builder (async avec support IA)
+        from services.lunar_report_builder import build_lunar_report_v4_async
+
+        report = await build_lunar_report_v4_async(lunar_return, db=db)
+
+        logger.info(
+            f"[corr={correlation_id}] ✅ Rapport généré pour {lunar_return.month} - "
+            f"climate_len={len(report['general_climate'])}, "
+            f"axes={len(report['dominant_axes'])}, "
+            f"aspects={len(report['major_aspects'])}, "
+            f"source={report.get('interpretation_source', 'N/A')}"
+        )
 
         return report
 
@@ -1454,12 +1472,18 @@ async def get_lunar_report_by_id(
                 detail=f"Révolution lunaire {lunar_return_id} non trouvée"
             )
 
-        # 2. Construire le rapport via le builder
-        from services.lunar_report_builder import build_lunar_report_v4
+        # 2. Construire le rapport via le builder (async avec support IA)
+        from services.lunar_report_builder import build_lunar_report_v4_async
 
-        report = build_lunar_report_v4(lunar_return)
+        report = await build_lunar_report_v4_async(lunar_return, db=db)
 
-        logger.info(f"[corr={correlation_id}] ✅ Rapport généré pour cycle {lunar_return_id} - climate_len={len(report['general_climate'])}, axes={len(report['dominant_axes'])}, aspects={len(report['major_aspects'])}")
+        logger.info(
+            f"[corr={correlation_id}] ✅ Rapport généré pour cycle {lunar_return_id} - "
+            f"climate_len={len(report['general_climate'])}, "
+            f"axes={len(report['dominant_axes'])}, "
+            f"aspects={len(report['major_aspects'])}, "
+            f"source={report.get('interpretation_source', 'N/A')}"
+        )
 
         return report
 

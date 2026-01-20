@@ -1,20 +1,28 @@
 """
 Service de génération du rapport mensuel de Révolution Lunaire (v4)
 
-Architecture template-first (pas d'IA) :
+Architecture:
 - Templates déterministes basés sur moon_sign + moon_house + lunar_ascendant
 - Réutilisation de enrich_aspects_v4() pour les aspects majeurs
 - Tone v4 : senior professionnel, structuré, concret
+- Mode IA (v4.1+) : interprétations enrichies via Claude si LUNAR_LLM_MODE=anthropic
 
 Scope MVP :
 - Climat général du mois (2-3 phrases)
 - Axes dominants (2-3 axes de vie)
 - Aspects majeurs du cycle (max 5)
+
+Scope IA (si activé) :
+- ai_interpretation: tonalité, ressources, défis, dynamiques
+- weekly_advice: conseils hebdomadaires datés (JSON)
+- interpretation_source: template | cache | anthropic
 """
 
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -745,3 +753,155 @@ def _build_major_aspects(lunar_return: Any) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"[LunarReportBuilder] ❌ Erreur enrichissement aspects: {e}", exc_info=True)
         return []
+
+
+# === FONCTION ASYNC AVEC TEMPLATES PRÉ-GÉNÉRÉS ===
+
+async def build_lunar_report_v4_async(
+    lunar_return: Any,
+    db: Optional[AsyncSession] = None
+) -> Dict[str, Any]:
+    """
+    Construit le rapport mensuel de la révolution lunaire (v4 + templates pré-générés)
+
+    Architecture par couches :
+    - lunar_climate : Tonalité émotionnelle par signe (chargée depuis DB)
+    - lunar_focus : Domaine de vie par maison (chargé depuis DB)
+    - lunar_approach : Approche par ascendant (chargée depuis DB)
+
+    Args:
+        lunar_return: Objet LunarReturn de la DB
+        db: Session async SQLAlchemy (pour charger les templates)
+
+    Returns:
+        {
+            'header': {...},
+            'general_climate': str,
+            'dominant_axes': List[str],
+            'major_aspects': List[Dict],
+            'lunar_interpretation': {
+                'climate': str,
+                'focus': str,
+                'approach': str
+            },
+            'weekly_advice': {...},
+            'interpretation_source': str
+        }
+    """
+    logger.info(f"[LunarReportBuilder] Construction rapport v4 async pour month={lunar_return.month}")
+
+    # 1. HEADER (factuel)
+    header = _build_header(lunar_return)
+
+    # 2. CLIMAT GÉNÉRAL (template enrichi v4.1 - existant)
+    general_climate = _build_general_climate_enriched(lunar_return)
+
+    # 3. AXES DOMINANTS (enrichis v4.1 - existant)
+    dominant_axes = _build_dominant_axes_enriched(lunar_return)
+
+    # 4. ASPECTS MAJEURS (réutiliser enrich_aspects_v4)
+    major_aspects = _build_major_aspects(lunar_return)
+
+    # Extraire les données du lunar_return
+    moon_sign = lunar_return.moon_sign or "Unknown"
+    moon_house = lunar_return.moon_house or 1
+    lunar_ascendant = lunar_return.lunar_ascendant or "Unknown"
+    return_date = lunar_return.return_date or datetime.now()
+
+    # 5. INTERPRÉTATION PAR COUCHES (depuis DB ou fallback)
+    lunar_interpretation = {
+        'climate': None,
+        'focus': None,
+        'approach': None
+    }
+    interpretation_source = 'fallback'
+
+    if db is not None:
+        try:
+            from services.lunar_interpretation_service import (
+                load_lunar_interpretation_layers,
+                get_fallback_climate,
+                get_fallback_focus,
+                get_fallback_approach
+            )
+
+            logger.info(
+                f"[LunarReportBuilder] 📚 Chargement templates pour {moon_sign} M{moon_house} ASC {lunar_ascendant}"
+            )
+
+            # Charger les 3 couches depuis la DB
+            layers = await load_lunar_interpretation_layers(
+                db=db,
+                moon_sign=moon_sign,
+                moon_house=moon_house,
+                lunar_ascendant=lunar_ascendant,
+                version=1,
+                lang='fr'
+            )
+
+            # Utiliser les templates DB ou fallback
+            lunar_interpretation['climate'] = layers['climate'] or get_fallback_climate(moon_sign)
+            lunar_interpretation['focus'] = layers['focus'] or get_fallback_focus(moon_house)
+            lunar_interpretation['approach'] = layers['approach'] or get_fallback_approach(lunar_ascendant)
+
+            # Déterminer la source
+            if layers['climate'] and layers['focus'] and layers['approach']:
+                interpretation_source = 'database'
+            elif layers['climate'] or layers['focus'] or layers['approach']:
+                interpretation_source = 'partial-database'
+            else:
+                interpretation_source = 'fallback'
+
+            logger.info(
+                f"[LunarReportBuilder] ✅ Templates chargés (source={interpretation_source})"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"[LunarReportBuilder] ❌ Erreur chargement templates: {e}",
+                exc_info=True
+            )
+            # Fallback complet
+            from services.lunar_interpretation_service import (
+                get_fallback_climate,
+                get_fallback_focus,
+                get_fallback_approach
+            )
+            lunar_interpretation['climate'] = get_fallback_climate(moon_sign)
+            lunar_interpretation['focus'] = get_fallback_focus(moon_house)
+            lunar_interpretation['approach'] = get_fallback_approach(lunar_ascendant)
+            interpretation_source = 'fallback-error'
+    else:
+        # Pas de DB, utiliser les fallbacks
+        from services.lunar_interpretation_service import (
+            get_fallback_climate,
+            get_fallback_focus,
+            get_fallback_approach
+        )
+        lunar_interpretation['climate'] = get_fallback_climate(moon_sign)
+        lunar_interpretation['focus'] = get_fallback_focus(moon_house)
+        lunar_interpretation['approach'] = get_fallback_approach(lunar_ascendant)
+
+    # 6. CONSEILS HEBDOMADAIRES
+    from services.lunar_interpretation_service import generate_weekly_advice
+    weekly_advice = generate_weekly_advice(return_date)
+
+    report = {
+        'header': header,
+        'general_climate': general_climate,
+        'dominant_axes': dominant_axes,
+        'major_aspects': major_aspects,
+        'lunar_interpretation': lunar_interpretation,
+        'weekly_advice': weekly_advice,
+        'interpretation_source': interpretation_source
+    }
+
+    logger.info(
+        f"[LunarReportBuilder] ✅ Rapport construit - "
+        f"climate_len={len(general_climate)}, "
+        f"axes_count={len(dominant_axes)}, "
+        f"aspects_count={len(major_aspects)}, "
+        f"source={interpretation_source}"
+    )
+
+    return report

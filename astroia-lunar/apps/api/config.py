@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     ASPECT_COPY_ENGINE: str = Field(default="template", description="Moteur de génération copy aspects: 'template' (déterministe) ou 'ai' (Haiku)")
     ASPECTS_VERSION: int = Field(default=4, description="Version du filtrage aspects (4=types majeurs, orbe ≤6°, exclure Lilith)")
 
+    # Lunar Interpretation (révolution lunaire enrichie IA)
+    LUNAR_LLM_MODE: str = Field(default="off", description="Mode LLM pour révolution lunaire: 'off' (templates) ou 'anthropic' (interprétation IA)")
+    LUNAR_INTERPRETATION_VERSION: int = Field(default=1, description="Version du prompt lunaire (1=v1 initial)")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
