@@ -1,16 +1,13 @@
-# Gitleaks configuration
-# Documentation: https://github.com/gitleaks/gitleaks
+# Configuration Gitleaks pour Astroia Lunar
+# Détection de secrets hardcodés
 
-title = "Astroia Lunar - Gitleaks Config"
+[extend]
+# Utiliser la configuration par défaut de gitleaks
+useDefault = true
 
-# Paths to exclude from scan
 [allowlist]
-paths = [
-  '''docs/archives/.*''',
-  '''\.gitleaksignore''',
-]
-
-# Regex patterns to exclude
+# Patterns autorisés (exemples, templates)
 regexes = [
-  '''YOUR_.*_HERE''',  # Placeholder values like YOUR_JWT_TOKEN_HERE
+    '''sk-ant-example''',
+    '''ANTHROPIC_API_KEY=sk-ant-\.\.\.''',
 ]
