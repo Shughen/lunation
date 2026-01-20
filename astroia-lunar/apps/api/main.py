@@ -11,7 +11,7 @@ import uuid
 
 from config import settings
 from database import engine, Base
-from routes import auth, natal, lunar_returns, lunar, transits, reports, natal_reading, natal_interpretation, journal
+from routes import auth, natal, lunar_returns, lunar, transits, reports, natal_reading, natal_interpretation, natal_aspect_interpretation, journal
 from services import ephemeris_rapidapi
 
 # Configuration logging
@@ -146,6 +146,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(natal.router, prefix="/api", tags=["Natal Chart"])
 app.include_router(natal_reading.router, prefix="/api/natal", tags=["Natal Reading"])
 app.include_router(natal_interpretation.router, prefix="/api/natal", tags=["Natal Interpretation"])
+app.include_router(natal_aspect_interpretation.router, prefix="/api/natal", tags=["Natal Aspect Interpretation"])
 app.include_router(lunar_returns.router, prefix="/api/lunar-returns", tags=["Lunar Returns"])
 app.include_router(lunar.router, tags=["Luna Pack"])
 app.include_router(transits.router, tags=["Transits"])

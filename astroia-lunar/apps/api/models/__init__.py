@@ -6,6 +6,7 @@ from models.lunar_return import LunarReturn
 from models.lunar_pack import LunarReport, LunarVocWindow, LunarMansionDaily
 from models.transits import TransitsOverview, TransitsEvent
 from models.journal_entry import JournalEntry
+from models.pregenerated_natal_aspect import PregeneratedNatalAspect
 
 __all__ = [
     "User",
@@ -17,6 +18,7 @@ __all__ = [
     "LunarMansionDaily",
     "TransitsOverview",
     "TransitsEvent",
-    "JournalEntry"
+    "JournalEntry",
+    "PregeneratedNatalAspect"
 ]
 

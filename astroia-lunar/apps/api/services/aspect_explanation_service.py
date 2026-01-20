@@ -4,23 +4,143 @@ Service pour générer les explications pédagogiques des aspects majeurs (v4)
 Ce module fournit:
 - Filtrage v4 des aspects (types majeurs, orbe ≤6°, exclure Lilith)
 - Calcul métadonnées (expectedAngle, actualAngle, deltaToExact, placements)
-- Génération copy (summary, why, manifestation, advice) via templates
+- Génération copy (summary, why, manifestation, advice) via DB pré-générées ou templates
 - Support optionnel génération AI (Haiku) derrière flag ASPECT_COPY_ENGINE
 
-Architecture alignée avec natal_interpretation_service.py (template-first, AI optional)
+Architecture alignée avec natal_interpretation_service.py (DB-first, template fallback)
 """
 
 import logging
+import re
 from typing import Dict, Any, List, Optional, Tuple
 import hashlib
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
+# === CHARGEMENT DB INTERPRÉTATIONS PRÉ-GÉNÉRÉES ===
+
+async def load_pregenerated_aspect_interpretation(
+    planet1: str,
+    planet2: str,
+    aspect_type: str,
+    db_session,
+    version: int = 2,
+    lang: str = 'fr'
+) -> Optional[str]:
+    """
+    Charge une interprétation pré-générée depuis la DB.
+
+    Normalise les planètes en ordre alphabétique pour la symétrie.
+
+    Returns:
+        Le contenu markdown ou None si non trouvé
+    """
+    from sqlalchemy import select
+    from models.pregenerated_natal_aspect import PregeneratedNatalAspect
+
+    # Normaliser en ordre alphabétique
+    p1_norm = planet1.lower().strip()
+    p2_norm = planet2.lower().strip()
+    if p1_norm > p2_norm:
+        p1_norm, p2_norm = p2_norm, p1_norm
+
+    aspect_norm = aspect_type.lower().strip()
+
+    try:
+        result = await db_session.execute(
+            select(PregeneratedNatalAspect).where(
+                PregeneratedNatalAspect.planet1 == p1_norm,
+                PregeneratedNatalAspect.planet2 == p2_norm,
+                PregeneratedNatalAspect.aspect_type == aspect_norm,
+                PregeneratedNatalAspect.version == version,
+                PregeneratedNatalAspect.lang == lang
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            logger.debug(f"[AspectDB] Trouvé: {p1_norm}-{p2_norm} {aspect_norm}")
+            return row.content
+        else:
+            logger.debug(f"[AspectDB] Non trouvé: {p1_norm}-{p2_norm} {aspect_norm}")
+            return None
+    except Exception as e:
+        logger.warning(f"[AspectDB] Erreur chargement {p1_norm}-{p2_norm} {aspect_norm}: {e}")
+        return None
+
+
+def parse_markdown_to_copy(markdown_content: str) -> Dict[str, Any]:
+    """
+    Parse le markdown V2 en format copy {summary, why[], manifestation, advice}.
+
+    Format markdown attendu:
+    ```
+    # ☌ Conjonction Planet1 - Planet2
+    **En une phrase :** Summary text
+
+    ## L'énergie de cet aspect
+    Manifestation text
+
+    ## Ton potentiel
+    Potential text
+
+    ## Ton défi
+    Challenge text
+
+    ## Conseil pratique
+    Advice text
+    ```
+
+    Returns:
+        {
+            'summary': str,
+            'why': [str, str],  # potentiel + défi
+            'manifestation': str,
+            'advice': str|None
+        }
+    """
+    copy = {
+        'summary': '',
+        'why': [],
+        'manifestation': '',
+        'advice': None
+    }
+
+    if not markdown_content:
+        return copy
+
+    # Extraire "En une phrase"
+    match = re.search(r'\*\*En une phrase\s*:\*\*\s*(.+?)(?:\n\n|\n##|$)', markdown_content, re.DOTALL)
+    if match:
+        copy['summary'] = match.group(1).strip()
+
+    # Extraire "L'énergie de cet aspect"
+    match = re.search(r"##\s*L'[eé]nergie de cet aspect\s*\n(.+?)(?:\n##|$)", markdown_content, re.DOTALL)
+    if match:
+        copy['manifestation'] = match.group(1).strip()
+
+    # Extraire "Ton potentiel"
+    match = re.search(r"##\s*Ton potentiel\s*\n(.+?)(?:\n##|$)", markdown_content, re.DOTALL)
+    if match:
+        copy['why'].append(match.group(1).strip())
+
+    # Extraire "Ton défi"
+    match = re.search(r"##\s*Ton d[eé]fi\s*\n(.+?)(?:\n##|$)", markdown_content, re.DOTALL)
+    if match:
+        copy['why'].append(match.group(1).strip())
+
+    # Extraire "Conseil pratique"
+    match = re.search(r"##\s*Conseil pratique\s*\n(.+?)(?:\n##|$)", markdown_content, re.DOTALL)
+    if match:
+        copy['advice'] = match.group(1).strip()
+
+    return copy
+
 # === CONSTANTES V4 ===
 
-# Types d'aspects majeurs uniquement (v4 senior professionnel)
-MAJOR_ASPECT_TYPES = {'conjunction', 'opposition', 'square', 'trine'}
+# Types d'aspects majeurs (v4 senior professionnel + sextile)
+MAJOR_ASPECT_TYPES = {'conjunction', 'opposition', 'square', 'trine', 'sextile'}
 
 # Orbe maximum pour v4 (strict)
 MAX_ORB_V4 = 6.0
@@ -31,6 +151,7 @@ EXPECTED_ANGLES: Dict[str, int] = {
     'opposition': 180,
     'square': 90,
     'trine': 120,
+    'sextile': 60,
 }
 
 # Symboles d'aspects pour affichage
@@ -39,6 +160,7 @@ ASPECT_SYMBOLS: Dict[str, str] = {
     'opposition': '☍',
     'square': '□',
     'trine': '△',
+    'sextile': '⚹',
 }
 
 # Noms français des aspects
@@ -47,6 +169,7 @@ ASPECT_NAMES_FR: Dict[str, str] = {
     'opposition': 'Opposition',
     'square': 'Carré',
     'trine': 'Trigone',
+    'sextile': 'Sextile',
 }
 
 
@@ -141,6 +264,28 @@ ASPECT_TEMPLATES_V4: Dict[str, Dict[str, Any]] = {
             ('moon', 'neptune'): "besoins émotionnels et imaginaire fluides → empathie spontanée, porosité à surveiller",
             ('venus', 'saturn'): "affectivité et structure compatibles → relations stables, loyauté naturelle, risque de rigidité",
             ('default', 'default'): "deux fonctions en harmonie élémentale → facilité, talent, vigilance sur la passivité"
+        }
+    },
+
+    'sextile': {
+        'summary': "{p1} ({sign1}) et {p2} ({sign2}) en opportunité harmonieuse. Potentiel à activer consciemment.",
+        'why': [
+            "Angle 60° : les deux planètes occupent des signes compatibles (éléments complémentaires)",
+            "Opportunité : {p1_function} et {p2_function} peuvent collaborer facilement",
+            "Activation requise : le potentiel existe mais demande un effort conscient"
+        ],
+        'manifestation': (
+            "{p1} en {sign1} (Maison {house1}) offre {house1_label}, "
+            "et {p2} en {sign2} (Maison {house2}) soutient {house2_label} en complémentarité. "
+            "Concrètement : {concrete_example}. "
+            "Le sextile est une ressource latente : elle se manifeste quand tu l'actives volontairement."
+        ),
+        'advice': "Saisir les opportunités : le sextile récompense l'initiative et l'effort conscient.",
+        'concrete_examples': {
+            ('sun', 'mars'): "identité et action en synergie → capacité d'initiative, leadership naturel quand mobilisé",
+            ('moon', 'venus'): "besoins émotionnels et affectivité compatibles → douceur relationnelle, harmonie accessible",
+            ('mercury', 'jupiter'): "communication et expansion alignées → facilité d'apprentissage, optimisme intellectuel",
+            ('default', 'default'): "deux fonctions en opportunité → potentiel de collaboration, activation consciente requise"
         }
     }
 }
@@ -601,5 +746,104 @@ def enrich_aspects_v4(
             continue
 
     logger.info(f"✅ [AspectExplanation] {len(enriched)} aspects enrichis")
+
+    return enriched
+
+
+async def enrich_aspects_v4_async(
+    aspects: List[Dict[str, Any]],
+    planets_data: Dict[str, Any],
+    db_session,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Version async de enrich_aspects_v4 qui charge les interprétations depuis la DB.
+
+    Workflow:
+    1. Filtrer aspects v4 (types majeurs + sextile, orbe ≤6°, exclure Lilith)
+    2. Trier par orbe croissant
+    3. Limiter à N aspects (default: 10)
+    4. Pour chaque aspect:
+       - Calculer métadonnées (expectedAngle, actualAngle, placements)
+       - Charger copy depuis DB (fallback templates si non trouvé)
+       - Ajouter ID unique (hash stable)
+
+    Args:
+        aspects: Liste brute des aspects
+        planets_data: Dict des planètes avec positions (sign, house, longitude)
+        db_session: Session async SQLAlchemy
+        limit: Nombre max d'aspects à retourner (default: 10)
+
+    Returns:
+        Liste d'aspects enrichis avec copy depuis DB ou templates
+    """
+    logger.info(f"[AspectExplanation] Enrichissement aspects v4 async (DB-first) - {len(aspects)} aspects bruts")
+
+    # 1. Filtrer v4
+    filtered_aspects = filter_major_aspects_v4(aspects)
+    logger.info(f"[AspectExplanation] Après filtrage v4: {len(filtered_aspects)} aspects retenus")
+
+    # 2. Limiter
+    limited_aspects = filtered_aspects[:limit]
+
+    # 3. Enrichir avec DB-first
+    enriched = []
+    db_hits = 0
+    template_fallbacks = 0
+
+    for aspect in limited_aspects:
+        try:
+            planet1 = aspect.get('planet1', '')
+            planet2 = aspect.get('planet2', '')
+            aspect_type = aspect.get('type', '')
+
+            # Calculer métadonnées
+            metadata = calculate_aspect_metadata(aspect, planets_data)
+
+            # Essayer de charger depuis DB
+            markdown_content = await load_pregenerated_aspect_interpretation(
+                planet1, planet2, aspect_type, db_session
+            )
+
+            if markdown_content:
+                # Parser le markdown en format copy
+                copy = parse_markdown_to_copy(markdown_content)
+                db_hits += 1
+                logger.debug(f"[AspectExplanation] DB hit: {planet1}-{planet2} {aspect_type}")
+            else:
+                # Fallback sur templates
+                copy = build_aspect_explanation_v4(aspect, metadata)
+                template_fallbacks += 1
+                logger.debug(f"[AspectExplanation] Template fallback: {planet1}-{planet2} {aspect_type}")
+
+            # Générer ID unique (hash stable basé sur planet1+planet2+type)
+            aspect_id = hashlib.md5(
+                f"{planet1}_{planet2}_{aspect_type}".encode()
+            ).hexdigest()[:12]
+
+            # Construire aspect enrichi
+            enriched_aspect = {
+                'id': aspect_id,
+                'planet1': planet1,
+                'planet2': planet2,
+                'type': aspect_type,
+                'orb': aspect.get('orb'),
+                'expected_angle': metadata.get('expected_angle'),
+                'actual_angle': metadata.get('actual_angle'),
+                'delta_to_exact': metadata.get('delta_to_exact'),
+                'placements': metadata.get('placements'),
+                'copy': copy
+            }
+
+            enriched.append(enriched_aspect)
+
+        except Exception as e:
+            logger.error(
+                f"❌ Erreur enrichissement aspect {aspect.get('planet1')}-{aspect.get('planet2')}: {e}",
+                exc_info=True
+            )
+            continue
+
+    logger.info(f"✅ [AspectExplanation] {len(enriched)} aspects enrichis (DB: {db_hits}, Templates: {template_fallbacks})")
 
     return enriched

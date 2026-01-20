@@ -27,10 +27,10 @@ class TestV4Filtering:
     """Tests du filtrage v4 des aspects"""
 
     def test_filter_keeps_major_aspects_only(self):
-        """Filtre retient uniquement types majeurs (conjunction, opposition, square, trine)"""
+        """Filtre retient uniquement types majeurs (conjunction, opposition, square, trine, sextile)"""
         aspects = [
             {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.0},
-            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # Mineur
+            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # Majeur
             {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 3.5},
             {'planet1': 'saturn', 'planet2': 'uranus', 'type': 'square', 'orb': 4.0},
             {'planet1': 'moon', 'planet2': 'neptune', 'type': 'quincunx', 'orb': 2.0},  # Mineur
@@ -41,7 +41,7 @@ class TestV4Filtering:
         # Vérifier que seuls les types majeurs sont retenus
         types = {a['type'] for a in filtered}
         assert types.issubset(MAJOR_ASPECT_TYPES)
-        assert len(filtered) == 3  # conjunction, trine, square
+        assert len(filtered) == 4  # conjunction, sextile, trine, square
 
     def test_filter_respects_max_orb_6(self):
         """Filtre exclut aspects avec orbe > 6°"""
@@ -269,7 +269,7 @@ class TestV4Integration:
         raw_aspects = [
             {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.0},
             {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 4.5},
-            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # ❌ Mineur
+            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # ✅ Majeur
             {'planet1': 'saturn', 'planet2': 'pluto', 'type': 'square', 'orb': 7.5},     # ❌ Orbe > 6
             {'planet1': 'lilith', 'planet2': 'neptune', 'type': 'opposition', 'orb': 3.0}, # ❌ Lilith
         ]
@@ -284,7 +284,7 @@ class TestV4Integration:
         enriched = enrich_aspects_v4(raw_aspects, planets_data, limit=10)
 
         # Vérifier filtrage
-        assert len(enriched) == 2  # Seulement conjunction et trine
+        assert len(enriched) == 3  # conjunction, trine et sextile
 
         # Vérifier structure enrichie
         for aspect in enriched:

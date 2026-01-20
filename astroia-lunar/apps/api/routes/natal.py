@@ -464,8 +464,8 @@ async def calculate_natal_chart(
     aspects = raw_aspects
     if settings.ASPECTS_VERSION == 4:
         try:
-            from services.aspect_explanation_service import enrich_aspects_v4
-            aspects = enrich_aspects_v4(raw_aspects, planets, limit=10)
+            from services.aspect_explanation_service import enrich_aspects_v4_async
+            aspects = await enrich_aspects_v4_async(raw_aspects, planets, db, limit=10)
             logger.info(f"✅ Aspects enrichis v4: {len(aspects)} aspects avec copy")
         except Exception as e:
             logger.warning(f"⚠️ Erreur enrichissement aspects v4 (fallback raw aspects): {e}")
@@ -603,8 +603,8 @@ async def get_natal_chart(
     aspects = raw_aspects
     if settings.ASPECTS_VERSION == 4:
         try:
-            from services.aspect_explanation_service import enrich_aspects_v4
-            aspects = enrich_aspects_v4(raw_aspects, planets, limit=10)
+            from services.aspect_explanation_service import enrich_aspects_v4_async
+            aspects = await enrich_aspects_v4_async(raw_aspects, planets, db, limit=10)
             logger.info(f"✅ Aspects enrichis v4: {len(aspects)} aspects avec copy")
         except Exception as e:
             logger.warning(f"⚠️ Erreur enrichissement aspects v4 (fallback raw aspects): {e}")
