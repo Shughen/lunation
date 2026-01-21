@@ -15,6 +15,7 @@ export const getOnboardingFlowState = (): OnboardingState => {
     hasSeenWelcomeScreen: s.hasSeenWelcomeScreen,
     hasAcceptedConsent: s.hasAcceptedConsent,
     hasCompletedProfile: s.hasCompletedProfile,
+    hasSeenChartPreview: s.hasSeenChartPreview,
     hasSeenDisclaimer: s.hasSeenDisclaimer,
     hasCompletedOnboarding: s.hasCompletedOnboarding,
   };

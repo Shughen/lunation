@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   ONBOARDING_PROFILE: 'onboarding_profile',
   ONBOARDING_CONSENT: 'onboarding_consent',
   ONBOARDING_DISCLAIMER: 'onboarding_disclaimer',
+  ONBOARDING_CHART_PREVIEW: 'onboarding_chart_preview',
 
   // Profile
   BIRTH_DATE: 'birth_date',

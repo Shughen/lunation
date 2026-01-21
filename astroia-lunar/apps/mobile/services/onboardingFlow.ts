@@ -5,7 +5,7 @@
  * and prevent rebounding or skipped steps.
  *
  * Flow:
- * /welcome → /onboarding/consent → /onboarding/profile-setup → /onboarding/disclaimer → /onboarding (slides) → / (Home)
+ * /welcome → /onboarding/consent → /onboarding/profile-setup → /onboarding/chart-preview → /onboarding/disclaimer → /onboarding (slides) → / (Home)
  *
  * NOTE: This file does NOT import useOnboardingStore to avoid require cycles.
  * State is passed via a getter function parameter.
@@ -21,6 +21,7 @@ export type OnboardingState = {
   hasSeenWelcomeScreen: boolean;
   hasAcceptedConsent: boolean;
   hasCompletedProfile: boolean;
+  hasSeenChartPreview: boolean;
   hasSeenDisclaimer: boolean;
   hasCompletedOnboarding: boolean;
 };
@@ -42,6 +43,9 @@ export function getNextOnboardingStep(state: OnboardingState): string {
   if (!state.hasCompletedProfile) {
     return '/onboarding/profile-setup';
   }
+  if (!state.hasSeenChartPreview) {
+    return '/onboarding/chart-preview';
+  }
   if (!state.hasSeenDisclaimer) {
     return '/onboarding/disclaimer';
   }
@@ -51,6 +55,70 @@ export function getNextOnboardingStep(state: OnboardingState): string {
 
   // All steps completed → Home
   return '/';
+}
+
+/**
+ * Ordered list of onboarding steps for navigation
+ */
+const ONBOARDING_STEPS = [
+  '/welcome',
+  '/onboarding/consent',
+  '/onboarding/profile-setup',
+  '/onboarding/chart-preview',
+  '/onboarding/disclaimer',
+  '/onboarding', // slides
+] as const;
+
+/**
+ * Get the previous step in the onboarding flow
+ *
+ * @param currentStep - Current step identifier (e.g., 'PROFILE-SETUP', 'CONSENT')
+ * @returns Previous route or null if at the beginning
+ */
+export function getPreviousOnboardingStep(currentStep: string): string | null {
+  // Map step identifiers to routes
+  const stepToRoute: Record<string, string> = {
+    'WELCOME': '/welcome',
+    'CONSENT': '/onboarding/consent',
+    'PROFILE-SETUP': '/onboarding/profile-setup',
+    'CHART-PREVIEW': '/onboarding/chart-preview',
+    'DISCLAIMER': '/onboarding/disclaimer',
+    'SLIDES': '/onboarding',
+  };
+
+  const currentRoute = stepToRoute[currentStep];
+  if (!currentRoute) {
+    console.warn(`[ONBOARDING_FLOW] Unknown step: ${currentStep}`);
+    return null;
+  }
+
+  const currentIndex = ONBOARDING_STEPS.indexOf(currentRoute as any);
+  if (currentIndex <= 0) {
+    // Already at the first step, no previous
+    return null;
+  }
+
+  return ONBOARDING_STEPS[currentIndex - 1];
+}
+
+/**
+ * Navigate to the previous onboarding step
+ *
+ * @param router - Expo router instance
+ * @param currentStep - Current step identifier (e.g., 'PROFILE-SETUP', 'CONSENT')
+ */
+export function goToPreviousOnboardingStep(
+  router: Router,
+  currentStep: string
+): void {
+  const previousStep = getPreviousOnboardingStep(currentStep);
+
+  if (previousStep) {
+    console.log(`[ONBOARDING_FLOW] back from=${currentStep} to=${previousStep}`);
+    router.replace(previousStep as any);
+  } else {
+    console.log(`[ONBOARDING_FLOW] at first step (${currentStep}), cannot go back`);
+  }
 }
 
 /**
@@ -80,6 +148,7 @@ export async function goToNextOnboardingStep(
     `welcome=${state.hasSeenWelcomeScreen}, ` +
     `consent=${state.hasAcceptedConsent}, ` +
     `profile=${state.hasCompletedProfile}, ` +
+    `chartPreview=${state.hasSeenChartPreview}, ` +
     `disclaimer=${state.hasSeenDisclaimer}, ` +
     `completed=${state.hasCompletedOnboarding}}`
   );

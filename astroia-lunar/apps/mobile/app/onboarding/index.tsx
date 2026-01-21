@@ -1,6 +1,11 @@
 /**
- * Onboarding slides - Value proposition
- * Adapté pour Lunation (Révolutions Lunaires prioritaires)
+ * Onboarding slides - Interactive Feature Discovery
+ *
+ * Features:
+ * - 5 slides interactifs avec previews reelles
+ * - Navigation swipe horizontal
+ * - Indicateurs cliquables
+ * - Donnees reelles de l'utilisateur
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -12,87 +17,256 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  Easing,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useOnboardingStore } from '../../stores/useOnboardingStore';
+import { useNatalStore } from '../../stores/useNatalStore';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { goToNextOnboardingStep } from '../../services/onboardingFlow';
 import { getOnboardingFlowState } from '../../utils/onboardingHelpers';
+import { translateZodiacSign } from '../../utils/astrologyTranslations';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const STEPS = [
+// Slide data structure
+interface SlideData {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  previewType: 'ritual' | 'lunar' | 'voc' | 'journal' | 'transits';
+}
+
+const SLIDES: SlideData[] = [
   {
-    id: 'welcome',
-    emoji: '🌙',
-    title: 'Bienvenue sur Lunation',
-    subtitle: 'Révolutions Lunaires',
-    description: 'Découvre tes révolutions lunaires mensuelles et comprends leur influence sur ta vie.',
+    id: 'ritual',
+    icon: '🌙',
+    title: 'Rituel Quotidien',
+    description: 'Chaque jour, découvre l\'énergie lunaire du moment et prends un temps pour toi.',
+    previewType: 'ritual',
   },
   {
-    id: 'value1',
-    emoji: '⭐',
-    title: 'Ton thème natal précis',
-    description: 'Calcule ton thème natal complet avec les positions planétaires exactes.',
+    id: 'lunar',
+    icon: '🔮',
+    title: 'Saisons Lunaires',
+    description: '12 cycles de 29 jours par an. Chaque mois, une nouvelle énergie à explorer.',
+    previewType: 'lunar',
   },
   {
-    id: 'value2',
-    emoji: '🌙',
-    title: 'Révolutions lunaires mensuelles',
-    description: 'Suis tes retours lunaires et explore comment la Lune influence tes cycles de vie.',
+    id: 'voc',
+    icon: '⏸️',
+    title: 'Pauses Lunaires',
+    description: 'Sache quand la Lune fait une pause (Void of Course) pour mieux planifier.',
+    previewType: 'voc',
   },
   {
-    id: 'value3',
-    emoji: '🔮',
-    title: 'Transits et influences',
-    description: 'Explore les transits planétaires actuels et leurs impacts sur ton quotidien.',
+    id: 'journal',
+    icon: '📝',
+    title: 'Journal Lunaire',
+    description: 'Note tes pensées et émotions. Vois les patterns se dessiner au fil des cycles.',
+    previewType: 'journal',
+  },
+  {
+    id: 'transits',
+    icon: '✨',
+    title: 'Transits Personnels',
+    description: 'Vois comment les planètes dialoguent avec ton thème natal, chaque jour.',
+    previewType: 'transits',
   },
 ];
+
+// Preview components
+function RitualPreview() {
+  const today = new Date();
+  const dayName = today.toLocaleDateString('fr-FR', { weekday: 'long' });
+  const { chart } = useNatalStore();
+  const moonSign = chart?.moon_sign ? translateZodiacSign(chart.moon_sign) : 'ton signe';
+
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewLabel}>AUJOURD'HUI</Text>
+      <Text style={styles.previewTitle}>
+        {dayName.charAt(0).toUpperCase() + dayName.slice(1)}
+      </Text>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewIcon}>🌗</Text>
+        <Text style={styles.previewText}>Lune croissante en {moonSign}</Text>
+      </View>
+      <Text style={styles.previewHint}>
+        Énergie favorable pour initier de nouveaux projets
+      </Text>
+    </View>
+  );
+}
+
+function LunarPreview() {
+  const now = new Date();
+  const monthName = now.toLocaleDateString('fr-FR', { month: 'long' });
+
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewLabel}>CE MOIS</Text>
+      <Text style={styles.previewTitle}>
+        {monthName.charAt(0).toUpperCase() + monthName.slice(1)} {now.getFullYear()}
+      </Text>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewIcon}>🌕</Text>
+        <Text style={styles.previewText}>Ta révolution lunaire personnalisée</Text>
+      </View>
+      <Text style={styles.previewHint}>
+        Découvre les thèmes majeurs de ce cycle
+      </Text>
+    </View>
+  );
+}
+
+function VocPreview() {
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewLabel}>STATUT ACTUEL</Text>
+      <View style={styles.previewStatusRow}>
+        <View style={styles.statusDot} />
+        <Text style={styles.previewTitle}>Lune active</Text>
+      </View>
+      <Text style={styles.previewText}>
+        Prochaine pause: demain 14h30
+      </Text>
+      <Text style={styles.previewHint}>
+        Notification avant chaque pause lunaire
+      </Text>
+    </View>
+  );
+}
+
+function JournalPreview() {
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewLabel}>TON JOURNAL</Text>
+      <View style={styles.journalLines}>
+        <View style={styles.journalLine}>
+          <Text style={styles.journalLineText}>Aujourd'hui...</Text>
+        </View>
+        <View style={[styles.journalLine, styles.journalLineFaded]} />
+        <View style={[styles.journalLine, styles.journalLineFaded, { width: '60%' }]} />
+      </View>
+      <Text style={styles.previewHint}>
+        Écris tes pensées, reviens-y plus tard
+      </Text>
+    </View>
+  );
+}
+
+function TransitsPreview() {
+  const { chart } = useNatalStore();
+  const sunSign = chart?.sun_sign ? translateZodiacSign(chart.sun_sign) : 'ton signe';
+
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewLabel}>TES TRANSITS</Text>
+      <View style={styles.transitItem}>
+        <Text style={styles.transitIcon}>☀️</Text>
+        <Text style={styles.transitText}>
+          Soleil conjoint Soleil natal en {sunSign}
+        </Text>
+      </View>
+      <View style={styles.transitItem}>
+        <Text style={styles.transitIcon}>🌙</Text>
+        <Text style={styles.transitText}>
+          Lune trigone Lune natale
+        </Text>
+      </View>
+      <Text style={styles.previewHint}>
+        Mis à jour quotidiennement
+      </Text>
+    </View>
+  );
+}
+
+function SlideItem({ item, index }: { item: SlideData; index: number }) {
+  const renderPreview = () => {
+    switch (item.previewType) {
+      case 'ritual':
+        return <RitualPreview />;
+      case 'lunar':
+        return <LunarPreview />;
+      case 'voc':
+        return <VocPreview />;
+      case 'journal':
+        return <JournalPreview />;
+      case 'transits':
+        return <TransitsPreview />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={styles.slideContainer}>
+      {/* Icon */}
+      <View style={styles.iconContainer}>
+        <Text style={styles.icon}>{item.icon}</Text>
+      </View>
+
+      {/* Title */}
+      <Text style={styles.title}>{item.title}</Text>
+
+      {/* Description */}
+      <Text style={styles.description}>{item.description}</Text>
+
+      {/* Preview */}
+      <View style={styles.previewContainer}>
+        {renderPreview()}
+      </View>
+    </View>
+  );
+}
 
 export default function OnboardingIndexScreen() {
   const router = useRouter();
   const onboardingStore = useOnboardingStore();
   const { completeOnboarding } = onboardingStore;
-  const [currentStep, setCurrentStep] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    console.log('[ONBOARDING] Slides montées, étape:', currentStep);
-  }, []);
+    console.log('[ONBOARDING] Slides montees, slide:', currentIndex);
+  }, [currentIndex]);
 
   const handleNext = async () => {
-    if (currentStep < STEPS.length - 1) {
+    if (currentIndex < SLIDES.length - 1) {
       // Fade out
       Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
+        toValue: 0.5,
+        duration: 150,
         useNativeDriver: true,
       }).start(() => {
-        const nextStep = currentStep + 1;
-        setCurrentStep(nextStep);
-        scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        const nextIndex = currentIndex + 1;
+        setCurrentIndex(nextIndex);
+        flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
 
         // Fade in
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
         }).start();
       });
     } else {
-      // Dernier slide → marquer onboarding comme terminé
+      // Last slide → complete onboarding
       console.log('[ONBOARDING] Dernier slide → completeOnboarding()');
 
       try {
         await completeOnboarding();
-        console.log('[ONBOARDING] ✅ completeOnboarding réussi, navigation vers /');
+        console.log('[ONBOARDING] completeOnboarding reussi, navigation vers /');
         router.replace('/');
       } catch (error: any) {
-        console.error('[ONBOARDING] ❌ completeOnboarding échoué:', error.message);
-        // Rediriger vers l'étape manquante
+        console.error('[ONBOARDING] completeOnboarding echoue:', error.message);
+        // Redirect to missing step
         await goToNextOnboardingStep(router, 'ONBOARDING_SLIDES_ERROR', getOnboardingFlowState);
       }
     }
@@ -103,16 +277,27 @@ export default function OnboardingIndexScreen() {
 
     try {
       await completeOnboarding();
-      console.log('[ONBOARDING] ✅ completeOnboarding réussi, navigation vers /');
+      console.log('[ONBOARDING] completeOnboarding reussi, navigation vers /');
       router.replace('/');
     } catch (error: any) {
-      console.error('[ONBOARDING] ❌ completeOnboarding échoué:', error.message);
-      // Rediriger vers l'étape manquante
+      console.error('[ONBOARDING] completeOnboarding echoue:', error.message);
+      // Redirect to missing step
       await goToNextOnboardingStep(router, 'ONBOARDING_SLIDES_SKIP_ERROR', getOnboardingFlowState);
     }
   };
 
-  const currentStepData = STEPS[currentStep];
+  const handleIndicatorPress = (index: number) => {
+    setCurrentIndex(index);
+    flatListRef.current?.scrollToIndex({ index, animated: true });
+  };
+
+  const handleScroll = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / SCREEN_WIDTH);
+    if (index !== currentIndex && index >= 0 && index < SLIDES.length) {
+      setCurrentIndex(index);
+    }
+  };
 
   return (
     <LinearGradient
@@ -122,54 +307,54 @@ export default function OnboardingIndexScreen() {
       end={{ x: 1, y: 1 }}
     >
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header avec Skip */}
+        {/* Header with Skip */}
         <View style={styles.header}>
+          <View style={{ width: 60 }} />
+          <Text style={styles.headerTitle}>Découvre Lunation</Text>
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
             <Text style={styles.skipText}>Passer</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Content */}
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-            {/* Emoji */}
-            <View style={styles.emojiContainer}>
-              <Text style={styles.emoji}>{currentStepData.emoji}</Text>
-            </View>
-
-            {/* Title */}
-            <Text style={styles.title}>{currentStepData.title}</Text>
-
-            {/* Subtitle (si existe) */}
-            {currentStepData.subtitle && (
-              <Text style={styles.subtitle}>{currentStepData.subtitle}</Text>
+        {/* Slides */}
+        <Animated.View style={[styles.slidesContainer, { opacity: fadeAnim }]}>
+          <FlatList
+            ref={flatListRef}
+            data={SLIDES}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            renderItem={({ item, index }) => (
+              <SlideItem item={item} index={index} />
             )}
+            keyExtractor={(item) => item.id}
+            getItemLayout={(data, index) => ({
+              length: SCREEN_WIDTH,
+              offset: SCREEN_WIDTH * index,
+              index,
+            })}
+          />
+        </Animated.View>
 
-            {/* Description */}
-            <Text style={styles.description}>{currentStepData.description}</Text>
-          </Animated.View>
-        </ScrollView>
-
-        {/* Footer avec indicateurs et bouton */}
+        {/* Footer with indicators and button */}
         <View style={styles.footer}>
-          {/* Indicateurs */}
+          {/* Indicators */}
           <View style={styles.indicators}>
-            {STEPS.map((_, index) => (
-              <View
+            {SLIDES.map((_, index) => (
+              <TouchableOpacity
                 key={index}
+                onPress={() => handleIndicatorPress(index)}
                 style={[
                   styles.indicator,
-                  index === currentStep && styles.indicatorActive,
+                  index === currentIndex && styles.indicatorActive,
                 ]}
               />
             ))}
           </View>
 
-          {/* Bouton Suivant */}
+          {/* Next Button */}
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
@@ -182,7 +367,7 @@ export default function OnboardingIndexScreen() {
               end={{ x: 1, y: 0 }}
             >
               <Text style={styles.nextButtonText}>
-                {currentStep < STEPS.length - 1 ? 'Suivant' : 'Commencer'}
+                {currentIndex < SLIDES.length - 1 ? 'Suivant' : 'Entrer dans mon univers'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -201,9 +386,15 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+  },
+  headerTitle: {
+    color: colors.textMuted,
+    fontSize: fonts.sizes.md,
+    fontWeight: '600',
   },
   skipButton: {
     paddingVertical: spacing.sm,
@@ -214,60 +405,138 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.md,
     fontWeight: '600',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-  },
-  content: {
+  slidesContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
   },
-  emojiContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  slideContainer: {
+    width: SCREEN_WIDTH,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: 'rgba(183, 148, 246, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
   },
-  emoji: {
-    fontSize: 64,
+  icon: {
+    fontSize: 48,
   },
   title: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.sm,
-    textShadowColor: 'rgba(183, 148, 246, 0.5)',
+    textShadowColor: 'rgba(183, 148, 246, 0.4)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
-  subtitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: colors.accent,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-    textShadowColor: 'rgba(183, 148, 246, 0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
   description: {
-    fontSize: fonts.sizes.lg,
-    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: fonts.sizes.md,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    lineHeight: 28,
-    paddingHorizontal: spacing.md,
-    maxWidth: width * 0.8,
+    lineHeight: 24,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.sm,
+  },
+  previewContainer: {
+    width: '100%',
+  },
+  previewCard: {
+    backgroundColor: 'rgba(183, 148, 246, 0.08)',
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(183, 148, 246, 0.2)',
+  },
+  previewLabel: {
+    fontSize: 11,
+    color: colors.accent,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  previewTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  previewIcon: {
+    fontSize: 20,
+  },
+  previewText: {
+    fontSize: fonts.sizes.sm,
+    color: 'rgba(255, 255, 255, 0.8)',
+    flex: 1,
+  },
+  previewHint: {
+    fontSize: fonts.sizes.sm,
+    color: colors.accent,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  previewStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.success,
+  },
+  journalLines: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  journalLine: {
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    justifyContent: 'center',
+    paddingLeft: spacing.sm,
+  },
+  journalLineFaded: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: '80%',
+  },
+  journalLineText: {
+    fontSize: fonts.sizes.sm,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+  transitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  transitIcon: {
+    fontSize: 18,
+  },
+  transitText: {
+    fontSize: fonts.sizes.sm,
+    color: 'rgba(255, 255, 255, 0.8)',
+    flex: 1,
   },
   footer: {
     paddingHorizontal: spacing.xl,

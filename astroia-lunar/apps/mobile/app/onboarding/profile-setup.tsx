@@ -22,9 +22,13 @@ import { useOnboardingStore } from '../../stores/useOnboardingStore';
 import { useNatalStore } from '../../stores/useNatalStore';
 import { natalChart } from '../../services/api';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
-import { goToNextOnboardingStep } from '../../services/onboardingFlow';
+import { goToNextOnboardingStep, goToPreviousOnboardingStep } from '../../services/onboardingFlow';
 import { getOnboardingFlowState } from '../../utils/onboardingHelpers';
 import { formatDateLocal } from '../../utils/date';
+import { getBig3Preview } from '../../services/localAstroCalc';
+import { Big3Preview } from '../../components/onboarding/Big3Preview';
+import { DateWheelPicker } from '../../components/onboarding/DateWheelPicker';
+import { TimeWheelPicker } from '../../components/onboarding/TimeWheelPicker';
 
 // Type pour une suggestion Nominatim
 interface NominatimPlace {
@@ -77,7 +81,6 @@ export default function ProfileSetupScreen() {
   const [suggestions, setSuggestions] = useState<NominatimPlace[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [natalCalculationError, setNatalCalculationError] = useState<string | null>(null);
 
@@ -212,23 +215,26 @@ export default function ProfileSetupScreen() {
 
       console.log('[PROFILE-SETUP] ✅ Profil sauvegardé (hasCompletedProfile=true)');
 
-      // Calculer le thème natal automatiquement (BLOQUANT avec UI) avec cache + in-flight guard
+      // Calculer le thème natal automatiquement (BLOQUANT avec UI)
+      // IMPORTANT: Toujours recalculer car les données de naissance peuvent avoir changé
       try {
         setNatalCalculationError(null); // Reset error state
 
-        // Guard 1: Vérifier si un calcul est déjà en cours
+        // Guard: Vérifier si un calcul est déjà en cours
         if (isNatalCalculating) {
           console.log('[PROFILE-SETUP] 🔒 Calcul natal déjà en cours, skip duplicate request');
-        } else if (isCacheFresh()) {
-          // Guard 2: Vérifier si le cache est frais (< 10 min)
-          console.log('[PROFILE-SETUP] 🎯 Cache natal frais, skip API call');
         } else {
+          // Invalider le cache car les données de profil peuvent avoir changé
+          console.log('[PROFILE-SETUP] 🗑️ Invalidation du cache natal (profil modifié)');
+          natalStore.clearChart();
           // Cache MISS ou expiré → appeler l'API (BLOQUANT)
           console.log('[PROFILE-SETUP] 🌟 Calcul du thème natal (API réelle)...');
           setIsCalculating(true);
 
+          const formattedDate = formatDateLocal(birthDate);
+
           const response = await natalChart.calculate({
-            date: formatDateLocal(birthDate), // YYYY-MM-DD en heure locale (pas UTC!)
+            date: formattedDate, // YYYY-MM-DD en heure locale (pas UTC!)
             time: birthTime.trim(),
             latitude: selectedPlace.latitude,
             longitude: selectedPlace.longitude,
@@ -265,28 +271,7 @@ export default function ProfileSetupScreen() {
   };
 
   const handleBack = () => {
-    router.back();
-  };
-
-  const formatDateDisplay = () => {
-    return birthDate.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  };
-
-  // Sélection de date simplifiée (sans DateTimePicker pour éviter dépendances)
-  const handleDateChange = (type: 'day' | 'month' | 'year', value: number) => {
-    const newDate = new Date(birthDate);
-    if (type === 'day') {
-      newDate.setDate(value);
-    } else if (type === 'month') {
-      newDate.setMonth(value);
-    } else if (type === 'year') {
-      newDate.setFullYear(value);
-    }
-    setBirthDate(newDate);
+    goToPreviousOnboardingStep(router, 'PROFILE-SETUP');
   };
 
   // Formater le label d'une suggestion : "Ville, Région, Pays"
@@ -357,7 +342,12 @@ export default function ProfileSetupScreen() {
             <TouchableOpacity onPress={handleBack} style={styles.backButton}>
               <Text style={styles.backText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Étape 2/3</Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: '50%' }]} />
+              </View>
+              <Text style={styles.headerTitle}>Étape 2/4</Text>
+            </View>
             <View style={{ width: 40 }} />
           </View>
 
@@ -372,98 +362,57 @@ export default function ProfileSetupScreen() {
               Ces informations nous permettront de personnaliser ton expérience Lunation
             </Text>
 
+            {/* Big 3 Preview - Real-time feedback */}
+            {(() => {
+              const preview = getBig3Preview(
+                birthDate,
+                birthTime,
+                selectedPlace?.latitude,
+                selectedPlace?.longitude
+              );
+              return (
+                <View style={styles.big3PreviewContainer}>
+                  <Big3Preview
+                    sunSign={preview.sunSign}
+                    moonSign={preview.moonSign}
+                    ascendant={preview.ascendant}
+                    sunPlaceholder={preview.sunPlaceholder}
+                    moonPlaceholder={preview.moonPlaceholder}
+                    ascendantPlaceholder={preview.ascendantPlaceholder}
+                    compact={true}
+                  />
+                </View>
+              );
+            })()}
+
             {/* Form */}
             <View style={styles.form}>
-              {/* Prénom */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Prénom</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: Marie"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-
-              {/* Date de naissance */}
+              {/* Date de naissance - EN PREMIER pour voir le Soleil bouger */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Date de naissance</Text>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowDatePicker(!showDatePicker)}
-                >
-                  <Text style={styles.dateButtonText}>{formatDateDisplay()}</Text>
-                  <Text style={styles.dateButtonIcon}>📅</Text>
-                </TouchableOpacity>
-              </View>
-
-              {showDatePicker && (
-                <View style={styles.datePickerSimple}>
-                  <Text style={styles.datePickerHint}>
-                    Utilisez les flèches pour ajuster la date
-                  </Text>
-                  <View style={styles.datePickerRow}>
-                    <Text style={styles.datePickerLabel}>Jour:</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('day', birthDate.getDate() - 1)}
-                    >
-                      <Text style={styles.datePickerButton}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.datePickerValue}>{birthDate.getDate()}</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('day', birthDate.getDate() + 1)}
-                    >
-                      <Text style={styles.datePickerButton}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.datePickerRow}>
-                    <Text style={styles.datePickerLabel}>Mois:</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('month', birthDate.getMonth() - 1)}
-                    >
-                      <Text style={styles.datePickerButton}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.datePickerValue}>{birthDate.getMonth() + 1}</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('month', birthDate.getMonth() + 1)}
-                    >
-                      <Text style={styles.datePickerButton}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.datePickerRow}>
-                    <Text style={styles.datePickerLabel}>Année:</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('year', birthDate.getFullYear() - 1)}
-                    >
-                      <Text style={styles.datePickerButton}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.datePickerValue}>{birthDate.getFullYear()}</Text>
-                    <TouchableOpacity
-                      onPress={() => handleDateChange('year', birthDate.getFullYear() + 1)}
-                    >
-                      <Text style={styles.datePickerButton}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Heure de naissance */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Heure de naissance</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: 14:30"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={birthTime}
-                  onChangeText={setBirthTime}
-                  keyboardType="numbers-and-punctuation"
+                <DateWheelPicker
+                  value={birthDate}
+                  onChange={setBirthDate}
+                  minYear={1920}
+                  maxYear={new Date().getFullYear()}
                 />
               </View>
 
-              {/* Lieu de naissance avec autocomplete */}
+              {/* Heure de naissance - pour l'Ascendant */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Heure de naissance</Text>
+                <View style={styles.timePickerContainer}>
+                  <TimeWheelPicker
+                    value={birthTime}
+                    onChange={setBirthTime}
+                  />
+                  <Text style={styles.timePickerHint}>
+                    Nécessaire pour calculer ton Ascendant. Si inconnue, laisse 12:00
+                  </Text>
+                </View>
+              </View>
+
+              {/* Lieu de naissance - pour l'Ascendant */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Lieu de naissance</Text>
                 <View style={styles.autocompleteContainer}>
@@ -504,6 +453,20 @@ export default function ProfileSetupScreen() {
                     </View>
                   )}
                 </View>
+              </View>
+
+              {/* Prénom */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Prénom</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: Marie"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
               </View>
 
               {/* Info box */}
@@ -595,6 +558,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  progressContainer: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  progressBar: {
+    width: 120,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 2,
+  },
   backButton: {
     width: 40,
     height: 40,
@@ -628,8 +607,11 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: fonts.sizes.md,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.lg,
     lineHeight: 22,
+  },
+  big3PreviewContainer: {
+    marginBottom: spacing.xl,
   },
   form: {
     gap: spacing.lg,
@@ -695,60 +677,15 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.sm,
     color: 'rgba(255, 255, 255, 0.6)',
   },
-  dateButton: {
-    flexDirection: 'row',
+  timePickerContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 2,
-    borderColor: 'rgba(183, 148, 246, 0.3)',
   },
-  dateButtonText: {
-    fontSize: fonts.sizes.lg,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  dateButtonIcon: {
-    fontSize: 20,
-  },
-  datePickerSimple: {
-    backgroundColor: 'rgba(183, 148, 246, 0.1)',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  datePickerHint: {
+  timePickerHint: {
     fontSize: fonts.sizes.sm,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: spacing.sm,
     textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  datePickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-  },
-  datePickerLabel: {
-    fontSize: fonts.sizes.md,
-    color: colors.accent,
-    fontWeight: '600',
-    width: 60,
-  },
-  datePickerButton: {
-    fontSize: 24,
-    color: colors.accent,
-    paddingHorizontal: spacing.md,
-  },
-  datePickerValue: {
-    fontSize: fonts.sizes.lg,
-    color: colors.text,
-    fontWeight: 'bold',
-    minWidth: 60,
-    textAlign: 'center',
+    fontStyle: 'italic',
   },
   infoBox: {
     flexDirection: 'row',

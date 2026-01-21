@@ -94,6 +94,8 @@ export default function HomeScreen() {
           await hydrateOnboarding();
           console.log('[INDEX] ✅ Hydratation terminée');
           // IMPORTANT: Le state sera mis à jour et déclenchera un re-render via subscription
+          // Relâcher le guard pour permettre au prochain render de faire le routing
+          routingInFlightRef.current = false;
           return; // Sortir immédiatement, le prochain render verra hydrated=true
         }
 

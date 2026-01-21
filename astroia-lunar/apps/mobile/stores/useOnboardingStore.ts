@@ -23,6 +23,7 @@ interface OnboardingState {
   hasSeenWelcomeScreen: boolean;
   hasCompletedProfile: boolean;
   hasAcceptedConsent: boolean;
+  hasSeenChartPreview: boolean;
   hasSeenDisclaimer: boolean;
   hasCompletedOnboarding: boolean;
 
@@ -36,6 +37,7 @@ interface OnboardingState {
   setWelcomeSeen: () => Promise<void>;
   setProfileData: (data: ProfileData) => Promise<void>;
   setConsentAccepted: () => Promise<void>;
+  setChartPreviewSeen: () => Promise<void>;
   setDisclaimerSeen: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   reset: () => Promise<void>;
@@ -55,6 +57,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   hasSeenWelcomeScreen: false,
   hasCompletedProfile: false,
   hasAcceptedConsent: false,
+  hasSeenChartPreview: false,
   hasSeenDisclaimer: false,
   hasCompletedOnboarding: false,
   profileData: null,
@@ -78,6 +81,11 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ hasAcceptedConsent: true });
   },
 
+  setChartPreviewSeen: async () => {
+    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_CHART_PREVIEW, 'true');
+    set({ hasSeenChartPreview: true });
+  },
+
   setDisclaimerSeen: async () => {
     await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_DISCLAIMER, 'true');
     set({ hasSeenDisclaimer: true });
@@ -91,6 +99,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       hasSeenWelcomeScreen: state.hasSeenWelcomeScreen,
       hasAcceptedConsent: state.hasAcceptedConsent,
       hasCompletedProfile: state.hasCompletedProfile,
+      hasSeenChartPreview: state.hasSeenChartPreview,
       hasSeenDisclaimer: state.hasSeenDisclaimer,
     };
 
@@ -122,6 +131,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       hasSeenWelcomeScreen: state.hasSeenWelcomeScreen,
       hasAcceptedConsent: state.hasAcceptedConsent,
       hasCompletedProfile: state.hasCompletedProfile,
+      hasSeenChartPreview: state.hasSeenChartPreview,
       hasSeenDisclaimer: state.hasSeenDisclaimer,
       hasCompletedOnboarding: state.hasCompletedOnboarding,
     };
@@ -148,6 +158,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       STORAGE_KEYS.ONBOARDING_COMPLETED,
       STORAGE_KEYS.ONBOARDING_PROFILE,
       STORAGE_KEYS.ONBOARDING_CONSENT,
+      STORAGE_KEYS.ONBOARDING_CHART_PREVIEW,
       STORAGE_KEYS.ONBOARDING_DISCLAIMER,
     ];
 
@@ -166,6 +177,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       hasSeenWelcomeScreen: false,
       hasCompletedProfile: false,
       hasAcceptedConsent: false,
+      hasSeenChartPreview: false,
       hasSeenDisclaimer: false,
       hasCompletedOnboarding: false,
       profileData: null,
@@ -176,6 +188,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       hasSeenWelcomeScreen: false,
       hasCompletedProfile: false,
       hasAcceptedConsent: false,
+      hasSeenChartPreview: false,
       hasSeenDisclaimer: false,
       hasCompletedOnboarding: false,
       profileData: null,
@@ -192,11 +205,13 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
     try {
       console.log('[OnboardingStore] 💧 Hydratation depuis AsyncStorage...');
+
       const [
         hasSeenWelcome,
         onboardingCompleted,
         profileDataStr,
         consent,
+        chartPreview,
         disclaimer,
         // Migration: vérifier ancienne clé hasSeenWelcome (sans "Screen")
         oldHasSeenWelcome,
@@ -205,6 +220,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         STORAGE_KEYS.ONBOARDING_COMPLETED,
         STORAGE_KEYS.ONBOARDING_PROFILE,
         STORAGE_KEYS.ONBOARDING_CONSENT,
+        STORAGE_KEYS.ONBOARDING_CHART_PREVIEW,
         STORAGE_KEYS.ONBOARDING_DISCLAIMER,
         'hasSeenWelcome', // Ancienne clé pour migration
       ]);
@@ -237,6 +253,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         hasCompletedOnboarding: onboardingCompleted[1] === 'true',
         hasCompletedProfile: !!profileData,
         hasAcceptedConsent: consent[1] === 'true',
+        hasSeenChartPreview: chartPreview[1] === 'true',
         hasSeenDisclaimer: disclaimer[1] === 'true',
         profileData,
         hydrated: true, // Marquer comme hydraté
@@ -245,6 +262,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         hasSeenWelcomeScreen: hasSeenWelcomeScreenValue,
         hasCompletedProfile: !!profileData,
         hasAcceptedConsent: consent[1] === 'true',
+        hasSeenChartPreview: chartPreview[1] === 'true',
         hasCompletedOnboarding: onboardingCompleted[1] === 'true',
       });
     } catch (error) {
