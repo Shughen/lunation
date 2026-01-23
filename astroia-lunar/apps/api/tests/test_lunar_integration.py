@@ -1,12 +1,17 @@
 """
 Tests d'intégration pour les endpoints Luna Pack (/api/lunar/voc et /api/lunar/mansion)
 Teste le format flat du payload et les codes d'erreur provider (502/504)
+
+IMPORTANT: Pour les tests V2 (lunar_interpretation), on utilise des UUID strings
+car SQLite ne supporte pas les UUID natifs. Les patches dans conftest.py
+convertissent automatiquement UUID -> String(36).
 """
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from fastapi import HTTPException
 from httpx import AsyncClient
+import uuid
 
 from main import app
 
@@ -550,3 +555,599 @@ async def test_mansion_deduplication_both():
 
             significant_periods = data["data"]["calendar_summary"]["significant_periods"]
             assert len(significant_periods) == 1
+
+
+# ============================================================================
+# TESTS INTÉGRATION LUNAR INTERPRETATION V2 (Agent B - Vague 4)
+# ============================================================================
+
+import pytest_asyncio
+from sqlalchemy import text
+from database import AsyncSessionLocal
+
+
+@pytest_asyncio.fixture
+async def async_db_real():
+    """
+    Fixture qui crée une session DB PostgreSQL réelle pour tests d'intégration.
+    Skip automatiquement si DB inaccessible.
+    """
+    async with AsyncSessionLocal() as session:
+        # Tester la connexion
+        try:
+            await session.execute(text("SELECT 1"))
+        except Exception as e:
+            pytest.skip(f"DB not accessible (required for integration tests): {str(e)[:100]}")
+
+        yield session
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_cache_hit(async_db_real):
+    """Test 1: Cache DB temporelle - Cache Hit
+
+    Vérifie qu'une interprétation existante est retournée depuis le cache DB
+    sans régénération Claude.
+    """
+    from models import LunarReturn, LunarInterpretation
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+
+    # Créer un LunarReturn en DB
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-01",
+        return_date=datetime(2025, 1, 15, tzinfo=timezone.utc),
+        moon_sign="Aries",
+        moon_house=1,
+        lunar_ascendant="Leo",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Créer une interprétation en cache DB
+    cached_interpretation = LunarInterpretation(
+        user_id=1,
+        lunar_return_id=lunar_return.id,
+        subject='full',
+        version=2,
+        lang='fr',
+        input_json={'test': 'context'},
+        output_text='Cached interpretation text',
+        weekly_advice={'week1': 'Advice 1'},
+        model_used='claude-opus-4-5'
+    )
+    async_db_real.add(cached_interpretation)
+    await async_db_real.commit()
+
+    # Appeler generate_or_get_interpretation
+    output_text, weekly_advice, source, model_used = await generate_or_get_interpretation(
+        db=async_db_real,
+        lunar_return_id=lunar_return.id,
+        user_id=1,
+        subject='full',
+        version=2,
+        lang='fr'
+    )
+
+    # Assertions
+    assert source == 'db_temporal', "Source devrait être db_temporal (cache hit)"
+    assert output_text == 'Cached interpretation text'
+    assert weekly_advice == {'week1': 'Advice 1'}
+    assert model_used == 'claude-opus-4-5'
+
+    # Cleanup
+    await async_db_real.delete(cached_interpretation)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_cache_miss_then_fallback(async_db_real):
+    """Test 2: Cache DB temporelle - Cache Miss puis Fallback Template
+
+    Vérifie qu'une interprétation manquante déclenche le fallback vers templates.
+    (On mock Claude pour forcer le fallback vers templates DB)
+    """
+    from models import LunarReturn, LunarInterpretationTemplate
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+
+    # Créer un LunarReturn en DB
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-02",
+        return_date=datetime(2025, 2, 15, tzinfo=timezone.utc),
+        moon_sign="Taurus",
+        moon_house=2,
+        lunar_ascendant="Virgo",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Créer un template fallback en DB
+    template = LunarInterpretationTemplate(
+        template_type='full',
+        moon_sign='Taurus',
+        moon_house=2,
+        lunar_ascendant='Virgo',
+        version=2,
+        lang='fr',
+        template_text='Template fallback text for Taurus/2/Virgo',
+        weekly_advice_template={'week1': 'Template advice'},
+        model_used='template'
+    )
+    async_db_real.add(template)
+    await async_db_real.commit()
+
+    # Mock Claude API pour forcer l'échec (fallback vers templates)
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        from services.lunar_interpretation_generator import ClaudeAPIError
+        mock_claude.side_effect = ClaudeAPIError("Mocked Claude failure")
+
+        # Appeler generate_or_get_interpretation
+        output_text, weekly_advice, source, model_used = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr'
+        )
+
+        # Assertions
+        assert source == 'db_template', "Source devrait être db_template après échec Claude"
+        assert output_text == 'Template fallback text for Taurus/2/Virgo'
+        assert weekly_advice == {'week1': 'Template advice'}
+        assert model_used == 'template'
+
+    # Cleanup
+    await async_db_real.delete(template)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_idempotence(async_db_real):
+    """Test 3: Cache DB temporelle - Idempotence
+
+    Vérifie que deux appels consécutifs avec mêmes paramètres retournent
+    la même interprétation (même ID, même contenu).
+    """
+    from models import LunarReturn, LunarInterpretation
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+
+    # Créer un LunarReturn en DB
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-03",
+        return_date=datetime(2025, 3, 15, tzinfo=timezone.utc),
+        moon_sign="Gemini",
+        moon_house=3,
+        lunar_ascendant="Libra",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Mock Claude pour retourner une génération
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        mock_claude.return_value = (
+            'Generated interpretation',
+            {'week1': 'Generated advice'},
+            {'test': 'input'}
+        )
+
+        # Premier appel (génération)
+        output1, advice1, source1, model1 = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr'
+        )
+
+        # Vérifier qu'on a généré via Claude
+        assert source1 == 'claude'
+        assert mock_claude.call_count == 1
+
+    # Deuxième appel (cache hit) - SANS mock Claude
+    output2, advice2, source2, model2 = await generate_or_get_interpretation(
+        db=async_db_real,
+        lunar_return_id=lunar_return.id,
+        user_id=1,
+        subject='full',
+        version=2,
+        lang='fr'
+    )
+
+    # Assertions idempotence
+    assert source2 == 'db_temporal', "Deuxième appel devrait être un cache hit"
+    assert output1 == output2, "Output devrait être identique"
+    assert advice1 == advice2, "Weekly advice devrait être identique"
+    assert model1 == model2, "Model used devrait être identique"
+
+    # Cleanup
+    result = await async_db_real.execute(
+        select(LunarInterpretation).filter_by(lunar_return_id=lunar_return.id)
+    )
+    interpretations = result.scalars().all()
+    for interp in interpretations:
+        await async_db_real.delete(interp)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_fallback_template_lookup(async_db_real):
+    """Test 4: Fallback Templates - Lookup par critères
+
+    Vérifie que le lookup de templates fonctionne correctement selon le type
+    de sujet (full, climate, focus, approach).
+    """
+    from models import LunarReturn, LunarInterpretationTemplate
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+
+    # Créer un LunarReturn
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-04",
+        return_date=datetime(2025, 4, 15, tzinfo=timezone.utc),
+        moon_sign="Cancer",
+        moon_house=4,
+        lunar_ascendant="Scorpio",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Créer un template 'climate' (utilise uniquement moon_sign)
+    template_climate = LunarInterpretationTemplate(
+        template_type='climate',
+        moon_sign='Cancer',
+        moon_house=None,
+        lunar_ascendant=None,
+        version=2,
+        lang='fr',
+        template_text='Climate template for Cancer',
+        model_used='template'
+    )
+    async_db_real.add(template_climate)
+    await async_db_real.commit()
+
+    # Mock Claude pour forcer fallback
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        from services.lunar_interpretation_generator import ClaudeAPIError
+        mock_claude.side_effect = ClaudeAPIError("Mocked failure")
+
+        # Appeler avec subject='climate'
+        output, advice, source, model = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='climate',
+            version=2,
+            lang='fr'
+        )
+
+        # Assertions
+        assert source == 'db_template'
+        assert output == 'Climate template for Cancer'
+        assert 'Cancer' in output
+
+    # Cleanup
+    await async_db_real.delete(template_climate)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_fallback_hierarchy(async_db_real):
+    """Test 5: Fallback Templates - Hiérarchie complète
+
+    Vérifie que la hiérarchie de fallback fonctionne :
+    DB temporelle → Claude → DB templates → Hardcoded
+    """
+    from models import LunarReturn
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+
+    # Créer un LunarReturn sans template DB
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-05",
+        return_date=datetime(2025, 5, 15, tzinfo=timezone.utc),
+        moon_sign="Leo",
+        moon_house=5,
+        lunar_ascendant="Sagittarius",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Mock Claude pour forcer fallback (pas de template DB = fallback hardcoded)
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        from services.lunar_interpretation_generator import ClaudeAPIError
+        mock_claude.side_effect = ClaudeAPIError("Mocked failure")
+
+        # Appeler generate_or_get_interpretation
+        output, advice, source, model = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr'
+        )
+
+        # Assertions - devrait fallback vers hardcoded
+        assert source == 'hardcoded', "Devrait fallback vers hardcoded si pas de template DB"
+        assert model == 'placeholder'
+        assert output is not None and len(output) > 0
+
+    # Cleanup
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_model_used_persistence(async_db_real):
+    """Test 6: Metadata Persistence - model_used
+
+    Vérifie que le champ model_used est correctement persisté en DB
+    lors de la génération.
+    """
+    from models import LunarReturn, LunarInterpretation
+    from services.lunar_interpretation_generator import generate_or_get_interpretation, CLAUDE_MODELS
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+
+    # Créer un LunarReturn
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-06",
+        return_date=datetime(2025, 6, 15, tzinfo=timezone.utc),
+        moon_sign="Virgo",
+        moon_house=6,
+        lunar_ascendant="Capricorn",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Mock Claude pour simuler génération
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        mock_claude.return_value = (
+            'Generated text',
+            {'week1': 'Advice'},
+            {'test': 'input'}
+        )
+
+        # Générer interprétation
+        output, advice, source, model_used = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr'
+        )
+
+        # Vérifier que model_used est retourné
+        assert model_used == CLAUDE_MODELS['opus']
+
+    # Vérifier en DB
+    result = await async_db_real.execute(
+        select(LunarInterpretation).filter_by(
+            lunar_return_id=lunar_return.id,
+            subject='full'
+        )
+    )
+    interpretation = result.scalar_one_or_none()
+
+    assert interpretation is not None
+    assert interpretation.model_used == CLAUDE_MODELS['opus']
+
+    # Cleanup
+    await async_db_real.delete(interpretation)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_weekly_advice_persistence(async_db_real):
+    """Test 7: Metadata Persistence - weekly_advice
+
+    Vérifie que le champ weekly_advice (JSONB) est correctement persisté
+    lors de la génération avec subject='full'.
+    """
+    from models import LunarReturn, LunarInterpretation
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+
+    # Créer un LunarReturn
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-07",
+        return_date=datetime(2025, 7, 15, tzinfo=timezone.utc),
+        moon_sign="Libra",
+        moon_house=7,
+        lunar_ascendant="Aquarius",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Mock Claude avec weekly_advice structuré
+    weekly_advice_data = {
+        'week1': 'Focus on communication',
+        'week2': 'Time for introspection',
+        'week3': 'Action phase begins',
+        'week4': 'Integration and rest'
+    }
+
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        mock_claude.return_value = (
+            'Full interpretation with weekly structure',
+            weekly_advice_data,
+            {'test': 'input'}
+        )
+
+        # Générer interprétation
+        output, advice, source, model = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr'
+        )
+
+        # Vérifier que weekly_advice est retourné
+        assert advice == weekly_advice_data
+
+    # Vérifier persistence en DB
+    result = await async_db_real.execute(
+        select(LunarInterpretation).filter_by(
+            lunar_return_id=lunar_return.id,
+            subject='full'
+        )
+    )
+    interpretation = result.scalar_one_or_none()
+
+    assert interpretation is not None
+    assert interpretation.weekly_advice == weekly_advice_data
+    assert 'week1' in interpretation.weekly_advice
+    assert interpretation.weekly_advice['week1'] == 'Focus on communication'
+
+    # Cleanup
+    await async_db_real.delete(interpretation)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
+
+
+@pytest.mark.real_db
+@pytest.mark.asyncio
+async def test_lunar_interpretation_force_regenerate(async_db_real):
+    """Test 8: Force Regenerate - Bypass cache
+
+    Vérifie que force_regenerate=True bypass le cache DB temporelle
+    et force une nouvelle génération même si une interprétation existe.
+    """
+    from models import LunarReturn, LunarInterpretation
+    from services.lunar_interpretation_generator import generate_or_get_interpretation
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+
+    # Créer un LunarReturn
+    lunar_return = LunarReturn(
+        user_id=1,
+        month="2025-08",
+        return_date=datetime(2025, 8, 15, tzinfo=timezone.utc),
+        moon_sign="Scorpio",
+        moon_house=8,
+        lunar_ascendant="Pisces",
+        aspects=[],
+        planets={},
+        houses={}
+    )
+    async_db_real.add(lunar_return)
+    await async_db_real.commit()
+    await async_db_real.refresh(lunar_return)
+
+    # Créer une interprétation existante en cache
+    old_interpretation = LunarInterpretation(
+        user_id=1,
+        lunar_return_id=lunar_return.id,
+        subject='full',
+        version=2,
+        lang='fr',
+        input_json={'old': 'context'},
+        output_text='Old cached interpretation',
+        weekly_advice={'week1': 'Old advice'},
+        model_used='claude-opus-old'
+    )
+    async_db_real.add(old_interpretation)
+    await async_db_real.commit()
+
+    # Mock Claude pour nouvelle génération
+    with patch('services.lunar_interpretation_generator._generate_via_claude') as mock_claude:
+        mock_claude.return_value = (
+            'Newly generated interpretation',
+            {'week1': 'New advice'},
+            {'new': 'context'}
+        )
+
+        # Appeler avec force_regenerate=True
+        output, advice, source, model = await generate_or_get_interpretation(
+            db=async_db_real,
+            lunar_return_id=lunar_return.id,
+            user_id=1,
+            subject='full',
+            version=2,
+            lang='fr',
+            force_regenerate=True
+        )
+
+        # Assertions
+        assert source == 'claude', "force_regenerate devrait bypasser cache et générer via Claude"
+        assert output == 'Newly generated interpretation'
+        assert advice == {'week1': 'New advice'}
+        assert mock_claude.call_count == 1, "Claude devrait être appelé malgré cache existant"
+
+    # Vérifier qu'une nouvelle interprétation a été créée (ou updated via UNIQUE constraint)
+    result = await async_db_real.execute(
+        select(LunarInterpretation).filter_by(
+            lunar_return_id=lunar_return.id,
+            subject='full',
+            version=2
+        )
+    )
+    interpretations = result.scalars().all()
+
+    # Avec UNIQUE constraint, on devrait avoir soit 1 (upsert) soit 2 (nouvelle entrée)
+    # Le comportement dépend de l'implémentation, mais le contenu devrait être nouveau
+    assert len(interpretations) >= 1
+    latest = interpretations[-1]  # Dernière version
+    assert latest.output_text == 'Newly generated interpretation'
+
+    # Cleanup
+    for interp in interpretations:
+        await async_db_real.delete(interp)
+    await async_db_real.delete(lunar_return)
+    await async_db_real.commit()
