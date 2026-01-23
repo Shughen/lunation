@@ -146,7 +146,7 @@ Tous les 12 signes lunaires complets, ready pour production
 - ✅ **Sprint 1 (Infra & Docs)** : Scripts agents, tests DB, MIGRATION_PLAN.md complet
 - ✅ **Vague 1** : ✅ COMPLÈTE - Agent A (Sprint 1), Agent B (2.1 generator enrichi), Agent C (2.3 legacy wrapper)
 - ✅ **Vague 2** : ✅ COMPLÈTE - Agent A ✅ (2.2 refactor report_builder), Agent B ✅ (2.4 tests generator), Agent C ✅ (4.3 audit migration)
-- ✅ **Vague 3** : ✅ DÉBLOQUÉE - Prête à démarrer (3 agents en parallèle)
+- ⏳ **Vague 3** : ⏳ EN COURS (1/3 agents terminés) - Agent A ✅ (3.1 routes metadata), Agent B ⏳ (3.2), Agent C ⏳ (3.3)
 - ⏸️ **Vagues 4-5** : Planifiées, en attente finalisation Vague 3
 
 ### 🏗️ Architecture V2 : 4 Couches
@@ -362,17 +362,31 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 
 ### 🌊 Vague 3 : API Routes (1h30)
 
-| Agent | Tâches | Durée | Dépendances |
-|-------|--------|-------|-------------|
-| **Agent A** | Task 3.1 : Update routes/lunar.py | 1h30 | ✅ Vague 2 (2.2) |
-| **Agent B** | Task 3.2 : Route POST /regenerate | 1h30 | ✅ Vague 1 (2.1) |
-| **Agent C** | Task 3.3 : Route GET /metadata | 1h | ✅ Vague 1 (2.1) |
+| Agent | Tâches | Durée | État | Dépendances |
+|-------|--------|-------|------|-------------|
+| **Agent A** | Task 3.1 : Update routes/lunar.py | 1h30 | ✅ **TERMINÉ** | ✅ Vague 2 (2.2) |
+| **Agent B** | Task 3.2 : Route POST /regenerate | 1h30 | ⏳ **EN ATTENTE** | ✅ Vague 1 (2.1) |
+| **Agent C** | Task 3.3 : Route GET /metadata | 1h | ⏳ **EN ATTENTE** | ✅ Vague 1 (2.1) |
+
+**Réalisations Agent A (23/01/2026)** :
+- ✅ Task 3.1 : routes/lunar_returns.py mis à jour (commit 3590b59)
+  - **Endpoints modifiés** :
+    - GET /api/lunar-returns/current/report : expose metadata V2
+    - GET /api/lunar-returns/{lunar_return_id}/report : expose metadata V2
+  - **Structure metadata exposée** :
+    - source : db_temporal | claude | db_template | hardcoded
+    - model_used : claude-opus-4-5 | template | none
+    - version : 2
+    - generated_at : ISO timestamp
+  - **Logs enrichis** : Ajout source et model_used dans tous les logs de génération
+  - **Tests validés** : 512 passed, 0 failed (100% compatibilité)
+  - **Durée réelle** : 1h05 (vs 1h30 estimée)
 
 **Pourquoi ça marche** :
 - 2.2 terminé en Vague 2 → débloquer 3.1
 - 2.1 terminé en Vague 1 → débloquer 3.2 et 3.3
 
-**État** : ✅ **DÉBLOQUÉE - Prête à démarrer**
+**État** : ⏳ **EN COURS (1/3 agents terminés) - Agents B et C prêts à démarrer**
 
 ---
 
@@ -415,21 +429,21 @@ Vague 1 (2h)    : ✅ TERMINÉE - Agent A ✅, Agent B ✅, Agent C ✅
     ↓
 Vague 2 (2h30)  : ✅ TERMINÉE - Agent A ✅ (2.2), Agent B ✅ (2.4), Agent C ✅ (4.3)
     ↓
-Vague 3 (1h30)  : ✅ DÉBLOQUÉE - Prête à démarrer (Agents A, B, C en parallèle)
+Vague 3 (1h30)  : ⏳ EN COURS - Agent A ✅ (3.1), Agent B ⏳ (3.2), Agent C ⏳ (3.3)
     ↓
 Vague 4 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 3
     ↓
 Vague 5 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 4
 ────────────────────────────────────────────────
 Total : 10h (vs 23h séquentiel = 57% gain)
-Progression : 7h/10h (70% complété)
+Progression : 8h/10h (80% complété)
 ```
 
 ### 📋 Checklist Vagues
 
 - [x] **Vague 1** : ✅ TERMINÉE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ✅ (2.3)
 - [x] **Vague 2** : ✅ TERMINÉE - Agent A ✅ (2.2), Agent B ✅ (2.4), Agent C ✅ (4.3)
-- [ ] **Vague 3** : ✅ DÉBLOQUÉE - Agent A (3.1), Agent B (3.2), Agent C (3.3) - **Prête à démarrer**
+- [~] **Vague 3** : ⏳ EN COURS (1/3) - Agent A ✅ (3.1 routes metadata), Agent B ⏳ (3.2), Agent C ⏳ (3.3)
 - [ ] **Vague 4** : ⏸️ BLOQUÉE - Agent A (3.4), Agent B (4.1), Agent C (4.2)
 - [ ] **Vague 5** : ⏸️ BLOQUÉE - Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
 
@@ -496,7 +510,7 @@ pytest -q
 - ✅ **Sprint 1** : Infrastructure & Documentation terminée (4/4 tâches)
 - ✅ **Vague 1** : ✅ COMPLÈTE (3/3 agents terminés - Agent A, B, C)
 - ✅ **Vague 2** : ✅ COMPLÈTE (3/3 agents terminés - Agent A ✅, Agent B ✅, Agent C ✅)
-- ✅ **Vague 3** : ✅ DÉBLOQUÉE - Prête à démarrer
+- ⏳ **Vague 3** : ⏳ EN COURS (1/3 agents terminés) - Agent A ✅ (3.1 routes metadata, commit 3590b59)
 - ⏸️ **Vagues 4-5** : En attente finalisation Vague 3
 
 ---
@@ -1173,5 +1187,5 @@ Claude doit être attentif aux signaux comme :
 
 ---
 
-**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 2 COMPLÈTE)
-**Version** : 5.5 (Sprint 5 Vague 2 TERMINÉE - 3/3 agents (2.2 + 2.4 + 4.3) - 70% total complété - Vague 3 débloquée)
+**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 3 EN COURS)
+**Version** : 5.6 (Sprint 5 Vague 3 EN COURS - 1/3 agents (Agent A ✅ 3.1 routes metadata) - 80% total complété)
