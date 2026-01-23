@@ -311,7 +311,7 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 | Agent | Tâches | Durée | État | Dépendances |
 |-------|--------|-------|------|-------------|
 | **Agent A** | Task 2.2 : Refactor lunar_report_builder | 2h30 | ✅ **TERMINÉ** | ✅ Vague 1 (2.1) |
-| **Agent B** | Task 2.4 : Tests generator | 2h | ⏸️ En attente | ✅ Vague 1 (2.1) |
+| **Agent B** | Task 2.4 : Tests generator | 2h | ✅ **TERMINÉ** | ✅ Vague 1 (2.1) |
 | **Agent C** | Task 4.3 : Audit migration | 1h | ⏸️ En attente | ❌ Aucune (DB déjà migrée) |
 
 **Réalisations Agent A (23/01/2026)** :
@@ -322,11 +322,27 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
   - **Tests validés** : 479 passed, 25 skipped (100% compatibilité)
   - **Architecture unifiée** : Hiérarchie fallback DB temporelle → Claude → DB templates → hardcoded
 
+**Réalisations Agent B (23/01/2026)** :
+- ✅ Task 2.4 : Tests generator créés (commit f5a7cc3)
+  - **33 tests implémentés** : 22+ requis (objectif dépassé)
+  - **Coverage 88%** : 151/171 statements (proche objectif 90%)
+  - **Tests complets** :
+    - Idempotence et cache (2 tests)
+    - Hiérarchie de fallback (4 tests)
+    - Versionning (2 tests)
+    - Error handling (4 tests)
+    - Métriques Prometheus (4 tests)
+    - Logs structurés (2 tests)
+    - Helper functions (15 tests)
+  - **Mocks complets** : AsyncMock pour DB, Claude API, métriques
+  - **Tous tests passent** : 33/33 passed
+  - **Fichier** : tests/test_lunar_interpretation_generator.py (710 LOC)
+
 **Pourquoi ça marche** :
 - 2.1 terminé en Vague 1 → débloquer 2.2 et 2.4
 - 4.3 (Audit) peut se faire **à tout moment** (juste vérifier DB)
 
-**État** : ⏳ **EN COURS - Agent A terminé (1/3), Agents B & C en attente**
+**État** : ⏳ **EN COURS - Agents A & B terminés (2/3), Agent C en attente**
 
 ---
 
@@ -383,22 +399,22 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 ```
 Vague 1 (2h)    : ✅ TERMINÉE - Agent A ✅, Agent B ✅, Agent C ✅
     ↓
-Vague 2 (2h30)  : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ⏸️ (2.4), Agent C ⏸️ (4.3)
+Vague 2 (2h30)  : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ✅ (2.4), Agent C ⏸️ (4.3)
     ↓
-Vague 3 (1h30)  : ⏸️ BLOQUÉE - En attente fin Vague 2
+Vague 3 (1h30)  : ⏸️ BLOQUÉE - En attente fin Vague 2 (Agent C)
     ↓
 Vague 4 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 3
     ↓
 Vague 5 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 4
 ────────────────────────────────────────────────
 Total : 10h (vs 23h séquentiel = 57% gain)
-Progression : 4h30/10h (45% complété)
+Progression : 6h30/10h (65% complété)
 ```
 
 ### 📋 Checklist Vagues
 
 - [x] **Vague 1** : ✅ TERMINÉE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ✅ (2.3)
-- [ ] **Vague 2** : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ⏸️ (2.4), Agent C ⏸️ (4.3)
+- [ ] **Vague 2** : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ✅ (2.4), Agent C ⏸️ (4.3)
 - [ ] **Vague 3** : ⏸️ BLOQUÉE - Agent A (3.1), Agent B (3.2), Agent C (3.3)
 - [ ] **Vague 4** : ⏸️ BLOQUÉE - Agent A (3.4), Agent B (4.1), Agent C (4.2)
 - [ ] **Vague 5** : ⏸️ BLOQUÉE - Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
@@ -465,8 +481,8 @@ pytest -q
 - ✅ **Sprint 0** : Foundation terminée (1728 templates migrés)
 - ✅ **Sprint 1** : Infrastructure & Documentation terminée (4/4 tâches)
 - ✅ **Vague 1** : ✅ COMPLÈTE (3/3 agents terminés - Agent A, B, C)
-- ⏳ **Vague 2** : EN COURS (1/3 agents terminés - Agent A ✅, Agents B & C ⏸️)
-- ⏸️ **Vagues 3-5** : En attente finalisation Vague 2
+- ⏳ **Vague 2** : EN COURS (2/3 agents terminés - Agent A ✅, Agent B ✅, Agent C ⏸️)
+- ⏸️ **Vagues 3-5** : En attente finalisation Vague 2 (Agent C)
 
 ---
 
@@ -1142,5 +1158,5 @@ Claude doit être attentif aux signaux comme :
 
 ---
 
-**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 2 à 33%)
-**Version** : 5.3 (Sprint 5 Vague 2 EN COURS - Agent A terminé (2.2) - 45% total complété)
+**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 2 à 67%)
+**Version** : 5.4 (Sprint 5 Vague 2 EN COURS - Agents A & B terminés (2.2 + 2.4) - 65% total complété)
