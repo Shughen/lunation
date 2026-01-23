@@ -133,6 +133,321 @@ Tous les 12 signes lunaires complets, ready pour production
 
 ---
 
+## 📊 Sprint 5 (Janvier 2026) - ⏳ EN COURS
+
+### 🎯 Objectifs
+1. ⏳ **Refonte Architecture Lunar** : V1 (statique) → V2 (temporelle)
+2. ⏳ **Génération à la volée** : Claude Opus 4.5 avec fallbacks intelligents
+3. ⏳ **Système multi-agents** : Coordination 3 agents parallèles
+4. ⏳ **Monitoring production** : Métriques Prometheus
+
+### 📈 Progrès (23/01/2026)
+- ✅ **Sprint 0 (Foundation)** : Modèles créés, migrations exécutées, 1728 templates migrés
+- ✅ **Sprint 1 (Infra & Docs)** : Scripts agents, tests DB, MIGRATION_PLAN.md complet
+- ⚠️ **Vague 1** : Agent A terminé, Agent B & C en attente de démarrage
+- ⏸️ **Sprints 2-5** : Planifiés, en attente finalisation Vague 1
+
+### 🏗️ Architecture V2 : 4 Couches
+
+```
+Layer 1: FAITS ASTRONOMIQUES (immutables)
+  └─ LunarReturn (existant) : moon_sign, moon_house, lunar_ascendant, aspects
+
+Layer 2: NARRATION IA TEMPORELLE (régénérable) ⭐ NOUVEAU
+  └─ LunarInterpretation : user_id, lunar_return_id FK, input_json, output_text
+     Génération: Claude Opus 4.5 à la volée
+     Cache: DB temporelle (idempotence via UNIQUE constraint)
+
+Layer 3: CACHE APPLICATION (FastAPI)
+  └─ LunarReport (existant) : cache court terme (TTL 1h)
+
+Layer 4: FALLBACK TEMPLATES (statiques) ⭐ NOUVEAU
+  └─ LunarInterpretationTemplate : 1728 templates migrés depuis V1
+     Utilisation: Fallback si génération Claude échoue
+```
+
+### 🔄 Hiérarchie de Génération
+
+1. **LunarInterpretation** (DB temporelle) → Cache hit ⚡
+2. **Claude Opus 4.5** (génération) → Temps réel 🤖
+3. **LunarInterpretationTemplate** (DB statique) → Fallback 1 📚
+4. **Templates hardcodés** (code) → Fallback 2 💾
+
+### ✅ Réalisations Sprint 5 (Foundation)
+
+**Sprint 0 : Foundation (COMPLET)** ✅
+- ✅ Modèles SQLAlchemy créés (LunarInterpretation + LunarInterpretationTemplate)
+- ✅ Migrations Alembic créées et exécutées
+- ✅ Tables DB créées (`lunar_interpretations`, `lunar_interpretation_templates`)
+- ✅ **1728 interprétations migrées** : `pregenerated_lunar_interpretations` → templates
+- ✅ Service génération créé (`lunar_interpretation_generator.py`)
+- ✅ Documentation architecture (`LUNAR_ARCHITECTURE_V2.md`)
+- ✅ Système coordination multi-agents (`.tasks/`)
+- ✅ Plan migration détaillé (`MIGRATION_PLAN.md`)
+
+**Validation migration** :
+```sql
+SELECT COUNT(*) FROM lunar_interpretation_templates;
+-- Result: 1728 ✅
+
+SELECT COUNT(*) FROM pregenerated_lunar_interpretations_backup;
+-- Result: 1728 ✅ (backup conservé)
+```
+
+### 📋 Sprints Planifiés
+
+**Sprint 1 : Infrastructure & Documentation** ✅ **TERMINÉ** (23/01/2026)
+- ✅ Task 1.1 : Mettre à jour CLAUDE.md (30min) - Agent Main
+- ✅ Task 1.2 : Scripts utilitaires agents (45min) - Agent Main
+  - Créés : agent_start.sh, agent_complete.sh, agent_heartbeat.sh
+- ✅ Task 1.3 : Tests modèles DB (1h30) - Agent Main
+  - Créé : test_lunar_interpretation_v2_model.py (8 tests)
+- ✅ Task 1.4 : Documentation plan détaillé (1h) - Agent Main
+  - Complété : MIGRATION_PLAN.md (ADR + Rollback Plan)
+
+**Sprint 2 : Service Layer Refactoring** ⏳ **EN COURS** (6h, parallélisable)
+- ✅ Task 2.1 : Enrichir lunar_interpretation_generator (métriques, logs, retry) ⭐ (2h) - Agent B
+- Task 2.2 : Refactorer lunar_report_builder (intégration) ⭐ (2h30)
+- ✅ Task 2.3 : Facade rétrocompatibilité (1h30) - Agent C
+- Task 2.4 : Tests unitaires generator ⭐ (2h)
+
+**Sprint 3 : API Layer & Routes** (5h, parallélisable)
+- Task 3.1 : Mettre à jour routes/lunar.py ⭐ (1h30)
+- Task 3.2 : Route POST /api/lunar/interpretation/regenerate (1h30)
+- Task 3.3 : Route GET /api/lunar/interpretation/metadata (1h)
+- Task 3.4 : Tests E2E routes API ⭐ (2h)
+
+**Sprint 4 : Testing & QA** (4h, parallélisable)
+- Task 4.1 : Tests intégration service → DB ⭐ (1h30)
+- Task 4.2 : Benchmarks performance (1h30)
+- Task 4.3 : Audit migration (validation 1728 templates) ⭐ (1h)
+
+**Sprint 5 : Monitoring & Cleanup** (4h, parallélisable)
+- Task 5.1 : Métriques Prometheus (2h)
+- Task 5.2 : Documentation API utilisateur (1h30)
+- Task 5.3 : Cleanup tables backup (15min)
+- Task 5.4 : CLAUDE.md final ⭐ (30min)
+
+**Timeline** :
+- Séquentiel : 23h (3 jours)
+- Parallèle (3 agents) : 13h30 (2 jours)
+- **Stratégie optimale** : 5 vagues intelligentes (10h, 3 agents)
+
+---
+
+## 🌊 Plan Exécution : 5 Vagues Multi-Agents
+
+### ⚠️ Pourquoi PAS 5 Sprints en Parallèle Total ?
+
+**Problème** : Dépendances inter-sprints bloquantes
+```
+Sprint 1 → Sprint 2 → Sprint 3 → Sprint 4 → Sprint 5
+         (BLOQUANT) (BLOQUANT) (BLOQUANT) (BLOQUANT)
+```
+
+Si on lance 5 agents en parallèle sur 5 sprints :
+- Agent 1 (Sprint 1) : ✅ OK
+- Agent 2 (Sprint 2) : ⚠️ Bloqué en attendant Sprint 1
+- Agent 3 (Sprint 3) : ❌ Totalement bloqué (attend Sprint 2)
+- Agent 4 (Sprint 4) : ❌ Totalement bloqué (attend Sprint 3)
+- Agent 5 (Sprint 5) : ❌ Totalement bloqué (attend Sprint 4)
+
+**Résultat** : 3 agents sur 5 en attente = inefficace.
+
+### ✅ Solution : Vagues Intelligentes (Dépendances Résolues)
+
+Chaque vague contient uniquement des tâches **indépendantes ou dont les dépendances sont satisfaites**.
+
+---
+
+### 🌊 Vague 1 : Foundation (2h) - ⚠️ PARTIELLEMENT TERMINÉE
+
+| Agent | Tâches | Durée | État | Dépendances |
+|-------|--------|-------|------|-------------|
+| **Agent A (Main)** | Sprint 1 complet (1.2 + 1.3 + 1.4) | 1h30 | ✅ **TERMINÉ** | ❌ Aucune |
+| **Agent B** | Task 2.1 : Enrichir generator | 2h | ✅ **TERMINÉ** | ❌ Aucune (service base existe) |
+| **Agent C** | Task 2.3 : Legacy wrapper | 1h30 | ⏸️ EN ATTENTE | ❌ Aucune |
+
+**Réalisations Agent A (23/01/2026)** :
+- ✅ Task 1.2 : Scripts agents créés (agent_start.sh, agent_complete.sh, agent_heartbeat.sh)
+- ✅ Task 1.3 : Tests DB créés (test_lunar_interpretation_v2_model.py, 8 tests)
+- ✅ Task 1.4 : MIGRATION_PLAN.md complété (ADR + Rollback Plan)
+- ✅ Sprint 1 : 4/4 tâches terminées
+
+**Réalisations Agent B (23/01/2026)** :
+- ✅ Task 2.1 : lunar_interpretation_generator.py enrichi (commit 49a6888)
+  - **Métriques Prometheus** (5 metrics) : generated_total, cache_hit_total, fallback_total, duration_seconds, active_generations
+  - **Logs structurés** (structlog) : JSON output avec correlation IDs et contexte complet
+  - **Retry logic** (tenacity) : 3 attempts, exponential backoff (2-10s), retry sur APIConnectionError/RateLimitError
+  - **Timeouts** (asyncio) : 30s max pour appels Claude avec fallback automatique
+  - **Error categorization** : 4 custom exceptions (ClaudeAPIError, TemplateNotFoundError, InvalidLunarReturnError, LunarInterpretationError)
+  - **Dépendances ajoutées** : structlog==24.1.0, prometheus-client==0.20.0, tenacity==8.2.3
+
+**Pourquoi ça marche** :
+- Task 2.1 peut démarrer **sans attendre Sprint 1** (service de base créé en Sprint 0)
+- Task 2.3 totalement indépendante
+- Sprint 1 termine rapidement (tests + docs)
+
+**Prompts agents B & C** : Voir `.tasks/vague_1_prompts.md`
+
+**État** : ⚠️ **Agent A & B terminés ✅, Agent C à démarrer ⏸️**
+
+---
+
+### 🌊 Vague 2 : Service Layer (2h30)
+
+| Agent | Tâches | Durée | Dépendances |
+|-------|--------|-------|-------------|
+| **Agent A** | Task 2.2 : Refactor lunar_report_builder | 2h30 | ✅ Vague 1 (2.1) |
+| **Agent B** | Task 2.4 : Tests generator | 2h | ✅ Vague 1 (2.1) |
+| **Agent C** | Task 4.3 : Audit migration | 1h | ❌ Aucune (DB déjà migrée) |
+
+**Pourquoi ça marche** :
+- 2.1 terminé en Vague 1 → débloquer 2.2 et 2.4
+- 4.3 (Audit) peut se faire **à tout moment** (juste vérifier DB)
+
+**État** : ⏸️ En attente Vague 1
+
+---
+
+### 🌊 Vague 3 : API Routes (1h30)
+
+| Agent | Tâches | Durée | Dépendances |
+|-------|--------|-------|-------------|
+| **Agent A** | Task 3.1 : Update routes/lunar.py | 1h30 | ✅ Vague 2 (2.2) |
+| **Agent B** | Task 3.2 : Route POST /regenerate | 1h30 | ✅ Vague 1 (2.1) |
+| **Agent C** | Task 3.3 : Route GET /metadata | 1h | ✅ Vague 1 (2.1) |
+
+**Pourquoi ça marche** :
+- 2.2 terminé en Vague 2 → débloquer 3.1
+- 2.1 terminé en Vague 1 → débloquer 3.2 et 3.3
+
+**État** : ⏸️ En attente Vague 2
+
+---
+
+### 🌊 Vague 4 : Testing & QA (2h)
+
+| Agent | Tâches | Durée | Dépendances |
+|-------|--------|-------|-------------|
+| **Agent A** | Task 3.4 : Tests E2E routes | 2h | ✅ Vague 3 (3.1, 3.2) |
+| **Agent B** | Task 4.1 : Tests intégration | 1h30 | ✅ Vague 3 (API complète) |
+| **Agent C** | Task 4.2 : Benchmarks performance | 1h30 | ✅ Vague 3 (API complète) |
+
+**Pourquoi ça marche** :
+- Routes API complètes en Vague 3 → débloquer tous tests
+
+**État** : ⏸️ En attente Vague 3
+
+---
+
+### 🌊 Vague 5 : Monitoring & Cleanup (2h)
+
+| Agent | Tâches | Durée | Dépendances |
+|-------|--------|-------|-------------|
+| **Agent A** | Task 5.1 : Métriques Prometheus | 2h | ✅ Vague 1 (2.1) |
+| **Agent B** | Task 5.2 : Docs API utilisateur | 1h30 | ✅ Vague 3 (routes finales) |
+| **Agent C** | Task 5.3 + 5.4 : Cleanup + CLAUDE.md | 45min | ✅ Vague 4 (validation) |
+
+**Pourquoi ça marche** :
+- Métriques basées sur service enrichi (Vague 1)
+- Docs basées sur routes finales (Vague 3)
+- Cleanup après validation complète (Vague 4)
+
+**État** : ⏸️ En attente Vague 4
+
+---
+
+### 📊 Timeline Vagues
+
+```
+Vague 1 (2h)    : ⚠️ PARTIELLE - Agent A ✅ TERMINÉ, Agent B ✅ TERMINÉ, Agent C ⏸️ EN ATTENTE
+    ↓
+Vague 2 (2h30)  : Agent A + B + C en parallèle (peut démarrer quand Agent C termine)
+    ↓
+Vague 3 (1h30)  : Agent A + B + C en parallèle
+    ↓
+Vague 4 (2h)    : Agent A + B + C en parallèle
+    ↓
+Vague 5 (2h)    : Agent A + B + C en parallèle
+────────────────────────────────────────────────
+Total : 10h (vs 23h séquentiel = 57% gain)
+```
+
+### 📋 Checklist Vagues
+
+- [~] **Vague 1** : ⚠️ PARTIELLE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ⏸️ (2.3)
+- [ ] **Vague 2** : Agent A (2.2), Agent B (2.4), Agent C (4.3) - **Peut démarrer dès Agent C termine**
+- [ ] **Vague 3** : Agent A (3.1), Agent B (3.2), Agent C (3.3)
+- [ ] **Vague 4** : Agent A (3.4), Agent B (4.1), Agent C (4.2)
+- [ ] **Vague 5** : Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
+
+### 🔄 Workflow Inter-Vagues
+
+**Entre chaque vague** :
+1. Vérifier tous agents Vague N ont terminé
+2. Valider tests passent
+3. Merger branches si nécessaire
+4. Lancer prompts Vague N+1
+
+**Validation inter-vague** :
+```bash
+# Vérifier locks Vague actuelle
+ls .tasks/locks/  # Doit être vide
+
+# Vérifier completed
+ls .tasks/completed/ | grep task_X_Y
+
+# Run tests avant vague suivante
+pytest -q
+```
+
+### 📝 Prompts Agents par Vague
+
+**Vague 1 (EN COURS)** :
+- Agent A : Exécuté par Claude Main (automatique)
+- Agent B : Prompt complet dans conversation (23/01/2026 14:30)
+- Agent C : Prompt complet dans conversation (23/01/2026 14:30)
+
+**Vague 2** :
+- Prompts générés automatiquement par Agent A (Main) après Vague 1
+- Stockés dans `.tasks/vague_2_prompts.md`
+
+**Vagues 3-5** :
+- Prompts générés progressivement
+- Documentation complète dans `docs/MIGRATION_PLAN.md`
+
+**Pour lancer une vague** :
+1. Attendre fin vague précédente
+2. Demander à Agent A (Main) : "Génère les prompts pour Vague N"
+3. Copier-coller dans nouvelles sessions Claude Code
+
+---
+
+### 🤖 Système Coordination Multi-Agents
+
+**Fichiers** :
+- `.tasks/sprint_status.json` : État global 23 tâches
+- `.tasks/agent_registry.json` : Agents actifs
+- `.tasks/locks/*.lock` : Verrous par tâche
+- `.tasks/README.md` : Documentation système
+
+**Workflow** :
+1. Agent vérifie `sprint_status.json`
+2. Lock tâche via `scripts/agent_start.sh task_X agent_Y`
+3. Heartbeat toutes les 5min
+4. Complétion via `scripts/agent_complete.sh task_X`
+
+**Stratégie** : 3 agents parallèles max
+
+### 🎯 **Sprint 5 : EN COURS** ⏳
+- ✅ **Sprint 0** : Foundation terminée (1728 templates migrés)
+- ✅ **Sprint 1** : Infrastructure & Documentation terminée (4/4 tâches)
+- ⚠️ **Vague 1** : Partiellement terminée (Agent A ✅, Agent B & C en attente)
+- ⏸️ **Vague 2-5** : En attente finalisation Vague 1
+
+---
+
 ## 🏗️ Architecture Backend (`apps/api`)
 
 ### Routes principales (10 fichiers)
@@ -153,16 +468,37 @@ routes/
 ### Services critiques (27 fichiers)
 ```
 services/
-├── natal_interpretation_service.py   (1335 LOC) Anthropic integration
-├── lunar_report_builder.py           (928 LOC) Reports V4 + V2 migration
-├── interpretation_cache_service.py   (695 LOC) Cache applicatif
-├── voc_cache_service.py              (467 LOC) VoC cache + retry logic
-├── rapidapi_client.py                (317 LOC) Best Astrology API client
-├── lunar_interpretation_service.py   Interprétations lunaires DB/IA
-├── lunar_interpretation_v2_service.py V2 avec fallback templates
-├── transits_service.py               Calculs transits
-├── daily_climate_service.py          Ambiance journalière
+├── natal_interpretation_service.py       (1335 LOC) Anthropic integration
+├── lunar_report_builder.py               (928 LOC) Reports V4 + V2 migration
+├── lunar_interpretation_generator.py     (700 LOC) 🆕 V2 generator avec métriques/logs/retry
+├── interpretation_cache_service.py       (695 LOC) Cache applicatif
+├── voc_cache_service.py                  (467 LOC) VoC cache + retry logic
+├── rapidapi_client.py                    (317 LOC) Best Astrology API client
+├── lunar_interpretation_service.py       Interprétations lunaires DB/IA (V1)
+├── lunar_interpretation_v2_service.py    V2 avec fallback templates
+├── transits_service.py                   Calculs transits
+├── daily_climate_service.py              Ambiance journalière
 └── ... (18 autres services)
+```
+
+### Dépendances Production (requirements.txt)
+```python
+# Core
+fastapi==0.109.0, uvicorn[standard]==0.27.0, pydantic>=2.11.7
+
+# Database
+sqlalchemy==2.0.25, alembic==1.13.1, psycopg2-binary==2.9.9, asyncpg==0.29.0
+
+# AI/LLM
+anthropic==0.39.0
+
+# Observabilité (Sprint 5 - Task 2.1) 🆕
+structlog==24.1.0           # Logs structurés JSON
+prometheus-client==0.20.0   # Métriques production
+tenacity==8.2.3             # Retry logic avec exponential backoff
+
+# Testing
+pytest==7.4.4, pytest-asyncio==0.23.3
 ```
 
 ### Modèles SQLAlchemy (12 fichiers)
@@ -410,9 +746,14 @@ apps/api/
 ├── config.py                                Configuration centralisée
 ├── main.py                                  Startup + health checks + CORS
 ├── database.py                              Connexion Supabase
-├── services/natal_interpretation_service.py Anthropic integration
-├── services/lunar_report_builder.py         Reports V4 + V2 migration
-├── services/interpretation_cache_service.py Cache applicatif
+├── models/
+│   ├── lunar_interpretation.py              🆕 Narration IA temporelle (V2)
+│   └── lunar_interpretation_template.py     🆕 Templates fallback (V2)
+├── services/
+│   ├── natal_interpretation_service.py      Anthropic integration
+│   ├── lunar_interpretation_generator.py    🆕 Génération V2 (4 niveaux fallback)
+│   ├── lunar_report_builder.py              Reports V4 + V2 integration
+│   └── interpretation_cache_service.py      Cache applicatif
 └── routes/*.py                              10 fichiers routes
 
 apps/mobile/
@@ -432,14 +773,23 @@ apps/api/scripts/
     ├── sprint3_generation/      (30 fichiers)
     ├── natal_data_insertion/    (107 fichiers)
     └── utils_historiques/       (12 fichiers)
+
+apps/api/.tasks/                             🆕 Coordination multi-agents (Sprint 5)
+├── README.md                                Documentation système tasks
+├── sprint_status.json                       État global 23 tâches
+├── agent_registry.json                      Agents actifs
+├── locks/*.lock                             Verrous par tâche
+└── completed/*.json                         Tâches terminées
 ```
 
 ### Documentation importante
 ```
 apps/api/README.md                           Quick start API
 apps/api/docs/README.md                      Index docs techniques
-apps/api/docs/PREGENERATED_INTERPRETATIONS_README.md  Interprétations DB
-apps/api/docs/MIGRATION_PREGENERATED_TO_DB.md  Migration fichiers → DB
+apps/api/docs/PREGENERATED_INTERPRETATIONS_README.md  Interprétations DB (V1 legacy)
+apps/api/docs/MIGRATION_PREGENERATED_TO_DB.md  Migration fichiers → DB (V1 legacy)
+apps/api/docs/LUNAR_ARCHITECTURE_V2.md       🆕 Architecture V2 (4 couches)
+apps/api/docs/MIGRATION_PLAN.md              🆕 Plan migration V1→V2 (5 sprints)
 .claude/CLAUDE.md                            Ce fichier
 ```
 
@@ -448,7 +798,12 @@ apps/api/docs/MIGRATION_PREGENERATED_TO_DB.md  Migration fichiers → DB
 - RLS Supabase désactivé (commit e3531c8) : Auth JWT FastAPI only
 - user_id uniformisé INTEGER partout (commit 4acca51)
 - Cache application 1h pour interprétations (commit 24e06a6)
-- Lunar V2 : DB pre-generated + fallback templates (en migration)
+- Lunar V1 (dépréciée) : pregenerated_lunar_interpretations → MIGRÉE vers V2
+- 🆕 Lunar V2 (actuelle) : LunarInterpretation (temporelle) + LunarInterpretationTemplate (fallback)
+  - Génération à la volée via Claude Opus 4.5
+  - Hiérarchie fallback : DB temporelle → Claude → DB templates → hardcoded
+  - Versionning complet (input_json + model_used)
+  - Idempotence garantie (UNIQUE constraints)
 ```
 
 ---
@@ -526,22 +881,91 @@ Solution :
 - Vérifier PYTHONPATH si nécessaire
 ```
 
+### ⭐ Problème : Génération lunaire V2 échoue
+```
+Symptôme : Erreur lors génération interprétation lunaire
+Causes possibles :
+1. Claude API timeout (>30s)
+2. Quota Anthropic dépassé
+3. lunar_return_id invalide
+4. UNIQUE constraint violation (déjà généré)
+
+Solution :
+1. Vérifier logs : source='claude' | 'db_template' | 'hardcoded'
+2. Si timeout Claude → fallback automatique vers templates
+3. Si UNIQUE violation → normal, cache hit
+4. Vérifier table : SELECT COUNT(*) FROM lunar_interpretations WHERE lunar_return_id=X;
+
+Validation fallback hierarchy :
+- Layer 1 (DB temporelle) : cache hit
+- Layer 2 (Claude) : génération temps réel
+- Layer 3 (DB templates) : fallback 1
+- Layer 4 (hardcoded) : fallback 2
+```
+
+### ⭐ Problème : Migration V1→V2 incomplète
+```
+Symptôme : Templates manquants, count < 1728
+Causes possibles :
+1. Migration Alembic non exécutée
+2. Erreur lors migration données
+3. Table backup non accessible
+
+Solution :
+1. Vérifier état migrations :
+   alembic current
+   alembic history
+
+2. Valider count :
+   SELECT COUNT(*) FROM lunar_interpretation_templates; -- Expected: 1728
+   SELECT COUNT(*) FROM pregenerated_lunar_interpretations_backup; -- Expected: 1728
+
+3. Re-run migration si nécessaire :
+   alembic downgrade -1
+   alembic upgrade head
+
+4. Script audit :
+   python scripts/audit_lunar_migration.py
+```
+
+### ⭐ Problème : Multi-agents deadlock
+```
+Symptôme : Tâche bloquée, agent ne peut pas démarrer
+Causes possibles :
+1. Lock file > 10min sans heartbeat
+2. Agent précédent crash sans cleanup
+3. Race condition 2 agents même tâche
+
+Solution :
+1. Vérifier locks actifs :
+   find .tasks/locks -name "*.lock" -mmin +10
+
+2. Libérer locks timeout :
+   find .tasks/locks -name "*.lock" -mmin +10 -exec rm {} \;
+
+3. Vérifier agent_registry.json :
+   jq '.agents[] | select(.status=="active")' .tasks/agent_registry.json
+
+4. Forcer libération manuelle :
+   rm .tasks/locks/task_X_Y.lock
+```
+
 ---
 
 ## 📖 Contexte Historique
 
 ### Dernier commit
 ```
-2af540c - feat(api): Sprint 4 COMPLETE - 100% Migration Lunar V2 (1728/1728)
+d506cc3 - chore(tasks): mark task_2_1 as completed (Agent B)
 ```
 
 ### 5 derniers commits
 ```
+d506cc3 - chore(tasks): mark task_2_1 as completed (Agent B)
+49a6888 - feat(lunar): enrichir generator - métriques, logs, retry, timeouts (Agent B)
 2af540c - feat(api): Sprint 4 COMPLETE - 100% Migration Lunar V2 (1728/1728)
 7f247ab - refactor(api): Sprint 4 nettoyage massif - 149 fichiers archivés
 ac9478d - docs(claude): mettre à jour contexte historique Sprint 3
-df620c4 - docs(claude): Sprint 3 terminé - Migration Lunar V2 89%
-69423fb - feat(lunar): compléter Aquarius de 48 à 144 interprétations
 ```
 
 ### Sprint 2 Timeline (Terminé)
@@ -575,10 +999,23 @@ df620c4 - docs(claude): Sprint 3 terminé - Migration Lunar V2 89%
   - Vérification finale : 1728/1728 (100%) ✅
   - Commit feat(api) 2af540c
 - **Status** : ✅ **SPRINT 4 COMPLET** (Migration V2 100%, ready production)
-- **Phase 2 - Génération** : À planifier
-  - Génération 178 interprétations ($3-5, 10-15min)
-  - Validation finale DB 1728/1728
-- **Status** : ✅ **PHASE 1 TERMINÉE** (nettoyage complet, génération à planifier)
+
+### Sprint 5 Timeline (En cours)
+- **Début Sprint 5** (23/01/2026) : Refonte architecture Lunar V1 → V2
+- **Sprint 0 - Foundation** (23/01/2026) : ✅ TERMINÉ
+  - Création modèles LunarInterpretation + LunarInterpretationTemplate
+  - Migrations Alembic créées et exécutées (5a1b2c3d4e5f, 6b2c3d4e5f6a)
+  - Tables DB créées avec indexes et FK
+  - **Migration 1728 interprétations** : pregenerated → lunar_interpretation_templates
+  - Service lunar_interpretation_generator.py créé (500 LOC)
+  - Documentation LUNAR_ARCHITECTURE_V2.md + MIGRATION_PLAN.md
+  - Système coordination multi-agents opérationnel (.tasks/)
+- **Vague 1 - Foundation** (23/01/2026) : ⚠️ PARTIELLE (2/3 agents terminés)
+  - ✅ Agent A : Sprint 1 complet (scripts + tests + docs)
+  - ✅ Agent B : Task 2.1 complétée (generator enrichi - métriques, logs, retry, timeouts)
+  - ⏸️ Agent C : Task 2.3 en attente (legacy wrapper)
+- **Vague 2-5** : Planifiés (8h restantes avec 3 agents parallèles)
+- **Status** : ⏳ **SPRINT 5 EN COURS** (Foundation OK, Vague 1 à 66%)
 
 ---
 
@@ -680,5 +1117,5 @@ Claude doit être attentif aux signaux comme :
 
 ---
 
-**Dernière mise à jour** : 2026-01-23 (Sprint 4 COMPLET - 100% Migration V2)
-**Version** : 4.1 (Sprint 4 terminé - 1728/1728 interprétations, Migration Lunar V2 à 100%)
+**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 1 à 66%, Task 2.1 terminée)
+**Version** : 5.1 (Sprint 5 Vague 1 - Agent B Task 2.1 complétée - Generator enrichi avec métriques/logs/retry)
