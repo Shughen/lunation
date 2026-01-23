@@ -808,57 +808,72 @@ async def build_lunar_report_v4_async(
     lunar_ascendant = lunar_return.lunar_ascendant or "Unknown"
     return_date = lunar_return.return_date or datetime.now()
 
-    # 5. INTERPRÉTATION PAR COUCHES (depuis DB ou fallback)
+    # 5. INTERPRÉTATION LUNAIRE (V2 si disponible, sinon V1 ou fallback)
     lunar_interpretation = {
         'climate': None,
         'focus': None,
-        'approach': None
+        'approach': None,
+        'full': None  # Interprétation complète V2 si disponible
     }
     interpretation_source = 'fallback'
+    weekly_advice_db = None
 
     if db is not None:
         try:
             from services.lunar_interpretation_service import (
-                load_lunar_interpretation_layers,
+                load_lunar_interpretation_with_fallback,
+                format_weekly_advice_v2,
                 get_fallback_climate,
                 get_fallback_focus,
                 get_fallback_approach
             )
 
+            # Récupérer la version préférée depuis config
+            preferred_version = settings.LUNAR_INTERPRETATION_VERSION
+
             logger.info(
-                f"[LunarReportBuilder] 📚 Chargement templates pour {moon_sign} M{moon_house} ASC {lunar_ascendant}"
+                f"[LunarReportBuilder] 📚 Chargement interprétation v{preferred_version} "
+                f"pour {moon_sign} M{moon_house} ASC {lunar_ascendant}"
             )
 
-            # Charger les 3 couches depuis la DB
-            layers = await load_lunar_interpretation_layers(
+            # Charger l'interprétation avec fallback automatique
+            interpretation_full, weekly_advice_db, interpretation_source = await load_lunar_interpretation_with_fallback(
                 db=db,
                 moon_sign=moon_sign,
                 moon_house=moon_house,
                 lunar_ascendant=lunar_ascendant,
-                version=1,
+                preferred_version=preferred_version,
                 lang='fr'
             )
 
-            # Utiliser les templates DB ou fallback
-            lunar_interpretation['climate'] = layers['climate'] or get_fallback_climate(moon_sign)
-            lunar_interpretation['focus'] = layers['focus'] or get_fallback_focus(moon_house)
-            lunar_interpretation['approach'] = layers['approach'] or get_fallback_approach(lunar_ascendant)
-
-            # Déterminer la source
-            if layers['climate'] and layers['focus'] and layers['approach']:
-                interpretation_source = 'database'
-            elif layers['climate'] or layers['focus'] or layers['approach']:
-                interpretation_source = 'partial-database'
+            # Si V2, on a une interprétation complète
+            if interpretation_source == 'database-v2':
+                lunar_interpretation['full'] = interpretation_full
+                # Pas de couches séparées en V2
+                lunar_interpretation['climate'] = None
+                lunar_interpretation['focus'] = None
+                lunar_interpretation['approach'] = None
             else:
-                interpretation_source = 'fallback'
+                # V1 ou fallback: on a les couches séparées
+                lunar_interpretation['full'] = None
+                # Parser l'interpretation assemblée en couches (approximatif)
+                parts = interpretation_full.split('\n\n')
+                if len(parts) >= 3:
+                    lunar_interpretation['climate'] = parts[0]
+                    lunar_interpretation['focus'] = parts[1]
+                    lunar_interpretation['approach'] = parts[2]
+                else:
+                    lunar_interpretation['climate'] = interpretation_full
+                    lunar_interpretation['focus'] = get_fallback_focus(moon_house)
+                    lunar_interpretation['approach'] = get_fallback_approach(lunar_ascendant)
 
             logger.info(
-                f"[LunarReportBuilder] ✅ Templates chargés (source={interpretation_source})"
+                f"[LunarReportBuilder] ✅ Interprétation chargée (source={interpretation_source})"
             )
 
         except Exception as e:
             logger.error(
-                f"[LunarReportBuilder] ❌ Erreur chargement templates: {e}",
+                f"[LunarReportBuilder] ❌ Erreur chargement interprétation: {e}",
                 exc_info=True
             )
             # Fallback complet
@@ -882,9 +897,15 @@ async def build_lunar_report_v4_async(
         lunar_interpretation['focus'] = get_fallback_focus(moon_house)
         lunar_interpretation['approach'] = get_fallback_approach(lunar_ascendant)
 
-    # 6. CONSEILS HEBDOMADAIRES
-    from services.lunar_interpretation_service import generate_weekly_advice
-    weekly_advice = generate_weekly_advice(return_date)
+    # 6. CONSEILS HEBDOMADAIRES (V2 depuis DB ou fallback statique)
+    from services.lunar_interpretation_service import format_weekly_advice_v2, generate_weekly_advice
+
+    if weekly_advice_db:
+        # Formater les conseils V2 avec les dates
+        weekly_advice = format_weekly_advice_v2(weekly_advice_db, return_date)
+    else:
+        # Fallback statique
+        weekly_advice = generate_weekly_advice(return_date)
 
     report = {
         'header': header,

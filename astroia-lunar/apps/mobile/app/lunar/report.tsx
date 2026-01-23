@@ -35,11 +35,20 @@ interface LunarReportHeader {
   lunar_ascendant: string;
 }
 
+interface LunarInterpretation {
+  climate: string | null;
+  focus: string | null;
+  approach: string | null;
+  full: string | null;
+}
+
 interface LunarReport {
   header: LunarReportHeader;
   general_climate: string;
   dominant_axes: string[];
   major_aspects: AspectV4[];
+  lunar_interpretation?: LunarInterpretation;
+  interpretation_source?: string;
 }
 
 export default function LunarReportScreen() {
@@ -118,10 +127,15 @@ export default function LunarReportScreen() {
   };
 
   const renderClimate = () => {
-    if (!report || !report.general_climate) return null;
+    if (!report) return null;
+
+    // Priorité : lunar_interpretation.full (DB) > general_climate (templates)
+    const climateText = report.lunar_interpretation?.full || report.general_climate;
+
+    if (!climateText) return null;
 
     // Traduire tous les signes et mois dans le texte
-    const translatedClimate = translateAstrologyText(report.general_climate);
+    const translatedClimate = translateAstrologyText(climateText);
 
     return (
       <AnimatedCard style={styles.card} delay={100} duration={500}>
