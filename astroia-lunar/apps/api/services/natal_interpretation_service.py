@@ -68,7 +68,7 @@ async def load_pregenerated_interpretation_from_db(
     lang: str = 'fr'
 ) -> Optional[str]:
     """
-    Charge une interprétation pré-générée depuis la base de données
+    Charge une interprétation pré-générée depuis la base de données (avec cache)
 
     Args:
         db: Session async SQLAlchemy
@@ -81,7 +81,7 @@ async def load_pregenerated_interpretation_from_db(
     Returns:
         Texte markdown complet OU None si introuvable
     """
-    from models.pregenerated_natal_interpretation import PregeneratedNatalInterpretation
+    from services.interpretation_cache_service import get_natal_pregenerated_cached
 
     # Normaliser le signe (minuscule, sans espaces)
     sign_normalized = sign.lower().strip()
@@ -99,21 +99,14 @@ async def load_pregenerated_interpretation_from_db(
         sign_en = sign_no_accents if 'sign_no_accents' in locals() else sign_normalized
 
     try:
-        # Query DB
-        result = await db.execute(
-            select(PregeneratedNatalInterpretation).where(
-                PregeneratedNatalInterpretation.subject == subject,
-                PregeneratedNatalInterpretation.sign == sign_en,
-                PregeneratedNatalInterpretation.house == house,
-                PregeneratedNatalInterpretation.version == version,
-                PregeneratedNatalInterpretation.lang == lang
-            )
+        # Query DB avec cache
+        interpretation = await get_natal_pregenerated_cached(
+            db, subject, sign_en, house, version, lang
         )
-        interpretation = result.scalar_one_or_none()
 
         if interpretation:
-            logger.info(f"✅ Interprétation pré-générée chargée depuis DB: {subject} en {sign} M{house} ({interpretation.length} chars)")
-            return interpretation.content
+            logger.info(f"✅ Interprétation pré-générée chargée depuis DB: {subject} en {sign} M{house} ({len(interpretation)} chars)")
+            return interpretation
 
         logger.warning(f"⚠️ Interprétation introuvable en DB: {subject} en {sign_en} M{house} v{version} lang={lang}")
         return None

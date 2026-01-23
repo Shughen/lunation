@@ -27,30 +27,21 @@ async def load_lunar_climate(
     lang: str = 'fr'
 ) -> Optional[str]:
     """
-    Charge le template de climat pour un signe lunaire
+    Charge le template de climat pour un signe lunaire (avec cache)
 
     Convention DB:
     - moon_sign = le signe (Aries, Taurus, etc.)
     - moon_house = 0 (marqueur climat)
     - lunar_ascendant = '_climate_' (marqueur)
     """
-    from models.pregenerated_lunar_interpretation import PregeneratedLunarInterpretation
+    from services.interpretation_cache_service import get_lunar_climate_cached
 
     try:
-        result = await db.execute(
-            select(PregeneratedLunarInterpretation).where(
-                PregeneratedLunarInterpretation.moon_sign == moon_sign,
-                PregeneratedLunarInterpretation.moon_house == 0,
-                PregeneratedLunarInterpretation.lunar_ascendant == '_climate_',
-                PregeneratedLunarInterpretation.version == version,
-                PregeneratedLunarInterpretation.lang == lang
-            )
-        )
-        entry = result.scalar_one_or_none()
+        interpretation = await get_lunar_climate_cached(db, moon_sign, version, lang)
 
-        if entry:
+        if interpretation:
             logger.debug(f"✅ Loaded lunar_climate/{moon_sign}")
-            return entry.interpretation_full
+            return interpretation
 
         logger.warning(f"⚠️ lunar_climate/{moon_sign} not found in DB")
         return None
@@ -67,30 +58,21 @@ async def load_lunar_focus(
     lang: str = 'fr'
 ) -> Optional[str]:
     """
-    Charge le template de focus pour une maison
+    Charge le template de focus pour une maison (avec cache)
 
     Convention DB:
     - moon_sign = '_focus_' (marqueur)
     - moon_house = la maison (1-12)
     - lunar_ascendant = '_focus_' (marqueur)
     """
-    from models.pregenerated_lunar_interpretation import PregeneratedLunarInterpretation
+    from services.interpretation_cache_service import get_lunar_focus_cached
 
     try:
-        result = await db.execute(
-            select(PregeneratedLunarInterpretation).where(
-                PregeneratedLunarInterpretation.moon_sign == '_focus_',
-                PregeneratedLunarInterpretation.moon_house == moon_house,
-                PregeneratedLunarInterpretation.lunar_ascendant == '_focus_',
-                PregeneratedLunarInterpretation.version == version,
-                PregeneratedLunarInterpretation.lang == lang
-            )
-        )
-        entry = result.scalar_one_or_none()
+        interpretation = await get_lunar_focus_cached(db, moon_house, version, lang)
 
-        if entry:
+        if interpretation:
             logger.debug(f"✅ Loaded lunar_focus/M{moon_house}")
-            return entry.interpretation_full
+            return interpretation
 
         logger.warning(f"⚠️ lunar_focus/M{moon_house} not found in DB")
         return None
@@ -107,30 +89,21 @@ async def load_lunar_approach(
     lang: str = 'fr'
 ) -> Optional[str]:
     """
-    Charge le template d'approche pour un ascendant
+    Charge le template d'approche pour un ascendant (avec cache)
 
     Convention DB:
     - moon_sign = '_approach_' (marqueur)
     - moon_house = 0
     - lunar_ascendant = l'ascendant (Aries, Taurus, etc.)
     """
-    from models.pregenerated_lunar_interpretation import PregeneratedLunarInterpretation
+    from services.interpretation_cache_service import get_lunar_approach_cached
 
     try:
-        result = await db.execute(
-            select(PregeneratedLunarInterpretation).where(
-                PregeneratedLunarInterpretation.moon_sign == '_approach_',
-                PregeneratedLunarInterpretation.moon_house == 0,
-                PregeneratedLunarInterpretation.lunar_ascendant == lunar_ascendant,
-                PregeneratedLunarInterpretation.version == version,
-                PregeneratedLunarInterpretation.lang == lang
-            )
-        )
-        entry = result.scalar_one_or_none()
+        interpretation = await get_lunar_approach_cached(db, lunar_ascendant, version, lang)
 
-        if entry:
+        if interpretation:
             logger.debug(f"✅ Loaded lunar_approach/{lunar_ascendant}")
-            return entry.interpretation_full
+            return interpretation
 
         logger.warning(f"⚠️ lunar_approach/{lunar_ascendant} not found in DB")
         return None
@@ -262,6 +235,169 @@ def generate_weekly_advice(return_date: datetime) -> Dict[str, Any]:
             "dates": f"Du {start.strftime('%d/%m')} au {end.strftime('%d/%m')}",
             "theme": themes[i],
             "conseil": conseils[i],
+            "focus": focus_list[i]
+        }
+
+    return weeks
+
+
+# === CHARGEMENT INTERPRETATION V2 (1728 combinaisons complètes) ===
+
+async def load_full_lunar_interpretation_v2(
+    db: AsyncSession,
+    moon_sign: str,
+    moon_house: int,
+    lunar_ascendant: str,
+    version: int = 2,
+    lang: str = 'fr'
+) -> Optional[Tuple[str, Optional[Dict[str, Any]]]]:
+    """
+    Charge une interprétation lunaire complète v2 (combinaison unique) avec cache
+
+    V2 = 1728 combinaisons pré-générées par Opus 4.5
+    (12 signes × 12 maisons × 12 ascendants)
+
+    Args:
+        db: Session async SQLAlchemy
+        moon_sign: Signe lunaire (Aries, Taurus, etc.)
+        moon_house: Maison lunaire (1-12)
+        lunar_ascendant: Ascendant lunaire (Aries, Taurus, etc.)
+        version: Version du prompt (2 = Opus 4.5)
+        lang: Langue (fr, en)
+
+    Returns:
+        Tuple (interpretation_full, weekly_advice) ou None si non trouvé
+    """
+    from services.interpretation_cache_service import get_lunar_v2_full_cached
+
+    try:
+        result = await get_lunar_v2_full_cached(
+            db, moon_sign, moon_house, lunar_ascendant, version, lang
+        )
+
+        if result:
+            logger.debug(
+                f"✅ Loaded lunar_interpretation_v2/{moon_sign}/M{moon_house}/ASC_{lunar_ascendant}"
+            )
+            return result
+
+        logger.debug(
+            f"⚠️ lunar_interpretation_v2/{moon_sign}/M{moon_house}/ASC_{lunar_ascendant} not found"
+        )
+        return None
+
+    except Exception as e:
+        logger.error(f"❌ Error loading lunar_interpretation_v2: {e}")
+        return None
+
+
+async def load_lunar_interpretation_with_fallback(
+    db: AsyncSession,
+    moon_sign: str,
+    moon_house: int,
+    lunar_ascendant: str,
+    preferred_version: int = 2,
+    lang: str = 'fr'
+) -> Tuple[Optional[str], Optional[Dict[str, Any]], str]:
+    """
+    Charge une interprétation lunaire avec fallback automatique
+
+    Ordre de priorité:
+    1. V2 (1728 combinaisons Opus 4.5) si disponible
+    2. V1 (36 templates par couches) assemblé
+    3. Fallback statique
+
+    Args:
+        db: Session async SQLAlchemy
+        moon_sign: Signe lunaire
+        moon_house: Maison lunaire (1-12)
+        lunar_ascendant: Ascendant lunaire
+        preferred_version: Version préférée (défaut: 2)
+        lang: Langue
+
+    Returns:
+        Tuple (interpretation_full, weekly_advice, source)
+        source = 'database-v2' | 'database-v1' | 'fallback'
+    """
+    # 1. Essayer V2 d'abord si demandé
+    if preferred_version >= 2:
+        v2_result = await load_full_lunar_interpretation_v2(
+            db, moon_sign, moon_house, lunar_ascendant, version=2, lang=lang
+        )
+        if v2_result:
+            interpretation, weekly_advice = v2_result
+            return (interpretation, weekly_advice, 'database-v2')
+
+    # 2. Fallback sur V1 (templates par couches)
+    layers = await load_lunar_interpretation_layers(
+        db, moon_sign, moon_house, lunar_ascendant, version=1, lang=lang
+    )
+
+    # Vérifier si on a au moins une couche V1
+    if layers['climate'] or layers['focus'] or layers['approach']:
+        # Assembler les couches V1
+        parts = []
+        if layers['climate']:
+            parts.append(layers['climate'])
+        else:
+            parts.append(get_fallback_climate(moon_sign))
+
+        if layers['focus']:
+            parts.append(layers['focus'])
+        else:
+            parts.append(get_fallback_focus(moon_house))
+
+        if layers['approach']:
+            parts.append(layers['approach'])
+        else:
+            parts.append(get_fallback_approach(lunar_ascendant))
+
+        interpretation = '\n\n'.join(parts)
+        return (interpretation, None, 'database-v1')
+
+    # 3. Fallback complet (statique)
+    interpretation = '\n\n'.join([
+        get_fallback_climate(moon_sign),
+        get_fallback_focus(moon_house),
+        get_fallback_approach(lunar_ascendant)
+    ])
+    return (interpretation, None, 'fallback')
+
+
+def format_weekly_advice_v2(
+    weekly_advice_db: Optional[Dict[str, Any]],
+    return_date: datetime
+) -> Dict[str, Any]:
+    """
+    Formate les conseils hebdomadaires V2 avec les dates
+
+    Args:
+        weekly_advice_db: Conseils depuis la DB (format simple {"week_1": "conseil", ...})
+        return_date: Date de début du cycle lunaire
+
+    Returns:
+        Format enrichi avec dates: {"week_1": {"dates": "...", "conseil": "...", ...}}
+    """
+    if not weekly_advice_db:
+        # Fallback sur les conseils statiques
+        return generate_weekly_advice(return_date)
+
+    weeks = {}
+    themes = ["Lancement du cycle", "Consolidation", "Ajustements", "Bilan et clôture"]
+    focus_list = ["intention", "stabilité", "adaptation", "clôture"]
+
+    for i in range(4):
+        week_key = f"week_{i + 1}"
+        start = return_date + timedelta(days=i * 7)
+        end = start + timedelta(days=6)
+
+        # Conseil depuis DB ou fallback
+        conseil_db = weekly_advice_db.get(week_key, "")
+
+        weeks[week_key] = {
+            "dates": f"Du {start.strftime('%d/%m')} au {end.strftime('%d/%m')}",
+            "theme": themes[i],
+            "conseil": conseil_db if conseil_db else f"Semaine {i + 1} : continue ton cycle.",
             "focus": focus_list[i]
         }
 

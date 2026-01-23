@@ -430,3 +430,35 @@ async def real_db_isolation(request):
         # Fermer proprement les connexions
         await truncate_engine.dispose()
 
+
+# ============================================================================
+# CACHE INTERPRETATION ISOLATION
+# ============================================================================
+
+@pytest.fixture(autouse=True, scope="function")
+def clear_interpretation_cache_between_tests():
+    """
+    Fixture autouse qui clear le cache d'interprétation avant ET après chaque test.
+
+    Garantit l'isolation complète entre tests utilisant les caches:
+    - lunar_climate, lunar_focus, lunar_approach
+    - lunar_v2_full
+    - natal_pregenerated
+
+    Évite les interférences entre tests qui utilisent les services d'interprétation.
+    """
+    try:
+        from services.interpretation_cache_service import clear_cache
+        clear_cache()
+    except ImportError:
+        # Si le module n'existe pas encore, skip silencieusement
+        pass
+
+    yield
+
+    try:
+        from services.interpretation_cache_service import clear_cache
+        clear_cache()
+    except ImportError:
+        pass
+
