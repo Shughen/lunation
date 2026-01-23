@@ -260,13 +260,13 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 
 ---
 
-### 🌊 Vague 1 : Foundation (2h) - ⚠️ PARTIELLEMENT TERMINÉE
+### 🌊 Vague 1 : Foundation (2h) - ✅ **TERMINÉE**
 
 | Agent | Tâches | Durée | État | Dépendances |
 |-------|--------|-------|------|-------------|
 | **Agent A (Main)** | Sprint 1 complet (1.2 + 1.3 + 1.4) | 1h30 | ✅ **TERMINÉ** | ❌ Aucune |
 | **Agent B** | Task 2.1 : Enrichir generator | 2h | ✅ **TERMINÉ** | ❌ Aucune (service base existe) |
-| **Agent C** | Task 2.3 : Legacy wrapper | 1h30 | ⏸️ EN ATTENTE | ❌ Aucune |
+| **Agent C** | Task 2.3 : Legacy wrapper | 1h30 | ✅ **TERMINÉ** | ❌ Aucune |
 
 **Réalisations Agent A (23/01/2026)** :
 - ✅ Task 1.2 : Scripts agents créés (agent_start.sh, agent_complete.sh, agent_heartbeat.sh)
@@ -283,6 +283,17 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
   - **Error categorization** : 4 custom exceptions (ClaudeAPIError, TemplateNotFoundError, InvalidLunarReturnError, LunarInterpretationError)
   - **Dépendances ajoutées** : structlog==24.1.0, prometheus-client==0.20.0, tenacity==8.2.3
 
+**Réalisations Agent C (23/01/2026)** :
+- ✅ Task 2.3 : Legacy wrapper créé pour migration progressive V1→V2 (commit 01c3e8f)
+  - **Fichiers créés** :
+    - services/lunar_interpretation_legacy_wrapper.py (181 lignes)
+    - tests/test_lunar_interpretation_legacy_wrapper.py (179 lignes, 3 passed/4 skipped)
+  - **Wrapper principal** : `load_lunar_interpretation_with_fallback()` avec DeprecationWarning
+  - **Traduction signature** : V1 (moon_sign/house/asc) → V2 (lunar_return_id)
+  - **Format rétrocompatible** : 3-tuple au lieu de 4-tuple
+  - **Fonctions helper** : get_fallback_climate(), get_fallback_focus(), get_fallback_approach()
+  - **Migration progressive** : Warnings explicites pointant vers nouvelle API V2
+
 **Pourquoi ça marche** :
 - Task 2.1 peut démarrer **sans attendre Sprint 1** (service de base créé en Sprint 0)
 - Task 2.3 totalement indépendante
@@ -290,7 +301,7 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 
 **Prompts agents B & C** : Voir `.tasks/vague_1_prompts.md`
 
-**État** : ⚠️ **Agent A & B terminés ✅, Agent C à démarrer ⏸️**
+**État** : ✅ **VAGUE 1 COMPLÈTE - Déblocage Vague 2**
 
 ---
 
@@ -306,7 +317,7 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 - 2.1 terminé en Vague 1 → débloquer 2.2 et 2.4
 - 4.3 (Audit) peut se faire **à tout moment** (juste vérifier DB)
 
-**État** : ⏸️ En attente Vague 1
+**État** : ✅ **DÉBLOQUÉE - Peut démarrer maintenant**
 
 ---
 
@@ -361,9 +372,9 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 ### 📊 Timeline Vagues
 
 ```
-Vague 1 (2h)    : ⚠️ PARTIELLE - Agent A ✅ TERMINÉ, Agent B ✅ TERMINÉ, Agent C ⏸️ EN ATTENTE
+Vague 1 (2h)    : ✅ TERMINÉE - Agent A ✅, Agent B ✅, Agent C ✅
     ↓
-Vague 2 (2h30)  : Agent A + B + C en parallèle (peut démarrer quand Agent C termine)
+Vague 2 (2h30)  : ⏳ PRÊTE - Agent A + B + C en parallèle (démarrage immédiat possible)
     ↓
 Vague 3 (1h30)  : Agent A + B + C en parallèle
     ↓
@@ -372,12 +383,13 @@ Vague 4 (2h)    : Agent A + B + C en parallèle
 Vague 5 (2h)    : Agent A + B + C en parallèle
 ────────────────────────────────────────────────
 Total : 10h (vs 23h séquentiel = 57% gain)
+Progression : 2h/10h (20% complété)
 ```
 
 ### 📋 Checklist Vagues
 
-- [~] **Vague 1** : ⚠️ PARTIELLE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ⏸️ (2.3)
-- [ ] **Vague 2** : Agent A (2.2), Agent B (2.4), Agent C (4.3) - **Peut démarrer dès Agent C termine**
+- [x] **Vague 1** : ✅ TERMINÉE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ✅ (2.3)
+- [ ] **Vague 2** : Agent A (2.2), Agent B (2.4), Agent C (4.3) - **✅ DÉBLOQUÉE**
 - [ ] **Vague 3** : Agent A (3.1), Agent B (3.2), Agent C (3.3)
 - [ ] **Vague 4** : Agent A (3.4), Agent B (4.1), Agent C (4.2)
 - [ ] **Vague 5** : Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
@@ -465,20 +477,21 @@ routes/
 └── journal.py                       CRUD /api/journal/entries (JWT)
 ```
 
-### Services critiques (27 fichiers)
+### Services critiques (28 fichiers)
 ```
 services/
-├── natal_interpretation_service.py       (1335 LOC) Anthropic integration
-├── lunar_report_builder.py               (928 LOC) Reports V4 + V2 migration
-├── lunar_interpretation_generator.py     (700 LOC) 🆕 V2 generator avec métriques/logs/retry
-├── interpretation_cache_service.py       (695 LOC) Cache applicatif
-├── voc_cache_service.py                  (467 LOC) VoC cache + retry logic
-├── rapidapi_client.py                    (317 LOC) Best Astrology API client
-├── lunar_interpretation_service.py       Interprétations lunaires DB/IA (V1)
-├── lunar_interpretation_v2_service.py    V2 avec fallback templates
-├── transits_service.py                   Calculs transits
-├── daily_climate_service.py              Ambiance journalière
-└── ... (18 autres services)
+├── natal_interpretation_service.py           (1335 LOC) Anthropic integration
+├── lunar_report_builder.py                   (928 LOC) Reports V4 + V2 migration
+├── lunar_interpretation_generator.py         (700 LOC) 🆕 V2 generator avec métriques/logs/retry
+├── interpretation_cache_service.py           (695 LOC) Cache applicatif
+├── voc_cache_service.py                      (467 LOC) VoC cache + retry logic
+├── rapidapi_client.py                        (317 LOC) Best Astrology API client
+├── lunar_interpretation_legacy_wrapper.py    (181 LOC) 🆕 Wrapper rétrocompatibilité V1→V2
+├── lunar_interpretation_service.py           Interprétations lunaires DB/IA (V1 deprecated)
+├── lunar_interpretation_v2_service.py        V2 avec fallback templates
+├── transits_service.py                       Calculs transits
+├── daily_climate_service.py                  Ambiance journalière
+└── ... (17 autres services)
 ```
 
 ### Dépendances Production (requirements.txt)
@@ -750,11 +763,12 @@ apps/api/
 │   ├── lunar_interpretation.py              🆕 Narration IA temporelle (V2)
 │   └── lunar_interpretation_template.py     🆕 Templates fallback (V2)
 ├── services/
-│   ├── natal_interpretation_service.py      Anthropic integration
-│   ├── lunar_interpretation_generator.py    🆕 Génération V2 (4 niveaux fallback)
-│   ├── lunar_report_builder.py              Reports V4 + V2 integration
-│   └── interpretation_cache_service.py      Cache applicatif
-└── routes/*.py                              10 fichiers routes
+│   ├── natal_interpretation_service.py          Anthropic integration
+│   ├── lunar_interpretation_generator.py        🆕 Génération V2 (4 niveaux fallback)
+│   ├── lunar_interpretation_legacy_wrapper.py   🆕 Wrapper rétrocompatibilité V1→V2
+│   ├── lunar_report_builder.py                  Reports V4 + V2 integration
+│   └── interpretation_cache_service.py          Cache applicatif
+└── routes/*.py                                  10 fichiers routes
 
 apps/mobile/
 ├── services/api.ts                          Client API (Axios + interceptors)
@@ -956,16 +970,16 @@ Solution :
 
 ### Dernier commit
 ```
-d506cc3 - chore(tasks): mark task_2_1 as completed (Agent B)
+01c3e8f - feat(lunar): créer wrapper rétrocompatibilité V1→V2 (Agent C)
 ```
 
 ### 5 derniers commits
 ```
+01c3e8f - feat(lunar): créer wrapper rétrocompatibilité V1→V2 (Agent C)
 d506cc3 - chore(tasks): mark task_2_1 as completed (Agent B)
 49a6888 - feat(lunar): enrichir generator - métriques, logs, retry, timeouts (Agent B)
 2af540c - feat(api): Sprint 4 COMPLETE - 100% Migration Lunar V2 (1728/1728)
 7f247ab - refactor(api): Sprint 4 nettoyage massif - 149 fichiers archivés
-ac9478d - docs(claude): mettre à jour contexte historique Sprint 3
 ```
 
 ### Sprint 2 Timeline (Terminé)
@@ -1010,12 +1024,13 @@ ac9478d - docs(claude): mettre à jour contexte historique Sprint 3
   - Service lunar_interpretation_generator.py créé (500 LOC)
   - Documentation LUNAR_ARCHITECTURE_V2.md + MIGRATION_PLAN.md
   - Système coordination multi-agents opérationnel (.tasks/)
-- **Vague 1 - Foundation** (23/01/2026) : ⚠️ PARTIELLE (2/3 agents terminés)
+- **Vague 1 - Foundation** (23/01/2026) : ✅ **TERMINÉE** (3/3 agents terminés)
   - ✅ Agent A : Sprint 1 complet (scripts + tests + docs)
   - ✅ Agent B : Task 2.1 complétée (generator enrichi - métriques, logs, retry, timeouts)
-  - ⏸️ Agent C : Task 2.3 en attente (legacy wrapper)
-- **Vague 2-5** : Planifiés (8h restantes avec 3 agents parallèles)
-- **Status** : ⏳ **SPRINT 5 EN COURS** (Foundation OK, Vague 1 à 66%)
+  - ✅ Agent C : Task 2.3 complétée (legacy wrapper V1→V2)
+- **Vague 2** : Débloquée et prête à démarrer (3 agents parallèles)
+- **Vagues 3-5** : Planifiées (8h restantes avec 3 agents parallèles)
+- **Status** : ✅ **SPRINT 5 - VAGUE 1 COMPLÈTE** (20% du plan total, Vague 2 débloquée)
 
 ---
 
@@ -1117,5 +1132,5 @@ Claude doit être attentif aux signaux comme :
 
 ---
 
-**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 1 à 66%, Task 2.1 terminée)
-**Version** : 5.1 (Sprint 5 Vague 1 - Agent B Task 2.1 complétée - Generator enrichi avec métriques/logs/retry)
+**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 1 terminée à 100%)
+**Version** : 5.2 (Sprint 5 Vague 1 COMPLÈTE - 3/3 agents terminés - Vague 2 débloquée)
