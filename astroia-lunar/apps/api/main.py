@@ -33,6 +33,20 @@ async def lifespan(app: FastAPI):
     logger.info(f"[corr={correlation_id}] 🔗 Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'local'}")
     logger.info(f"[corr={correlation_id}] 🔑 RapidAPI key configured: {bool(settings.RAPIDAPI_KEY)}")
 
+    # Validation SECRET_KEY en production
+    if settings.APP_ENV == "production":
+        if "dev" in settings.SECRET_KEY.lower() or settings.SECRET_KEY == "dev-secret-key-change-in-production":
+            error_msg = (
+                f"[corr={correlation_id}] ❌ SÉCURITÉ: SECRET_KEY par défaut détectée en production!\n"
+                f"Action requise: Générer une clé forte avec 'openssl rand -hex 32' et la définir dans .env"
+            )
+            logger.error(error_msg)
+            raise RuntimeError("SECRET_KEY non sécurisée en production")
+        logger.info(f"[corr={correlation_id}] ✅ SECRET_KEY validée (production)")
+    else:
+        if "dev" in settings.SECRET_KEY.lower():
+            logger.warning(f"[corr={correlation_id}] ⚠️  SECRET_KEY dev détectée (OK en {settings.APP_ENV})")
+
     # Log configuration des mocks DEV
     logger.info(f"[corr={correlation_id}] 🎭 DEV Mock Configuration:")
     logger.info(f"[corr={correlation_id}]   - DEV_MOCK_NATAL: {settings.DEV_MOCK_NATAL}")
