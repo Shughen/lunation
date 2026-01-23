@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload, selectinload
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -100,7 +101,9 @@ async def resolve_dev_user(
     try:
         user_uuid = UUID(user_identifier)
         result = await db.execute(
-            select(User).where(User.dev_external_id == str(user_uuid))
+            select(User)
+            .where(User.dev_external_id == str(user_uuid))
+            .options(joinedload(User.natal_chart))
         )
         user = result.scalar_one_or_none()
 
@@ -133,7 +136,9 @@ async def resolve_dev_user(
             logger.warning(f"⚠️ DEV_AUTH_BYPASS: échec création user avec dev_external_id={user_uuid}, erreur: {e}")
             # Réessayer de chercher par dev_external_id (peut-être créé entre temps)
             result = await db.execute(
-                select(User).where(User.dev_external_id == str(user_uuid))
+                select(User)
+                .where(User.dev_external_id == str(user_uuid))
+                .options(joinedload(User.natal_chart))
             )
             user = result.scalar_one_or_none()
             if user:
@@ -141,7 +146,11 @@ async def resolve_dev_user(
                 return user, "header_uuid"
             # Si toujours pas trouvé, essayer par email généré
             email = f"dev+{str(user_uuid)[:8]}@local.dev"
-            result = await db.execute(select(User).where(User.email == email))
+            result = await db.execute(
+                select(User)
+                .where(User.email == email)
+                .options(joinedload(User.natal_chart))
+            )
             user = result.scalar_one_or_none()
             if user:
                 logger.info(f"✅ DEV_AUTH_BYPASS: user trouvé via email={email} après échec création")
@@ -155,7 +164,11 @@ async def resolve_dev_user(
     # Tentative 2: Traiter comme integer ID
     try:
         user_id = int(user_identifier)
-        result = await db.execute(select(User).where(User.id == user_id))
+        result = await db.execute(
+            select(User)
+            .where(User.id == user_id)
+            .options(joinedload(User.natal_chart))
+        )
         user = result.scalar_one_or_none()
 
         if user:
@@ -172,7 +185,11 @@ async def resolve_dev_user(
         pass
 
     # Tentative 3: Traiter comme email
-    result = await db.execute(select(User).where(User.email == user_identifier))
+    result = await db.execute(
+        select(User)
+        .where(User.email == user_identifier)
+        .options(joinedload(User.natal_chart))
+    )
     user = result.scalar_one_or_none()
 
     if user:
@@ -181,7 +198,11 @@ async def resolve_dev_user(
 
     # Tentative 4: Fallback vers dev@local.dev (utilisateur par défaut pour DEV)
     logger.info("📥 DEV_AUTH_BYPASS: pas de header/env, fallback vers dev@local.dev")
-    result = await db.execute(select(User).where(User.email == "dev@local.dev"))
+    result = await db.execute(
+        select(User)
+        .where(User.email == "dev@local.dev")
+        .options(joinedload(User.natal_chart))
+    )
     dev_user = result.scalar_one_or_none()
 
     if dev_user:
@@ -306,7 +327,11 @@ async def get_current_user(
         
         # Fallback: chercher ou créer user avec email dev@local.dev
         logger.info("📥 DEV_AUTH_BYPASS: pas de header/env, fallback vers dev@local.dev")
-        result = await db.execute(select(User).where(User.email == "dev@local.dev"))
+        result = await db.execute(
+            select(User)
+            .where(User.email == "dev@local.dev")
+            .options(joinedload(User.natal_chart))
+        )
         dev_user = result.scalar_one_or_none()
 
         if dev_user:
@@ -333,7 +358,11 @@ async def get_current_user(
         except IntegrityError:
             # L'utilisateur a peut-être été créé entre temps
             await db.rollback()
-            result = await db.execute(select(User).where(User.email == "dev@local.dev"))
+            result = await db.execute(
+                select(User)
+                .where(User.email == "dev@local.dev")
+                .options(joinedload(User.natal_chart))
+            )
             dev_user = result.scalar_one_or_none()
             if dev_user:
                 logger.info(f"✅ DEV_AUTH_BYPASS: user dev@local.dev trouvé après rollback - id={dev_user.id}")
@@ -364,7 +393,14 @@ async def get_current_user(
         logger.warning(f"❌ JWT decode: erreur de signature/format: {e}")
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Eager loading pour optimiser les queries (évite N+1 queries dans les routes)
+    # - natal_chart: chargé systématiquement (one-to-one, toujours petit, utilisé partout)
+    # - lunar_reports, transits_overview: lazy load (one-to-many, chargés seulement si nécessaire)
+    result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .options(joinedload(User.natal_chart))
+    )
     user = result.scalar_one_or_none()
 
     if user is None:
