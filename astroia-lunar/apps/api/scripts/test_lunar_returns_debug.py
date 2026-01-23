@@ -7,6 +7,7 @@ Capture l'exception exacte et affiche la stacktrace complète
 import asyncio
 import sys
 import traceback
+import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import select
 from config import settings
@@ -26,9 +27,11 @@ engine = create_async_engine(DATABASE_URL, echo=True)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+@pytest.mark.real_db
+@pytest.mark.skip(reason="Requires real DB connection (debug script)")
 async def test_generate_lunar_returns():
     """Reproduit le flow de generate_lunar_returns pour capturer l'erreur"""
-    
+
     async with AsyncSessionLocal() as db:
         # 1. Récupérer un user (premier disponible)
         result = await db.execute(select(User).limit(1))

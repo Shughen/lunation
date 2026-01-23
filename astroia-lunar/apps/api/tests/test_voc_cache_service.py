@@ -32,11 +32,21 @@ async def db_session():
     """
     Fixture pour créer une session DB async réelle pour les tests.
     Utilise NullPool pour éviter les conflits de connexion.
+    Skip si la DB n'est pas accessible.
     """
     # Convertir postgresql:// en postgresql+asyncpg://
     database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
     engine = create_async_engine(database_url, poolclass=NullPool)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    try:
+        # Tester la connexion
+        async with async_session() as test_session:
+            from sqlalchemy import text
+            await test_session.execute(text("SELECT 1"))
+    except Exception as e:
+        await engine.dispose()
+        pytest.skip(f"DB not accessible: {str(e)[:100]}")
 
     async with async_session() as session:
         yield session

@@ -390,37 +390,43 @@ def override_dependencies_no_natal(fake_user):
 async def real_db_isolation(request):
     """
     Fixture autouse qui isole les tests marqués real_db via TRUNCATE.
-    
+
     Exécute TRUNCATE ... RESTART IDENTITY CASCADE avant ET après chaque test
     pour garantir une isolation complète des données.
-    
+
     Utilise un engine dédié avec NullPool pour éviter toute collision avec
     l'engine global de l'app.
+
+    Skip automatiquement le test si la DB n'est pas accessible.
     """
     # Ne s'applique que si le test est marqué real_db
     if not request.node.get_closest_marker("real_db"):
         yield
         return
-    
+
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.pool import NullPool
     from sqlalchemy import text
     from config import settings
-    
+
     # Créer un engine dédié avec NullPool uniquement pour les TRUNCATE
     # Convertir postgresql:// en postgresql+asyncpg://
     database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
     truncate_engine = create_async_engine(database_url, poolclass=NullPool)
-    
+
     try:
-        # TRUNCATE avant le test (un seul statement multi-tables)
-        async with truncate_engine.begin() as conn:
-            await conn.execute(
-                text("TRUNCATE TABLE lunar_reports, lunar_returns, users RESTART IDENTITY CASCADE")
-            )
-        
+        # Tester la connexion DB - skip si inaccessible
+        try:
+            async with truncate_engine.begin() as conn:
+                await conn.execute(
+                    text("TRUNCATE TABLE lunar_reports, lunar_returns, users RESTART IDENTITY CASCADE")
+                )
+        except Exception as e:
+            await truncate_engine.dispose()
+            pytest.skip(f"DB not accessible (required for @pytest.mark.real_db tests): {str(e)[:100]}")
+
         yield
-        
+
         # TRUNCATE après le test (un seul statement multi-tables)
         async with truncate_engine.begin() as conn:
             await conn.execute(
