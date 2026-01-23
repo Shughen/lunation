@@ -732,7 +732,10 @@ async def _generate_rolling_if_empty(
                 )
             
             return True
-            
+
+        except HTTPException:
+            # Re-raise HTTPException pour préserver les erreurs HTTP (409, etc.)
+            raise
         except Exception as e:
             # Erreur pendant la génération: rollback AVANT unlock
             logger.error(
@@ -1408,7 +1411,7 @@ async def get_current_lunar_report(
                 logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire trouvée pour user_id={user_id}")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Aucune révolution lunaire en cours. Utilisez POST /api/lunar-returns/generate pour générer les cycles."
+                    detail="Aucune révolution lunaire disponible. Assurez-vous d'avoir créé votre thème natal via POST /api/natal-chart, puis utilisez POST /api/lunar-returns/generate pour générer les cycles."
                 )
 
         # 2. Construire le rapport via le builder (async avec support IA)
