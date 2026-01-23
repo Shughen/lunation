@@ -266,25 +266,29 @@ class FakeAsyncSession:
 
 class FakeResult:
     """Stub pour sqlalchemy.engine.result.Result"""
-    
+
     def __init__(self):
         self._scalar = None
         self._scalars_list = []
         self._rowcount = None
-    
+
     def scalar_one_or_none(self):
         return self._scalar
-    
+
     def scalar(self):
         return self._scalar
-    
+
     def scalars(self):
         # Si on a une liste de scalars (pour SELECT multiple), la retourner
         if hasattr(self, '_scalars_list') and self._scalars_list:
             return iter(self._scalars_list)
         # Sinon, retourner un itérable vide
         return iter([])
-    
+
+    def all(self):
+        """Retourne toutes les lignes (pour GROUP BY, etc.)"""
+        return self._scalars_list if hasattr(self, '_scalars_list') else []
+
     @property
     def rowcount(self):
         """Retourne le rowcount si disponible"""
