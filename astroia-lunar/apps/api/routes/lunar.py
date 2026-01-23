@@ -217,14 +217,54 @@ async def lunar_return_report(
     try:
         # Conversion du modèle Pydantic en dict pour l'API
         # Exclure user_id et month du payload provider (user_id n'existe plus, month est pour DB uniquement)
+        logger.info(f"📝 Génération Lunar Return Report - user_id: {user_id}, month: {request.month}")
+
+        # === CACHE DB CHECK (Performance Optimization) ===
+        # Vérifier d'abord si un rapport existe en DB pour éviter l'appel RapidAPI (2-3s)
+        existing_report = None
+        if request.month:
+            try:
+                stmt = select(LunarReport).where(
+                    and_(
+                        LunarReport.user_id == user_id,
+                        LunarReport.month == request.month
+                    )
+                )
+                result_db = await db.execute(stmt)
+                existing_report = result_db.scalar_one_or_none()
+
+                if existing_report:
+                    # Cache TTL: 30 jours (rapports lunaires valides 1 mois)
+                    from datetime import datetime, timedelta, timezone
+                    cache_age = datetime.now(timezone.utc) - existing_report.created_at
+                    cache_ttl_days = 30
+
+                    if cache_age.days < cache_ttl_days:
+                        # Cache hit: retourner le rapport existant sans appel API
+                        logger.info(
+                            f"⚡ Cache hit - user_id: {user_id}, month: {request.month}, "
+                            f"age: {cache_age.days}j/{cache_ttl_days}j"
+                        )
+                        return {
+                            "provider": "cache",
+                            "report": existing_report.report,
+                            "cached_at": existing_report.created_at.isoformat(),
+                            "cache_age_days": cache_age.days
+                        }
+                    else:
+                        # Cache expiré: on va regénérer
+                        logger.info(
+                            f"🔄 Cache expired - user_id: {user_id}, month: {request.month}, "
+                            f"age: {cache_age.days}j > {cache_ttl_days}j"
+                        )
+            except Exception as e:
+                logger.warning(f"⚠️  Erreur cache check: {str(e)}, fallback to API call")
+
+        # === APPEL RAPIDAPI (si cache miss ou expired) ===
         payload = request.model_dump(exclude_none=True, exclude={"month"})
-        # Réinsérer month si présent (utilisé par le service pour normalisation)
         if request.month:
             payload["month"] = request.month
 
-        logger.info(f"📝 Génération Lunar Return Report - user_id: {user_id}, month: {request.month}")
-
-        # Appel au service RapidAPI (avec transformation du payload)
         result = await lunar_services.get_lunar_return_report(payload)
 
         # Détecter si la réponse est un mock (pour mettre le bon provider)
@@ -235,20 +275,10 @@ async def lunar_return_report(
         # security: never trust request.user_id - always use authenticated user_id snapshot
         if request.month:
             try:
-                # Vérifier si un rapport existe déjà pour ce mois
-                stmt = select(LunarReport).where(
-                    and_(
-                        LunarReport.user_id == user_id,  # security: never trust request.user_id
-                        LunarReport.month == request.month
-                    )
-                )
-                result_db = await db.execute(stmt)
-                existing_report = result_db.scalar_one_or_none()
-
                 if existing_report:
-                    # Mise à jour du rapport existant
+                    # Mise à jour du rapport existant (cache refresh)
                     existing_report.report = result
-                    logger.info(f"♻️  Rapport existant mis à jour - user_id: {user_id}, month: {request.month}")
+                    logger.info(f"♻️  Cache refresh - user_id: {user_id}, month: {request.month}")
                 else:
                     # Création d'un nouveau rapport
                     lunar_report = LunarReport(
