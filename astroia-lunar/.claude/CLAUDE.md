@@ -469,16 +469,16 @@ Solution :
 
 ### Dernier commit
 ```
-78ba020 - perf(api): Phase 1 optimizations - Cache RapidAPI + DB indexes
+df620c4 - docs(claude): Sprint 3 terminé - Migration Lunar V2 89%
 ```
 
 ### 5 derniers commits
 ```
+df620c4 - docs(claude): Sprint 3 terminé - Migration Lunar V2 89%
+69423fb - feat(lunar): compléter Aquarius de 48 à 144 interprétations
 78ba020 - perf(api): Phase 1 optimizations - Cache RapidAPI + DB indexes
 b0995d0 - feat(api+mobile): migration Lunar V2 - support interprétations complètes DB
 2567a75 - docs(claude): mettre à jour état Sprint 2 - tous tests passent
-5acb0a6 - fix(tests): corriger async mocking dans tests VoC cache
-03960ed - test(api): skip tests nécessitant DB inaccessible
 ```
 
 ### Sprint 2 Timeline (Terminé)
