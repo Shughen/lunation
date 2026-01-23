@@ -144,8 +144,9 @@ Tous les 12 signes lunaires complets, ready pour production
 ### 📈 Progrès (23/01/2026)
 - ✅ **Sprint 0 (Foundation)** : Modèles créés, migrations exécutées, 1728 templates migrés
 - ✅ **Sprint 1 (Infra & Docs)** : Scripts agents, tests DB, MIGRATION_PLAN.md complet
-- ⚠️ **Vague 1** : Agent A terminé, Agent B & C en attente de démarrage
-- ⏸️ **Sprints 2-5** : Planifiés, en attente finalisation Vague 1
+- ✅ **Vague 1** : ✅ COMPLÈTE - Agent A (Sprint 1), Agent B (2.1 generator enrichi), Agent C (2.3 legacy wrapper)
+- ⏳ **Vague 2** : EN COURS - Agent A ✅ (2.2 lunar_report_builder refactoré), Agent B ⏸️ (2.4), Agent C ⏸️ (4.3)
+- ⏸️ **Vagues 3-5** : Planifiées, en attente finalisation Vague 2
 
 ### 🏗️ Architecture V2 : 4 Couches
 
@@ -305,19 +306,27 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 
 ---
 
-### 🌊 Vague 2 : Service Layer (2h30)
+### 🌊 Vague 2 : Service Layer (2h30) - ⏳ **EN COURS**
 
-| Agent | Tâches | Durée | Dépendances |
-|-------|--------|-------|-------------|
-| **Agent A** | Task 2.2 : Refactor lunar_report_builder | 2h30 | ✅ Vague 1 (2.1) |
-| **Agent B** | Task 2.4 : Tests generator | 2h | ✅ Vague 1 (2.1) |
-| **Agent C** | Task 4.3 : Audit migration | 1h | ❌ Aucune (DB déjà migrée) |
+| Agent | Tâches | Durée | État | Dépendances |
+|-------|--------|-------|------|-------------|
+| **Agent A** | Task 2.2 : Refactor lunar_report_builder | 2h30 | ✅ **TERMINÉ** | ✅ Vague 1 (2.1) |
+| **Agent B** | Task 2.4 : Tests generator | 2h | ⏸️ En attente | ✅ Vague 1 (2.1) |
+| **Agent C** | Task 4.3 : Audit migration | 1h | ⏸️ En attente | ❌ Aucune (DB déjà migrée) |
+
+**Réalisations Agent A (23/01/2026)** :
+- ✅ Task 2.2 : lunar_report_builder.py refactoré (commit dbad111)
+  - **Intégration V2** : Utilise `generate_or_get_interpretation()` au lieu de l'ancien service V1
+  - **Simplification** : 50 lignes supprimées, 70 lignes refactorées
+  - **Metadata ajoutée** : source, model_used, version, generated_at dans chaque réponse
+  - **Tests validés** : 479 passed, 25 skipped (100% compatibilité)
+  - **Architecture unifiée** : Hiérarchie fallback DB temporelle → Claude → DB templates → hardcoded
 
 **Pourquoi ça marche** :
 - 2.1 terminé en Vague 1 → débloquer 2.2 et 2.4
 - 4.3 (Audit) peut se faire **à tout moment** (juste vérifier DB)
 
-**État** : ✅ **DÉBLOQUÉE - Peut démarrer maintenant**
+**État** : ⏳ **EN COURS - Agent A terminé (1/3), Agents B & C en attente**
 
 ---
 
@@ -374,25 +383,25 @@ Chaque vague contient uniquement des tâches **indépendantes ou dont les dépen
 ```
 Vague 1 (2h)    : ✅ TERMINÉE - Agent A ✅, Agent B ✅, Agent C ✅
     ↓
-Vague 2 (2h30)  : ⏳ PRÊTE - Agent A + B + C en parallèle (démarrage immédiat possible)
+Vague 2 (2h30)  : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ⏸️ (2.4), Agent C ⏸️ (4.3)
     ↓
-Vague 3 (1h30)  : Agent A + B + C en parallèle
+Vague 3 (1h30)  : ⏸️ BLOQUÉE - En attente fin Vague 2
     ↓
-Vague 4 (2h)    : Agent A + B + C en parallèle
+Vague 4 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 3
     ↓
-Vague 5 (2h)    : Agent A + B + C en parallèle
+Vague 5 (2h)    : ⏸️ BLOQUÉE - En attente fin Vague 4
 ────────────────────────────────────────────────
 Total : 10h (vs 23h séquentiel = 57% gain)
-Progression : 2h/10h (20% complété)
+Progression : 4h30/10h (45% complété)
 ```
 
 ### 📋 Checklist Vagues
 
 - [x] **Vague 1** : ✅ TERMINÉE - Agent A ✅ (Sprint 1), Agent B ✅ (2.1), Agent C ✅ (2.3)
-- [ ] **Vague 2** : Agent A (2.2), Agent B (2.4), Agent C (4.3) - **✅ DÉBLOQUÉE**
-- [ ] **Vague 3** : Agent A (3.1), Agent B (3.2), Agent C (3.3)
-- [ ] **Vague 4** : Agent A (3.4), Agent B (4.1), Agent C (4.2)
-- [ ] **Vague 5** : Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
+- [ ] **Vague 2** : ⏳ EN COURS - Agent A ✅ (2.2), Agent B ⏸️ (2.4), Agent C ⏸️ (4.3)
+- [ ] **Vague 3** : ⏸️ BLOQUÉE - Agent A (3.1), Agent B (3.2), Agent C (3.3)
+- [ ] **Vague 4** : ⏸️ BLOQUÉE - Agent A (3.4), Agent B (4.1), Agent C (4.2)
+- [ ] **Vague 5** : ⏸️ BLOQUÉE - Agent A (5.1), Agent B (5.2), Agent C (5.3+5.4)
 
 ### 🔄 Workflow Inter-Vagues
 
@@ -455,8 +464,9 @@ pytest -q
 ### 🎯 **Sprint 5 : EN COURS** ⏳
 - ✅ **Sprint 0** : Foundation terminée (1728 templates migrés)
 - ✅ **Sprint 1** : Infrastructure & Documentation terminée (4/4 tâches)
-- ⚠️ **Vague 1** : Partiellement terminée (Agent A ✅, Agent B & C en attente)
-- ⏸️ **Vague 2-5** : En attente finalisation Vague 1
+- ✅ **Vague 1** : ✅ COMPLÈTE (3/3 agents terminés - Agent A, B, C)
+- ⏳ **Vague 2** : EN COURS (1/3 agents terminés - Agent A ✅, Agents B & C ⏸️)
+- ⏸️ **Vagues 3-5** : En attente finalisation Vague 2
 
 ---
 
@@ -1132,5 +1142,5 @@ Claude doit être attentif aux signaux comme :
 
 ---
 
-**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 1 terminée à 100%)
-**Version** : 5.2 (Sprint 5 Vague 1 COMPLÈTE - 3/3 agents terminés - Vague 2 débloquée)
+**Dernière mise à jour** : 2026-01-23 (Sprint 5 en cours - Vague 2 à 33%)
+**Version** : 5.3 (Sprint 5 Vague 2 EN COURS - Agent A terminé (2.2) - 45% total complété)
