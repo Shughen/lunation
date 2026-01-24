@@ -1375,45 +1375,15 @@ async def get_current_lunar_report(
             lunar_return = result_future.scalar_one_or_none()
 
         if not lunar_return:
-            # Lazy generate : si DB vide, générer automatiquement
-            logger.info(
-                f"[corr={correlation_id}] ℹ️ Aucune révolution lunaire trouvée, "
-                f"déclenchement lazy-generate..."
+            logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire trouvée pour user_id={user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Aucune révolution lunaire disponible. Assurez-vous d'avoir créé votre thème natal via POST /api/natal-chart, puis utilisez POST /api/lunar-returns/generate pour générer les cycles."
             )
 
-            generated = await _generate_rolling_if_empty(current_user, db, correlation_id)
-
-            if generated:
-                # Re-chercher après génération
-                result_past = await db.execute(
-                    select(LunarReturn)
-                    .where(
-                        LunarReturn.user_id == user_id,
-                        LunarReturn.return_date <= now
-                    )
-                    .order_by(LunarReturn.return_date.desc())
-                    .limit(1)
-                )
-                lunar_return = result_past.scalar_one_or_none()
-
-                if not lunar_return:
-                    result_future = await db.execute(
-                        select(LunarReturn)
-                        .where(
-                            LunarReturn.user_id == user_id,
-                            LunarReturn.return_date >= now
-                        )
-                        .order_by(LunarReturn.return_date.asc())
-                        .limit(1)
-                    )
-                    lunar_return = result_future.scalar_one_or_none()
-
-            if not lunar_return:
-                logger.info(f"[corr={correlation_id}] ❌ Aucune révolution lunaire trouvée pour user_id={user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Aucune révolution lunaire disponible. Assurez-vous d'avoir créé votre thème natal via POST /api/natal-chart, puis utilisez POST /api/lunar-returns/generate pour générer les cycles."
-                )
+        # 🔒 CRITIQUE : Extraire lunar_return.month IMMÉDIATEMENT pour éviter MissingGreenlet
+        # build_lunar_report_v4_async() fait des commits qui detachent lunar_return de la session
+        lunar_return_month = lunar_return.month
 
         # 2. Construire le rapport via le builder (async avec support IA)
         from services.lunar_report_builder import build_lunar_report_v4_async
@@ -1429,7 +1399,7 @@ async def get_current_lunar_report(
         })
 
         logger.info(
-            f"[corr={correlation_id}] ✅ Rapport généré pour {lunar_return.month} - "
+            f"[corr={correlation_id}] ✅ Rapport généré pour {lunar_return_month} - "
             f"climate_len={len(report['general_climate'])}, "
             f"axes={len(report['dominant_axes'])}, "
             f"aspects={len(report['major_aspects'])}, "
@@ -1446,9 +1416,12 @@ async def get_current_lunar_report(
         raise
     except Exception as e:
         logger.error(f"[corr={correlation_id}] ❌ Erreur get_current_lunar_report: {e}", exc_info=True)
+        import traceback
+        tb_str = traceback.format_exc()
+        logger.error(f"[corr={correlation_id}] 📍 Traceback complet:\n{tb_str}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la génération du rapport mensuel"
+            detail=f"Erreur lors de la génération du rapport mensuel: {str(e)}"
         )
 
 

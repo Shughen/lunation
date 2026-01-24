@@ -793,10 +793,27 @@ async def build_lunar_report_v4_async(
             'interpretation_source': str
         }
     """
-    logger.info(f"[LunarReportBuilder] Construction rapport v4 async pour month={lunar_return.month}")
+    # 🔒 CRITIQUE : Extraire TOUTES les primitives IMMÉDIATEMENT pour éviter MissingGreenlet
+    # Les fonctions async appelées plus tard (generate_or_get_interpretation) font des commits
+    # qui detachent lunar_return de la session, rendant tout accès ultérieur impossible
+    try:
+        lunar_return_id = int(lunar_return.id)
+        lunar_return_user_id = int(lunar_return.user_id)
+        lunar_return_month = str(lunar_return.month)
+        moon_sign = lunar_return.moon_sign or "Unknown"
+        moon_house = lunar_return.moon_house or 1
+        lunar_ascendant = lunar_return.lunar_ascendant or "Unknown"
+        return_date = lunar_return.return_date or datetime.now()
+
+        logger.info(f"[LunarReportBuilder] Construction rapport v4 async pour month={lunar_return_month}")
+    except Exception as e:
+        logger.error(f"[LunarReportBuilder] ❌ Erreur extraction données lunar_return: {e}", exc_info=True)
+        raise
 
     # 1. HEADER (factuel)
+    logger.info(f"[LunarReportBuilder] 1. Construction header...")
     header = _build_header(lunar_return)
+    logger.info(f"[LunarReportBuilder] ✅ Header construit")
 
     # 2. CLIMAT GÉNÉRAL (template enrichi v4.1 - existant)
     general_climate = _build_general_climate_enriched(lunar_return)
@@ -806,12 +823,6 @@ async def build_lunar_report_v4_async(
 
     # 4. ASPECTS MAJEURS (réutiliser enrich_aspects_v4)
     major_aspects = _build_major_aspects(lunar_return)
-
-    # Extraire les données du lunar_return
-    moon_sign = lunar_return.moon_sign or "Unknown"
-    moon_house = lunar_return.moon_house or 1
-    lunar_ascendant = lunar_return.lunar_ascendant or "Unknown"
-    return_date = lunar_return.return_date or datetime.now()
 
     # 5. INTERPRÉTATION LUNAIRE (V2 avec nouveau generator)
     lunar_interpretation = {
@@ -833,14 +844,14 @@ async def build_lunar_report_v4_async(
 
             logger.info(
                 f"[LunarReportBuilder] 📚 Génération interprétation v{preferred_version} "
-                f"pour lunar_return_id={lunar_return.id}, user_id={lunar_return.user_id}"
+                f"pour lunar_return_id={lunar_return_id}, user_id={lunar_return_user_id}"
             )
 
             # Utiliser le nouveau service V2
             output_text, weekly_advice, source, model = await generate_or_get_interpretation(
                 db=db,
-                lunar_return_id=lunar_return.id,
-                user_id=lunar_return.user_id,
+                lunar_return_id=lunar_return_id,
+                user_id=lunar_return_user_id,
                 subject='full',
                 version=preferred_version,
                 lang='fr'
