@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     # Lunar Interpretation (révolution lunaire enrichie IA)
     LUNAR_LLM_MODE: str = Field(default="off", description="Mode LLM pour révolution lunaire: 'off' (templates) ou 'anthropic' (interprétation IA)")
     LUNAR_INTERPRETATION_VERSION: int = Field(default=2, description="Version du prompt lunaire (1=templates 36 couches, 2=Opus 4.5 1728 combinaisons)")
+    LUNAR_CLAUDE_MODEL: str = Field(default="opus", description="Modèle Claude pour génération lunaire: 'opus' (qualité max), 'sonnet' (équilibré), 'haiku' (rapide)")
 
     @model_validator(mode='before')
     @classmethod

@@ -84,6 +84,26 @@ CLAUDE_MODELS = {
 }
 
 
+def get_configured_model() -> str:
+    """
+    Retourne le modèle Claude configuré via LUNAR_CLAUDE_MODEL
+
+    Returns:
+        Model ID (ex: 'claude-opus-4-5-20251101')
+    """
+    model_key = settings.LUNAR_CLAUDE_MODEL.lower()
+    if model_key not in CLAUDE_MODELS:
+        logger.warning(
+            "invalid_model_config",
+            configured=model_key,
+            available=list(CLAUDE_MODELS.keys()),
+            fallback='opus'
+        )
+        model_key = 'opus'  # Fallback to Opus if invalid
+
+    return CLAUDE_MODELS[model_key]
+
+
 async def generate_or_get_interpretation(
     db: AsyncSession,
     lunar_return_id: int,
@@ -219,7 +239,7 @@ async def generate_or_get_interpretation(
                 input_json=input_context,
                 output_text=output_text,
                 weekly_advice=weekly_advice,
-                model_used=CLAUDE_MODELS['opus']
+                model_used=get_configured_model()
             )
             db.add(interpretation)
             await db.commit()
@@ -228,7 +248,7 @@ async def generate_or_get_interpretation(
             # Record metrics for generation
             lunar_interpretation_generated.labels(
                 source='claude',
-                model=CLAUDE_MODELS['opus'],
+                model=get_configured_model(),
                 subject=subject,
                 version=str(version)
             ).inc()
@@ -244,11 +264,11 @@ async def generate_or_get_interpretation(
                 lunar_return_id=lunar_return_id,
                 interpretation_id=str(interpretation.id),
                 source='claude',
-                model_used=CLAUDE_MODELS['opus'],
+                model_used=get_configured_model(),
                 duration_ms=int(duration * 1000)
             )
 
-            return output_text, weekly_advice, 'claude', CLAUDE_MODELS['opus']
+            return output_text, weekly_advice, 'claude', get_configured_model()
 
         except ClaudeAPIError as e:
             logger.warning(
@@ -420,7 +440,7 @@ async def _generate_via_claude(
                 client=client,
                 prompt=prompt,
                 max_tokens=max_tokens,
-                model=CLAUDE_MODELS['opus']
+                model=get_configured_model()
             ),
             timeout=30.0  # 30 seconds max
         )
