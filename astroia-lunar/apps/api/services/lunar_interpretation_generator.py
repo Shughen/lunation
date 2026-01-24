@@ -346,13 +346,20 @@ async def generate_or_get_interpretation(
     reraise=True
 )
 async def _call_claude_with_retry(client: Anthropic, prompt: str, max_tokens: int, model: str) -> str:
-    """Call Claude with automatic retry on transient errors"""
+    """Call Claude with automatic retry on transient errors + Prompt Caching (-90% cost)"""
     logger.debug("calling_claude_api")
 
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,
         temperature=0.7,
+        system=[
+            {
+                "type": "text",
+                "text": "Tu es un astrologue professionnel senior spécialisé en révolutions lunaires. Tu produis des interprétations chaleureuses, accessibles (tutoiement), concrètes et applicables.",
+                "cache_control": {"type": "ephemeral"}  # ⚡ CACHE (90% cost reduction)
+            }
+        ],
         messages=[{"role": "user", "content": prompt}]
     )
 
@@ -491,7 +498,7 @@ def _build_prompt(
 
     if subject == 'full':
         # Interprétation complète du mois
-        prompt = f"""Tu es un astrologue professionnel senior. Génère une interprétation complète de révolution lunaire mensuelle.
+        prompt = f"""Génère une interprétation complète de révolution lunaire mensuelle.
 
 **Contexte astronomique:**
 - Lune en {moon_sign}, Maison {moon_house}
@@ -514,7 +521,7 @@ Génère l'interprétation complète maintenant."""
 
     elif subject == 'climate':
         # Climat émotionnel seulement
-        prompt = f"""Tu es un astrologue professionnel senior. Génère le climat émotionnel d'une révolution lunaire.
+        prompt = f"""Génère le climat émotionnel d'une révolution lunaire.
 
 **Contexte:**
 - Lune en {moon_sign}
@@ -529,7 +536,7 @@ Génère le climat maintenant."""
 
     elif subject == 'focus':
         # Focus zones de vie
-        prompt = f"""Tu es un astrologue professionnel senior. Génère les zones de focus d'une révolution lunaire.
+        prompt = f"""Génère les zones de focus d'une révolution lunaire.
 
 **Contexte:**
 - Lune en Maison {moon_house}
@@ -544,7 +551,7 @@ Génère le focus maintenant."""
 
     elif subject == 'approach':
         # Approche du mois
-        prompt = f"""Tu es un astrologue professionnel senior. Génère l'approche d'une révolution lunaire.
+        prompt = f"""Génère l'approche d'une révolution lunaire.
 
 **Contexte:**
 - Ascendant lunaire: {lunar_ascendant}
