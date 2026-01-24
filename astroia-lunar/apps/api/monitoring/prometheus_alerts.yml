@@ -1,0 +1,331 @@
+# Alertes Prometheus - Génération Lunaire Claude Opus 4.5
+# Date: 2026-01-24
+# Version: 1.0
+
+groups:
+  - name: lunar_generation_alerts
+    interval: 1m
+    rules:
+
+      # ===========================================
+      # COÛT - Budget Alerts
+      # ===========================================
+
+      - alert: LunarGenerationCostHigh
+        expr: |
+          sum(increase(lunar_interpretation_generated_total{source="claude"}[24h])) * 0.020 > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Coût génération lunaire élevé"
+          description: |
+            Le coût estimé des générations Claude sur 24h dépasse $10.
+            Coût actuel: ${{ printf "%.2f" $value }}
+            Seuil: $10/jour
+
+            Actions recommandées:
+            1. Vérifier cache hit rate (doit être >50%)
+            2. Investiguer si force_regenerate utilisé abusivement
+            3. Considérer switch Opus → Sonnet temporairement
+          dashboard: https://grafana.com/d/lunar-generation
+          runbook: https://docs.astroia.com/runbooks/lunar-cost-high
+
+      - alert: LunarGenerationCostCritical
+        expr: |
+          sum(increase(lunar_interpretation_generated_total{source="claude"}[24h])) * 0.020 > 50
+        for: 5m
+        labels:
+          severity: critical
+          component: lunar_generation
+          team: backend
+          oncall: true
+        annotations:
+          summary: "⚠️ CRITICAL - Coût génération lunaire TRÈS élevé"
+          description: |
+            Le coût estimé des générations Claude sur 24h dépasse $50 (CRITIQUE).
+            Coût actuel: ${{ printf "%.2f" $value }}
+            Seuil critique: $50/jour
+
+            ACTIONS IMMÉDIATES REQUISES:
+            1. Désactiver génération Claude: LUNAR_LLM_MODE=off
+            2. Investiguer cause (logs, métriques)
+            3. Vérifier pas de boucle infinie de génération
+            4. Contact Anthropic si anomalie API
+          dashboard: https://grafana.com/d/lunar-generation
+          pagerduty: true
+
+      # ===========================================
+      # ERREURS - Fallback Rate
+      # ===========================================
+
+      - alert: LunarGenerationFallbackHigh
+        expr: |
+          (
+            sum(rate(lunar_interpretation_fallback_total[5m]))
+            /
+            sum(rate(lunar_interpretation_generated_total[5m]))
+          ) * 100 > 20
+        for: 10m
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Taux de fallback élevé (>20%)"
+          description: |
+            Plus de 20% des générations utilisent les fallbacks (templates/hardcoded).
+            Taux actuel: {{ printf "%.1f" $value }}%
+            Seuil: 20%
+
+            Causes possibles:
+            1. Claude API lente ou instable
+            2. Timeouts fréquents (>30s)
+            3. Rate limiting Anthropic
+            4. Problème réseau
+
+            Actions:
+            1. Vérifier Anthropic status page
+            2. Vérifier logs pour erreurs Claude
+            3. Augmenter timeout si nécessaire
+          dashboard: https://grafana.com/d/lunar-generation
+
+      - alert: LunarGenerationFallbackCritical
+        expr: |
+          (
+            sum(rate(lunar_interpretation_fallback_total[5m]))
+            /
+            sum(rate(lunar_interpretation_generated_total[5m]))
+          ) * 100 > 50
+        for: 5m
+        labels:
+          severity: critical
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "⚠️ CRITICAL - Taux de fallback TRÈS élevé (>50%)"
+          description: |
+            Plus de 50% des générations utilisent les fallbacks (Claude indisponible).
+            Taux actuel: {{ printf "%.1f" $value }}%
+            Seuil critique: 50%
+
+            ACTIONS IMMÉDIATES:
+            1. Vérifier Claude API status
+            2. Vérifier logs API pour erreurs
+            3. Valider fallback templates fonctionnent
+            4. Considérer désactivation génération Claude si >90%
+          dashboard: https://grafana.com/d/lunar-generation
+
+      # ===========================================
+      # PERFORMANCE - Latence
+      # ===========================================
+
+      - alert: LunarGenerationLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            rate(lunar_interpretation_duration_seconds_bucket{source="claude"}[5m])
+          ) > 20
+        for: 10m
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Latence P95 génération élevée (>20s)"
+          description: |
+            La latence P95 des générations Claude dépasse 20s.
+            P95 actuel: {{ printf "%.1f" $value }}s
+            Seuil: 20s
+
+            Impact utilisateur: Temps d'attente trop long
+
+            Actions:
+            1. Vérifier Claude API status
+            2. Investiguer goulots d'étranglement DB
+            3. Vérifier pool connexions DB
+            4. Considérer switch Sonnet (plus rapide)
+          dashboard: https://grafana.com/d/lunar-generation
+
+      - alert: LunarGenerationLatencyCritical
+        expr: |
+          histogram_quantile(0.95,
+            rate(lunar_interpretation_duration_seconds_bucket{source="claude"}[5m])
+          ) > 45
+        for: 5m
+        labels:
+          severity: critical
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "⚠️ CRITICAL - Latence P95 TRÈS élevée (>45s)"
+          description: |
+            La latence P95 des générations Claude dépasse 45s (timeout approchant).
+            P95 actuel: {{ printf "%.1f" $value }}s
+            Seuil critique: 45s (timeout à 60s)
+
+            ACTIONS IMMÉDIATES:
+            1. Investiguer cause (DB, Claude API, réseau)
+            2. Vérifier pas de deadlock DB
+            3. Augmenter timeout si nécessaire
+            4. Considérer désactivation temporaire si timeout fréquents
+          dashboard: https://grafana.com/d/lunar-generation
+
+      # ===========================================
+      # CACHE - Cache Hit Rate
+      # ===========================================
+
+      - alert: LunarCacheHitRateLow
+        expr: |
+          (
+            sum(rate(lunar_interpretation_cache_hit_total[1h]))
+            /
+            sum(rate(lunar_interpretation_generated_total[1h]))
+          ) * 100 < 30
+        for: 2h
+        labels:
+          severity: info
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Taux de cache hit faible (<30%)"
+          description: |
+            Le taux de cache hit sur 1h est inférieur à 30%.
+            Taux actuel: {{ printf "%.1f" $value }}%
+            Seuil: 30%
+
+            Note: Normal en début de déploiement (cache vide).
+
+            Actions (si >7 jours après déploiement):
+            1. Vérifier UNIQUE constraint fonctionnel
+            2. Vérifier pas de force_regenerate systématique
+            3. Investiguer distribution users (peu d'utilisateurs récurrents?)
+          dashboard: https://grafana.com/d/lunar-generation
+
+      # ===========================================
+      # DISPONIBILITÉ - Générations Actives
+      # ===========================================
+
+      - alert: LunarGenerationStuck
+        expr: lunar_active_generations > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Trop de générations actives simultanées (>10)"
+          description: |
+            Plus de 10 générations en cours simultanément (possible deadlock).
+            Générations actives: {{ $value }}
+            Seuil: 10
+
+            Actions:
+            1. Vérifier logs pour générations bloquées
+            2. Vérifier pool connexions DB
+            3. Restart worker si nécessaire
+          dashboard: https://grafana.com/d/lunar-generation
+
+      - alert: LunarGenerationNoActivity
+        expr: |
+          sum(increase(lunar_interpretation_generated_total[1h])) == 0
+        for: 2h
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Aucune génération lunaire depuis 2h"
+          description: |
+            Aucune génération lunaire détectée depuis 2h.
+
+            Causes possibles:
+            1. Aucun utilisateur actif (normal en off-peak)
+            2. Endpoint /lunar-returns down
+            3. LUNAR_LLM_MODE=off (désactivé)
+
+            Actions:
+            1. Vérifier trafic API
+            2. Vérifier health checks
+            3. Vérifier configuration LUNAR_LLM_MODE
+          dashboard: https://grafana.com/d/lunar-generation
+
+      # ===========================================
+      # QUALITÉ - Template Fallback Spike
+      # ===========================================
+
+      - alert: LunarTemplateFallbackSpike
+        expr: |
+          (
+            rate(lunar_interpretation_fallback_total{type="db_template"}[5m])
+            /
+            rate(lunar_interpretation_generated_total[5m])
+          ) > 0.8
+        for: 15m
+        labels:
+          severity: warning
+          component: lunar_generation
+          team: backend
+        annotations:
+          summary: "Spike de fallback vers templates DB (>80%)"
+          description: |
+            Plus de 80% des générations utilisent les templates DB (fallback niveau 3).
+            Taux actuel: {{ printf "%.1f" $value }}%
+
+            Cause probable: Claude API totalement indisponible
+
+            Actions:
+            1. Vérifier Anthropic status
+            2. Vérifier ANTHROPIC_API_KEY valide
+            3. Vérifier logs pour erreurs 401/403
+            4. Valider qualité templates DB (user feedback)
+          dashboard: https://grafana.com/d/lunar-generation
+
+# ===========================================
+# RECORDING RULES (Pré-calculs)
+# ===========================================
+
+  - name: lunar_generation_recordings
+    interval: 1m
+    rules:
+
+      # Coût horaire (sans caching)
+      - record: lunar:generation_cost_hourly_usd
+        expr: |
+          sum(rate(lunar_interpretation_generated_total{source="claude"}[1h])) * 3600 * 0.020
+
+      # Coût quotidien estimé (avec caching -90%)
+      - record: lunar:generation_cost_daily_usd_cached
+        expr: |
+          sum(increase(lunar_interpretation_generated_total{source="claude"}[24h])) * 0.002
+
+      # Cache hit rate (%)
+      - record: lunar:cache_hit_rate_percent
+        expr: |
+          (
+            sum(rate(lunar_interpretation_cache_hit_total[5m]))
+            /
+            sum(rate(lunar_interpretation_generated_total[5m]))
+          ) * 100
+
+      # Fallback rate (%)
+      - record: lunar:fallback_rate_percent
+        expr: |
+          (
+            sum(rate(lunar_interpretation_fallback_total[5m]))
+            /
+            sum(rate(lunar_interpretation_generated_total[5m]))
+          ) * 100
+
+      # P95 latency
+      - record: lunar:generation_latency_p95_seconds
+        expr: |
+          histogram_quantile(0.95,
+            rate(lunar_interpretation_duration_seconds_bucket{source="claude"}[5m])
+          )
+
+      # Générations par source (répartition)
+      - record: lunar:generation_by_source_rate
+        expr: |
+          sum by (source) (rate(lunar_interpretation_generated_total[5m]))
