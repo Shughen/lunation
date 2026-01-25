@@ -80,6 +80,8 @@ export default function LunarReportScreen() {
   const [report, setReport] = useState<LunarReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsGeneration, setNeedsGeneration] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [selectedAspect, setSelectedAspect] = useState<AspectV4 | null>(null);
   const [regenerating, setRegenerating] = useState(false);
 
@@ -91,6 +93,7 @@ export default function LunarReportScreen() {
     try {
       setLoading(true);
       setError(null);
+      setNeedsGeneration(false);
 
       // Si params.id existe, charger le rapport par ID, sinon charger le cycle courant
       const endpoint = params.id
@@ -102,7 +105,20 @@ export default function LunarReportScreen() {
     } catch (err: any) {
       console.error('[LunarReport] Erreur chargement rapport:', err);
       if (err.response?.status === 404) {
-        setError(params.id ? 'Cycle lunaire non trouvé' : 'Aucune révolution lunaire en cours');
+        const backendMessage = err.response?.data?.detail;
+        if (typeof backendMessage === 'string') {
+          // Détecter le cas spécifique : cycles non générés (message contient "generate")
+          if (backendMessage.toLowerCase().includes('generate')) {
+            setError('Tes cycles lunaires n\'ont pas encore été générés');
+            setNeedsGeneration(true);
+          } else {
+            setError(params.id ? 'Cycle lunaire non trouvé' : 'Aucune révolution lunaire en cours');
+            setNeedsGeneration(false);
+          }
+        } else {
+          setError(params.id ? 'Cycle lunaire non trouvé' : 'Aucune révolution lunaire en cours');
+          setNeedsGeneration(false);
+        }
       } else {
         // Utiliser le helper pour formater le message d'erreur
         const errorMessage = getHumanErrorMessage(err);
@@ -116,6 +132,31 @@ export default function LunarReportScreen() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Génère les cycles lunaires si non existants
+  const generateLunarCycles = async () => {
+    try {
+      setGenerating(true);
+      haptics.light();
+
+      console.log('[LunarReport] 🔄 Génération des cycles lunaires...');
+      await apiClient.post('/api/lunar-returns/generate');
+
+      console.log('[LunarReport] ✅ Cycles générés, rechargement du rapport...');
+      haptics.success();
+
+      // Recharger le rapport
+      await loadReport();
+    } catch (err: any) {
+      console.error('[LunarReport] ❌ Erreur génération cycles:', err);
+      haptics.error();
+
+      const errorMessage = getHumanErrorMessage(err);
+      setError(`Impossible de générer les cycles: ${errorMessage}`);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -301,10 +342,16 @@ export default function LunarReportScreen() {
     return symbols[type.toLowerCase()] || type;
   };
 
-  if (loading || regenerating) {
+  if (loading || regenerating || generating) {
     return (
       <LunarInterpretationLoader
-        message={regenerating ? "Régénération en cours..." : "Génération de ton interprétation lunaire..."}
+        message={
+          generating
+            ? "Génération de tes cycles lunaires..."
+            : regenerating
+            ? "Régénération en cours..."
+            : "Génération de ton interprétation lunaire..."
+        }
       />
     );
   }
@@ -315,6 +362,20 @@ export default function LunarReportScreen() {
         <Text style={styles.errorText}>
           {error || 'Rapport non disponible'}
         </Text>
+
+        {/* CTA pour générer les cycles lunaires si requis */}
+        {needsGeneration && (
+          <TouchableOpacity
+            style={[styles.errorButton, styles.primaryButton]}
+            onPress={generateLunarCycles}
+            disabled={generating}
+          >
+            <Text style={styles.errorButtonText}>
+              {generating ? 'Génération en cours...' : 'Générer mes cycles lunaires'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.errorActions}>
           <TouchableOpacity
             style={[styles.errorButton, styles.retryButton]}
@@ -429,6 +490,13 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: '#8B7BF7',
+  },
+  primaryButton: {
+    flex: 0,
+    backgroundColor: '#8B7BF7',
+    width: '100%',
+    maxWidth: 300,
+    marginBottom: 16,
   },
   header: {
     padding: 20,
