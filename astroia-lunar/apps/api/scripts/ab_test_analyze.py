@@ -27,13 +27,13 @@ from database import get_db
 async def get_paired_samples(sample_size: int) -> List[Dict[str, Any]]:
     """Récupérer paires Opus/Sonnet pour même lunar_return_id"""
 
+    # CORRECTION: Enlever ORDER BY RANDOM() du SELECT DISTINCT (incompatibilité PostgreSQL)
     query = """
     WITH sample_returns AS (
-        SELECT DISTINCT lunar_return_id
+        SELECT lunar_return_id
         FROM lunar_interpretations_ab_test
         GROUP BY lunar_return_id
-        HAVING COUNT(DISTINCT model_tested) >= 2  -- Au moins 2 modèles testés
-        ORDER BY RANDOM()
+        HAVING COUNT(DISTINCT model_tested) >= 2
         LIMIT :sample_size
     )
     SELECT

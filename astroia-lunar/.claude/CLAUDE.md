@@ -839,10 +839,37 @@ app/
 
 ## ⚠️ Règles Strictes
 
+### 🔐 Sécurité & Exécution (CRITIQUE)
+
+**Règle d'or : UNIQUEMENT les scripts `tools/`**
+- ✅ **AUTORISÉ** : Exécuter UNIQUEMENT les scripts dans `tools/` (allowlist MCP)
+- ❌ **INTERDIT** : Commandes shell arbitraires (npm, node, gradle, adb, etc.)
+- ❌ **INTERDIT** : Lire des fichiers hors du repo
+- ❌ **INTERDIT** : Modifier des fichiers systèmes
+
+**Scripts autorisés** :
+- `tools/build_android.sh` : Build & run Android (expo run:android)
+- `tools/run_tests_mobile.sh` : Tests + typecheck mobile
+- `tools/run_tests_api.sh` : Tests backend (pytest)
+- `tools/collect_logcat.sh` : Capture logcat Android
+- `tools/start_expo.sh` : Start Expo dev server
+
+**Workflow sécurisé** :
+1. Claude exécute un script `tools/*.sh` via MCP
+2. Le script sauvegarde la sortie dans `logs/*.log` avec timestamp
+3. Claude lit le fichier log pour analyser les erreurs
+4. Claude corrige le code et relance si nécessaire
+
+**Permissions** :
+- Configuration MCP : `--allowed-commands=tools/build_android.sh,tools/run_tests_mobile.sh,tools/run_tests_api.sh,tools/collect_logcat.sh,tools/start_expo.sh`
+- Permissions Claude Code : REFUSER "Bash(*)" global, ACCEPTER uniquement tool MCP `shell-safe`
+
 ### Sécurité & Secrets
 - ❌ **JAMAIS** modifier `.env`
 - ❌ **JAMAIS** afficher/commiter de secrets (API keys, tokens, passwords)
 - ❌ **JAMAIS** logger des données utilisateurs réelles
+- ❌ **JAMAIS** exécuter `printenv`, `env`, ou dumper l'environnement
+- ❌ **JAMAIS** lire des fichiers sensibles (`.env`, `*.key`, `secrets*`)
 
 ### Workflow Git
 - ✅ **Un changement = un commit** (atomicité)

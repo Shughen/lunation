@@ -22,6 +22,7 @@ import { AspectDetailSheet } from '../../components/AspectDetailSheet';
 import { Skeleton, SkeletonCard } from '../../components/Skeleton';
 import { AnimatedCard } from '../../components/AnimatedCard';
 import { MarkdownText } from '../../components/MarkdownText';
+import LunarInterpretationLoader from '../../components/LunarInterpretationLoader';
 import { showNetworkErrorAlert, getHumanErrorMessage } from '../../utils/errorHandler';
 import { translateZodiacSign, translateAstrologyText } from '../../utils/astrologyTranslations';
 import type { AspectV4 } from '../../types/api';
@@ -50,6 +51,7 @@ interface LunarReportMetadata {
 }
 
 interface LunarReport {
+  lunar_return_id: number;  // 🆕 ID pour régénération
   header: LunarReportHeader;
   general_climate: string;
   dominant_axes: string[];
@@ -79,6 +81,7 @@ export default function LunarReportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAspect, setSelectedAspect] = useState<AspectV4 | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -113,6 +116,48 @@ export default function LunarReportScreen() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🆕 Force la régénération de l'interprétation avec Claude Opus 4.5
+  const regenerateInterpretation = async () => {
+    if (!report?.lunar_return_id) {
+      console.error('[LunarReport] Impossible de régénérer : lunar_return_id manquant');
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      haptics.light();
+
+      console.log(`[LunarReport] 🔄 Régénération pour lunar_return_id=${report.lunar_return_id}...`);
+
+      const response = await apiClient.post('/api/lunar/interpretation/regenerate', {
+        lunar_return_id: report.lunar_return_id,
+        subject: 'full'
+      });
+
+      console.log('[LunarReport] ✅ Régénération réussie:', {
+        source: response.data.metadata?.source,
+        model: response.data.metadata?.model_used,
+      });
+
+      haptics.success();
+
+      // Recharger le rapport complet pour voir la nouvelle interprétation
+      await loadReport();
+    } catch (err: any) {
+      console.error('[LunarReport] ❌ Erreur régénération:', err);
+      haptics.error();
+
+      const errorMessage = getHumanErrorMessage(err);
+      showNetworkErrorAlert(
+        err,
+        () => regenerateInterpretation(),
+        `Impossible de régénérer l'interprétation. ${errorMessage}`
+      );
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -256,28 +301,11 @@ export default function LunarReportScreen() {
     return symbols[type.toLowerCase()] || type;
   };
 
-  if (loading) {
+  if (loading || regenerating) {
     return (
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButtonSmall}
-            onPress={() => router.back()}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-          >
-            <Text style={styles.backButtonText}>← Retour</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>Rapport Mensuel</Text>
-          <Text style={styles.subtitle}>Révolution Lunaire</Text>
-        </View>
-
-        <View style={{ margin: 16 }}>
-          <SkeletonCard style={{ marginBottom: 16 }} />
-          <SkeletonCard style={{ marginBottom: 16 }} />
-          <SkeletonCard style={{ marginBottom: 16 }} />
-        </View>
-      </ScrollView>
+      <LunarInterpretationLoader
+        message={regenerating ? "Régénération en cours..." : "Génération de ton interprétation lunaire..."}
+      />
     );
   }
 
@@ -333,6 +361,19 @@ export default function LunarReportScreen() {
               ? `📊 V${report.metadata.version} • Source: ${getSourceLabel(report.metadata.source)}${report.metadata.model_used ? ` • ${report.metadata.model_used}` : ''}`
               : '✨ Généré spécialement pour toi'}
           </Text>
+
+          {/* 🧪 Bouton régénération (DEV only) */}
+          {__DEV__ && report && (
+            <TouchableOpacity
+              style={styles.regenerateButton}
+              onPress={regenerateInterpretation}
+              disabled={regenerating}
+            >
+              <Text style={styles.regenerateButtonText}>
+                {regenerating ? '⏳ Régénération...' : '🔄 Régénérer l\'interprétation'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -576,5 +617,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#A0A0B0',
     textAlign: 'center',
+  },
+  regenerateButton: {
+    marginTop: 16,
+    backgroundColor: '#8B7BF7',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    minWidth: 250,
+    alignItems: 'center',
+  },
+  regenerateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

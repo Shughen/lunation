@@ -33,28 +33,36 @@ from config import settings
 async def create_ab_test_table():
     """Créer table temporaire pour stocker résultats A/B test"""
 
+    # Séparer les commandes SQL pour asyncpg
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS lunar_interpretations_ab_test (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id INTEGER NOT NULL,
         lunar_return_id INTEGER NOT NULL,
-        model_tested VARCHAR(50) NOT NULL,  -- 'opus' | 'sonnet'
+        model_tested VARCHAR(50) NOT NULL,
         output_text TEXT NOT NULL,
         weekly_advice JSONB,
         metadata JSONB,
         duration_seconds FLOAT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
+    )
+    """
 
+    create_index_model_sql = """
     CREATE INDEX IF NOT EXISTS idx_ab_test_model
-    ON lunar_interpretations_ab_test(model_tested);
+    ON lunar_interpretations_ab_test(model_tested)
+    """
 
+    create_index_lr_sql = """
     CREATE INDEX IF NOT EXISTS idx_ab_test_lunar_return
-    ON lunar_interpretations_ab_test(lunar_return_id);
+    ON lunar_interpretations_ab_test(lunar_return_id)
     """
 
     async for db in get_db():
+        # Exécuter chaque commande séparément
         await db.execute(text(create_table_sql))
+        await db.execute(text(create_index_model_sql))
+        await db.execute(text(create_index_lr_sql))
         await db.commit()
         print("✅ Table lunar_interpretations_ab_test créée/vérifiée")
         break

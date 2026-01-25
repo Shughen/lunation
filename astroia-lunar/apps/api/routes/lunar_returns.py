@@ -1381,8 +1381,9 @@ async def get_current_lunar_report(
                 detail="Aucune révolution lunaire disponible. Assurez-vous d'avoir créé votre thème natal via POST /api/natal-chart, puis utilisez POST /api/lunar-returns/generate pour générer les cycles."
             )
 
-        # 🔒 CRITIQUE : Extraire lunar_return.month IMMÉDIATEMENT pour éviter MissingGreenlet
+        # 🔒 CRITIQUE : Extraire lunar_return.id et lunar_return.month IMMÉDIATEMENT pour éviter MissingGreenlet
         # build_lunar_report_v4_async() fait des commits qui detachent lunar_return de la session
+        lunar_return_id = lunar_return.id
         lunar_return_month = lunar_return.month
 
         # 2. Construire le rapport via le builder (async avec support IA)
@@ -1409,6 +1410,7 @@ async def get_current_lunar_report(
 
         return {
             **report,
+            'lunar_return_id': lunar_return_id,  # 🆕 Ajouté pour permettre régénération
             'metadata': metadata
         }
 
@@ -1485,6 +1487,7 @@ async def get_lunar_report_by_id(
 
         return {
             **report,
+            'lunar_return_id': lunar_return_id,  # 🆕 Ajouté pour permettre régénération
             'metadata': metadata
         }
 
