@@ -11,7 +11,7 @@ Charger rapidement tout le contexte nécessaire pour travailler sur le domaine l
 - `apps/api/routes/lunar_returns.py` — Routes API lunar
 - `apps/api/services/lunar_returns_service.py` — Service principal
 - `apps/api/services/lunar_interpretation_generator.py` — Générateur IA
-- `apps/api/models/lunar.py` — Modèles SQLAlchemy lunar
+- `apps/api/models/lunar_return.py` — Modèle LunarReturn (faits astronomiques)
 - `apps/api/docs/LUNAR_ARCHITECTURE_V2.md` — Documentation architecture
 
 # Rôle
