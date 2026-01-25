@@ -6,6 +6,30 @@ Ce répertoire contient la documentation technique détaillée des fonctionnalit
 
 ---
 
+## 📚 Documentation Générale
+
+### Guides Essentiels
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture complète backend + mobile
+- **[SPRINTS_HISTORY.md](./SPRINTS_HISTORY.md)** - Historique détaillé Sprints 2-6
+- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Guide de dépannage complet
+- **[CHANGELOG.md](./CHANGELOG.md)** - Historique commits et décisions architecturales
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Conventions et best practices
+
+### Guides Production
+
+- **[DEPLOYMENT_PRODUCTION.md](./DEPLOYMENT_PRODUCTION.md)** - Guide déploiement production
+- **[PROMETHEUS_METRICS.md](./PROMETHEUS_METRICS.md)** - Monitoring production (6 métriques + 12 alertes)
+- **[AB_TESTING_GUIDE.md](./AB_TESTING_GUIDE.md)** - Méthodologie A/B testing
+
+### Guides Techniques Spécialisés
+
+- **[LUNAR_ARCHITECTURE_V2.md](./LUNAR_ARCHITECTURE_V2.md)** - Architecture V2 (4 couches)
+- **[API_LUNAR_V2.md](./API_LUNAR_V2.md)** - API utilisateur V2
+- **[MIGRATION_PLAN.md](./MIGRATION_PLAN.md)** - Plan migration V1→V2
+
+---
+
 ## Table des matières
 
 ### 1. Transits - Filtrage des aspects majeurs
@@ -272,6 +296,30 @@ Pour toute question sur cette documentation:
 ### 2024-12-29
 - ✅ Documentation Natal Interpretation V3 et V4
 
+### 2026-01-24
+- ✅ Réorganisation documentation complète
+- ✅ Ajout ARCHITECTURE.md (architecture backend + mobile)
+- ✅ Ajout SPRINTS_HISTORY.md (historique Sprints 2-6)
+- ✅ Ajout TROUBLESHOOTING.md (guide dépannage)
+- ✅ Ajout CHANGELOG.md (historique commits + décisions)
+- ✅ Ajout CONTRIBUTING.md (conventions + best practices)
+- ✅ Refonte CLAUDE.md (1706 → 184 lignes, -89%)
+
+### 2025-01-16
+- ✅ Ajout documentation complète filtrage major_only (3 fichiers)
+- ✅ Ajout script de validation test_major_only_flow.py
+- ✅ Création de ce README
+
+### 2025-01-15
+- ✅ Documentation VoC Cache optimizations
+- ✅ Tests unitaires VoC Cache
+
+### 2024-12-31
+- ✅ Documentation Aspect Explanations V4
+
+### 2024-12-29
+- ✅ Documentation Natal Interpretation V3 et V4
+
 ---
 
-**Dernière mise à jour:** 2025-01-16
+**Dernière mise à jour:** 2026-01-24
