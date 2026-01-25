@@ -93,6 +93,23 @@ class Settings(BaseSettings):
     LUNAR_INTERPRETATION_VERSION: int = Field(default=2, description="Version du prompt lunaire (1=templates 36 couches, 2=Opus 4.5 1728 combinaisons)")
     LUNAR_CLAUDE_MODEL: str = Field(default="opus", description="Modèle Claude pour génération lunaire: 'opus' (qualité max), 'sonnet' (équilibré), 'haiku' (rapide)")
 
+    # === SCHEDULER ALERTS ===
+    LUNAR_REFRESH_ALERT_THRESHOLD: float = Field(
+        default=0.20,
+        description="Seuil d'alerte taux d'échec refresh lunar returns (0-1, défaut: 0.20 = 20%)"
+    )
+
+    # === SCHEDULER BATCHING ===
+    LUNAR_REFRESH_WINDOW_START_DAYS: int = Field(
+        default=7,
+        description="Rafraîchir users dont la prochaine révolution lunaire est dans >= N jours (défaut: 7)"
+    )
+
+    LUNAR_REFRESH_WINDOW_END_DAYS: int = Field(
+        default=14,
+        description="Rafraîchir users dont la prochaine révolution lunaire est dans <= N jours (défaut: 14)"
+    )
+
     @model_validator(mode='before')
     @classmethod
     def strip_string_values(cls, data: Any) -> Any:

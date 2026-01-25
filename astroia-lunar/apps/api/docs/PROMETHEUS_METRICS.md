@@ -162,6 +162,86 @@ lunar_migration_info{version="2.0",templates_count="1728",migration_date="2026-0
 
 ---
 
+### 5. Scheduler - Lunar Returns Refresh
+
+#### `lunar_returns_refresh_total` (Counter)
+**Description** : Nombre total d'utilisateurs traités lors du refresh quotidien.
+
+**Labels** :
+- `status` : Statut (`success`, `failed`)
+
+**Exemple** :
+```promql
+lunar_returns_refresh_total{status="success"} 9.0
+lunar_returns_refresh_total{status="failed"} 1.0
+```
+
+**Queries utiles** :
+```promql
+# Taux de succès quotidien
+rate(lunar_returns_refresh_total{status="success"}[1d]) / rate(lunar_returns_refresh_total[1d]) * 100
+```
+
+---
+
+#### `lunar_returns_refresh_duration_seconds` (Histogram)
+**Description** : Durée du cycle de refresh quotidien.
+
+**Buckets** : `5, 10, 30, 60, 120, 300, 600` (5s → 10min)
+
+**Exemple** :
+```promql
+lunar_returns_refresh_duration_seconds_bucket{le="5.0"} 10.0
+lunar_returns_refresh_duration_seconds_sum 450.5
+lunar_returns_refresh_duration_seconds_count 10.0
+```
+
+**Queries utiles** :
+```promql
+# Durée moyenne
+lunar_returns_refresh_duration_seconds_sum / lunar_returns_refresh_duration_seconds_count
+
+# Alerte si durée > 5 min
+lunar_returns_refresh_duration_seconds_sum / lunar_returns_refresh_duration_seconds_count > 300
+```
+
+---
+
+#### `lunar_returns_refresh_failure_rate` (Gauge)
+**Description** : Taux d'échec du dernier refresh (0-1).
+
+**Exemple** :
+```promql
+lunar_returns_refresh_failure_rate 0.05
+```
+
+**Queries utiles** :
+```promql
+# Taux en %
+lunar_returns_refresh_failure_rate * 100
+
+# Alerte si > 20%
+lunar_returns_refresh_failure_rate > 0.20
+```
+
+---
+
+#### `lunar_returns_refresh_users_total` (Gauge)
+**Description** : Nombre total d'utilisateurs traités (dernier run).
+
+**Exemple** :
+```promql
+lunar_returns_refresh_users_total 15.0
+```
+
+**Queries utiles** :
+```promql
+# Évolution quotidienne
+lunar_returns_refresh_users_total
+```
+
+---
+
 ## 🛠️ Utilisation
 
 ### Tester endpoint localement
@@ -288,23 +368,64 @@ annotations:
   description: "Plus de 30 générations en cours. Vérifier si API Claude ralentit."
 ```
 
+### 5. Taux d'échec refresh élevé
+```yaml
+alert: LunarRefreshFailureRateHigh
+expr: lunar_returns_refresh_failure_rate > 0.20
+for: 10m
+annotations:
+  summary: "Taux d'échec refresh lunar returns élevé ({{$value | humanizePercentage}})"
+  description: "Le taux d'échec du refresh quotidien dépasse 20%. Vérifier logs ERROR 🚨 [ALERT]."
+```
+
+### 6. Refresh trop long
+```yaml
+alert: LunarRefreshDurationHigh
+expr: lunar_returns_refresh_duration_seconds_sum / lunar_returns_refresh_duration_seconds_count > 300
+for: 5m
+annotations:
+  summary: "Durée refresh lunar returns élevée ({{$value}}s)"
+  description: "Le refresh quotidien prend plus de 5 minutes. Optimiser ou scaler workers."
+```
+
+### 7. Aucun refresh depuis 2 jours
+```yaml
+alert: LunarRefreshStale
+expr: time() - timestamp(lunar_returns_refresh_users_total) > 2*24*3600
+for: 30m
+annotations:
+  summary: "Aucun refresh lunar returns depuis 2 jours"
+  description: "Le dernier refresh date de plus de 2 jours. Vérifier si le cron job est actif."
+```
+
 ---
 
 ## 🧪 Tests
 
 ### Tests unitaires
 ```bash
+# Tests endpoint /metrics
 pytest tests/test_metrics_endpoint.py -v
+
+# Tests système d'alerte scheduler
+pytest tests/test_scheduler_alerts.py -v
 ```
 
-**Coverage** : 11 tests
-- Endpoint existe
-- Retourne 200 OK
-- Content-Type correct
-- Métriques lunaires présentes
-- Métrique migration_info présente
-- Format Prometheus valide
-- Types de métriques corrects
+**Coverage** : 16 tests
+- **Endpoint /metrics** (11 tests) :
+  - Endpoint existe
+  - Retourne 200 OK
+  - Content-Type correct
+  - Métriques lunaires présentes
+  - Métrique migration_info présente
+  - Format Prometheus valide
+  - Types de métriques corrects
+- **Système d'alerte scheduler** (5 tests) :
+  - Requête SQL identifie users dans fenêtre
+  - Alerte déclenchée si taux échec > 20%
+  - Pas d'alerte si taux échec <= 20%
+  - Métriques Prometheus enregistrées
+  - Gestion cas limite total_users=0
 
 ---
 
@@ -317,6 +438,6 @@ pytest tests/test_metrics_endpoint.py -v
 
 ---
 
-**Dernière mise à jour** : 2026-01-23
-**Version** : 1.0 (Sprint 5 - Task 5.1)
-**Auteur** : Agent A (Vague 5)
+**Dernière mise à jour** : 2026-01-25
+**Version** : 1.1 (Sprint 6 - Système d'alerte + Cron quotidien)
+**Auteur** : Claude Opus 4.5
