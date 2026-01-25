@@ -64,9 +64,27 @@ export function getHumanErrorMessage(error: any): string {
     return 'Fonction indisponible en dev (API non activée).';
   }
 
-  // Erreur 404 (Not Found) - cas spécifique
+  // Erreur 404 (Not Found) - utiliser le message backend si disponible
   if (error.response?.status === 404) {
+    const backendDetail = error.response?.data?.detail;
+    // Si le backend a renvoyé un message string, l'utiliser
+    if (typeof backendDetail === 'string' && backendDetail.length > 0) {
+      return backendDetail;
+    }
     return 'Contenu non trouvé.';
+  }
+
+  // Erreur 409 (Conflict) - souvent "natal chart requis"
+  if (error.response?.status === 409) {
+    const backendDetail = error.response?.data?.detail;
+    // Si c'est un objet avec un champ detail, l'extraire
+    if (typeof backendDetail === 'object' && backendDetail?.detail) {
+      return backendDetail.detail;
+    }
+    if (typeof backendDetail === 'string' && backendDetail.length > 0) {
+      return backendDetail;
+    }
+    return 'Action impossible dans l\'état actuel.';
   }
 
   // Message générique pour autres erreurs

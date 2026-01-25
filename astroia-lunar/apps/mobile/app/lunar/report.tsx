@@ -84,6 +84,7 @@ export default function LunarReportScreen() {
   const [generating, setGenerating] = useState(false);
   const [selectedAspect, setSelectedAspect] = useState<AspectV4 | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [needsNatalChart, setNeedsNatalChart] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -94,6 +95,7 @@ export default function LunarReportScreen() {
       setLoading(true);
       setError(null);
       setNeedsGeneration(false);
+      setNeedsNatalChart(false);
 
       // Si params.id existe, charger le rapport par ID, sinon charger le cycle courant
       const endpoint = params.id
@@ -139,6 +141,7 @@ export default function LunarReportScreen() {
   const generateLunarCycles = async () => {
     try {
       setGenerating(true);
+      setNeedsNatalChart(false);
       haptics.light();
 
       console.log('[LunarReport] 🔄 Génération des cycles lunaires...');
@@ -153,8 +156,27 @@ export default function LunarReportScreen() {
       console.error('[LunarReport] ❌ Erreur génération cycles:', err);
       haptics.error();
 
-      const errorMessage = getHumanErrorMessage(err);
-      setError(`Impossible de générer les cycles: ${errorMessage}`);
+      // Détecter si le thème natal est requis (404 ou 409 avec message natal)
+      const status = err.response?.status;
+      const backendDetail = err.response?.data?.detail;
+      const detailStr = typeof backendDetail === 'string'
+        ? backendDetail
+        : backendDetail?.detail || '';
+
+      const isNatalRequired =
+        (status === 404 && detailStr.toLowerCase().includes('natal')) ||
+        (status === 409 && (
+          backendDetail?.error_code === 'NATAL_REQUIRED' ||
+          detailStr.toLowerCase().includes('natal')
+        ));
+
+      if (isNatalRequired) {
+        setError('Tu dois d\'abord créer ton thème natal pour générer tes cycles lunaires.');
+        setNeedsNatalChart(true);
+      } else {
+        const errorMessage = getHumanErrorMessage(err);
+        setError(`Impossible de générer les cycles: ${errorMessage}`);
+      }
     } finally {
       setGenerating(false);
     }
@@ -254,6 +276,12 @@ export default function LunarReportScreen() {
   };
 
   const renderAxes = () => {
+    // Ne pas afficher les axes statiques si on a une interprétation IA complète
+    // L'interprétation full couvre déjà les domaines de vie activés
+    if (report?.lunar_interpretation?.full) {
+      return null;
+    }
+
     if (!report || !report.dominant_axes || report.dominant_axes.length === 0) {
       return null;
     }
@@ -363,8 +391,20 @@ export default function LunarReportScreen() {
           {error || 'Rapport non disponible'}
         </Text>
 
-        {/* CTA pour générer les cycles lunaires si requis */}
-        {needsGeneration && (
+        {/* CTA pour créer le thème natal si requis */}
+        {needsNatalChart && (
+          <TouchableOpacity
+            style={[styles.errorButton, styles.primaryButton]}
+            onPress={() => router.push('/natal-chart')}
+          >
+            <Text style={styles.errorButtonText}>
+              Créer mon thème natal
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* CTA pour générer les cycles lunaires si requis (et natal chart existe) */}
+        {needsGeneration && !needsNatalChart && (
           <TouchableOpacity
             style={[styles.errorButton, styles.primaryButton]}
             onPress={generateLunarCycles}
