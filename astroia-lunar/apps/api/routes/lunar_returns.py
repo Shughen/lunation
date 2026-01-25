@@ -21,6 +21,7 @@ from services.ephemeris import ephemeris_client, EphemerisAPIKeyError
 from services.interpretations import generate_lunar_return_interpretation
 from utils.natal_chart_helpers import extract_moon_data_from_positions
 from services.swiss_ephemeris import find_lunar_return, get_moon_position, SWISS_EPHEMERIS_AVAILABLE
+from services.lunar_returns_service import generate_lunar_returns_for_user
 from config import settings
 import os
 
@@ -814,158 +815,26 @@ async def generate_lunar_returns(
     )
 
     try:
-        # Vérifier que le thème natal existe (utiliser user_id INTEGER)
-        result = await db.execute(
-            select(NatalChart).where(NatalChart.user_id == user_id)
+        # Appeler le service pour générer les lunar returns
+        result = await generate_lunar_returns_for_user(
+            user_id=user_id,
+            db=db,
+            force_regenerate=True  # Supprimer tous les retours existants avant régénération
         )
-        natal_chart = result.scalar_one_or_none()
 
-        if not natal_chart:
-            logger.warning(
-                f"[corr={correlation_id}] ❌ Thème natal manquant pour user_id={user_id}"
-            )
-            detail = {
-                "detail": "Thème natal manquant. Calculez-le d'abord via POST /api/natal-chart",
-                "correlation_id": correlation_id,
-                "step": "fetch_natal_chart",
-            }
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=detail,
-            )
-
+        # Commit après génération réussie
+        await db.commit()
         logger.info(
-            f"[corr={correlation_id}] ✅ Thème natal trouvé - natal_chart_id={natal_chart.id}"
+            f"[corr={correlation_id}] ✅ Commit DB - {result['generated_count']} révolution(s) générée(s)"
         )
 
-        # Fallback vers raw_data si positions est NULL (pour compatibilité avec anciens enregistrements)
-        positions = natal_chart.positions
-        if not positions and hasattr(natal_chart, 'raw_data') and natal_chart.raw_data:
-            positions = natal_chart.raw_data
-        positions = positions or {}
-
-        # Les données de naissance sont stockées dans natal_charts (latitude, longitude, timezone)
-        # 🔒 CRITIQUE: Extraire primitives IMMÉDIATEMENT pour éviter MissingGreenlet
-        birth_latitude_raw = natal_chart.latitude
-        birth_longitude_raw = natal_chart.longitude
-        birth_timezone_raw = natal_chart.timezone
-
-        logger.debug(
-            f"[corr={correlation_id}] 📍 Récupération coordonnées depuis natal_chart: "
-            f"birth_latitude={birth_latitude_raw}, "
-            f"birth_longitude={birth_longitude_raw}, "
-            f"birth_timezone={birth_timezone_raw}"
-        )
-
-        birth_latitude = None
-        birth_longitude = None
-        birth_timezone = None
-
-        if birth_latitude_raw:
-            try:
-                birth_latitude = float(birth_latitude_raw)
-            except (ValueError, TypeError):
-                logger.warning(
-                    f"[corr={correlation_id}] ⚠️ birth_latitude invalide: {birth_latitude_raw}"
-                )
-
-        if birth_longitude_raw:
-            try:
-                birth_longitude = float(birth_longitude_raw)
-            except (ValueError, TypeError):
-                logger.warning(
-                    f"[corr={correlation_id}] ⚠️ birth_longitude invalide: {birth_longitude_raw}"
-                )
-
-        if birth_timezone_raw:
-            birth_timezone = str(birth_timezone_raw)
-
-        if birth_latitude is None or birth_longitude is None or not birth_timezone:
-            logger.warning(
-                f"[corr={correlation_id}] ❌ Coordonnées de naissance manquantes - "
-                f"lat={birth_latitude}, lon={birth_longitude}, tz={birth_timezone}"
-            )
-            detail = {
-                "detail": "Coordonnées de naissance manquantes. Veuillez recalculer le thème natal.",
-                "correlation_id": correlation_id,
-                "step": "resolve_birth_coordinates",
-            }
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=detail,
-            )
-
-        # Extraire position natale de la Lune depuis positions JSONB
-        # Fallback sur colonnes legacy (planets JSON) si positions n'existe pas (compatibilité)
-        logger.debug(
-            f"[corr={correlation_id}] 📊 Extraction données Lune depuis positions JSONB "
-            f"(présent: {bool(positions)})"
-        )
-
-        moon_data_extracted = extract_moon_data_from_positions(positions)
-
-        # Fallback sur colonnes legacy si positions.moon n'a pas de degree
-        if not moon_data_extracted.get("degree"):
-            # Essayer depuis positions.planets si disponible
-            if positions and isinstance(positions, dict):
-                raw_planets = positions.get("planets", {})
-                moon_data_legacy = raw_planets.get("Moon", {}) if isinstance(raw_planets, dict) else {}
-                if moon_data_legacy:
-                    logger.debug(
-                        f"[corr={correlation_id}] 🔄 Fallback sur positions.planets (legacy format)"
-                    )
-                    moon_data_extracted["degree"] = moon_data_legacy.get("degree", 0)
-                    moon_data_extracted["sign"] = (
-                        moon_data_extracted.get("sign") or moon_data_legacy.get("sign")
-                    )
-            
-            # Si toujours pas de données, essayer depuis colonnes legacy directes (planets JSON)
-            if not moon_data_extracted.get("degree") and hasattr(natal_chart, 'planets') and natal_chart.planets:
-                logger.debug(
-                    f"[corr={correlation_id}] 🔄 Fallback sur colonne legacy planets (JSON)"
-                )
-                if isinstance(natal_chart.planets, dict):
-                    moon_data_legacy = natal_chart.planets.get("Moon", {})
-                    if moon_data_legacy:
-                        moon_data_extracted["degree"] = moon_data_legacy.get("degree", 0)
-                        moon_data_extracted["sign"] = (
-                            moon_data_extracted.get("sign") or moon_data_legacy.get("sign")
-                        )
-
-        natal_moon_degree = moon_data_extracted.get("degree", 0)
-        natal_moon_sign = moon_data_extracted.get("sign")
-
-        if not natal_moon_sign:
-            logger.error(
-                f"[corr={correlation_id}] ❌ Données Lune incomplètes - "
-                f"degree={natal_moon_degree}, sign={natal_moon_sign}"
-            )
-            detail = {
-                "detail": "Données de la Lune manquantes dans le thème natal. Veuillez recalculer le thème natal.",
-                "correlation_id": correlation_id,
-                "step": "extract_moon_data",
-            }
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=detail,
-            )
-
-        logger.info(
-            f"[corr={correlation_id}] ✅ Lune natale extraite - "
-            f"sign={natal_moon_sign}, degree={natal_moon_degree}"
-        )
-
-        # Générer 12 retours glissants à partir de maintenant (rolling 12 months)
-        # Cela garantit qu'il y aura toujours un retour à venir pour /next
+        # Calculer start_date et end_date pour la réponse (rolling 12 mois)
         now = datetime.now(timezone.utc)
         months = _compute_rolling_months(now)
-        
-        # Calculer start_date et end_date pour la vérification post-insert
-        # (début du premier mois et début du 13ème mois)
         first_month = months[0]
         year, month_num = map(int, first_month.split('-'))
         start_date = datetime(year, month_num, 1, tzinfo=timezone.utc)
-        
+
         # Calculer end_date : début du 13ème mois (après les 12 mois)
         end_year = year
         end_month = month_num + 12
@@ -973,98 +842,19 @@ async def generate_lunar_returns(
             end_month -= 12
             end_year += 1
         end_date = datetime(end_year, end_month, 1, tzinfo=timezone.utc)
-        
-        logger.info(
-            f"[corr={correlation_id}] 📅 Génération rolling 12 mois glissants à partir de {now.strftime('%Y-%m-%d')} - "
-            f"mois: {months[0]} à {months[-1]} ({len(months)} mois), "
-            f"période: {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}"
-        )
-
-        # Générer les retours via service centralisé (supprime les existants avant)
-        try:
-            generated_count = await _generate_rolling_returns(
-                db=db,
-                user_id=user_id,
-                correlation_id=correlation_id,
-                months=months,
-                natal_moon_degree=natal_moon_degree,
-                natal_moon_sign=natal_moon_sign,
-                birth_latitude=birth_latitude,
-                birth_longitude=birth_longitude,
-                birth_timezone=birth_timezone,
-                delete_existing=True  # Supprimer tous les retours existants avant régénération
-            )
-        except HTTPException:
-            # Re-raise HTTPException (ex: EphemerisAPIKeyError)
-            raise
-
-        try:
-            await db.commit()
-            logger.info(
-                f"[corr={correlation_id}] ✅ Commit DB - {generated_count} révolution(s) générée(s)"
-            )
-        except Exception as commit_error:
-            # Erreur spécifique au commit (probablement problème de schéma DB)
-            logger.error(
-                f"[corr={correlation_id}] ❌ ERREUR AU COMMIT DB: {type(commit_error).__name__}: {commit_error}",
-                exc_info=True,
-            )
-            
-            # Rollback pour éviter de laisser la session dans un état invalide
-            await db.rollback()
-            
-            # Lever une HTTPException avec détails
-            detail = {
-                "detail": f"Erreur lors de la sauvegarde en base de données: {str(commit_error)}",
-                "correlation_id": correlation_id,
-                "step": "db_commit",
-                "error_type": type(commit_error).__name__,
-            }
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=detail,
-            ) from commit_error
-
-        # Vérification post-insert : compter les retours dans la période rolling
-        try:
-            count_result = await db.execute(
-                select(LunarReturn).where(
-                    LunarReturn.user_id == user_id,
-                    LunarReturn.return_date >= start_date,
-                    LunarReturn.return_date < end_date
-                )
-            )
-            actual_count = len(extract_scalars_all(count_result))
-            
-            if actual_count != 12:
-                logger.warning(
-                    f"[corr={correlation_id}] ⚠️ Vérification post-insert: "
-                    f"attendu 12 retours, trouvé {actual_count} dans la période rolling "
-                    f"({start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')})"
-                )
-            else:
-                logger.info(
-                    f"[corr={correlation_id}] ✅ Vérification post-insert: "
-                    f"{actual_count} retours confirmés dans la période rolling"
-                )
-        except Exception as count_error:
-            logger.warning(
-                f"[corr={correlation_id}] ⚠️ Erreur lors de la vérification post-insert: {count_error}"
-            )
-            # Ne pas faire échouer la requête si la vérification échoue
 
         return {
-            "message": f"{generated_count} révolution(s) lunaire(s) générée(s)",
+            "message": f"{result['generated_count']} révolution(s) lunaire(s) générée(s)",
             "mode": "rolling",
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
             "months_count": len(months),
-            "generated_count": generated_count,
+            "generated_count": result['generated_count'],
             "correlation_id": correlation_id,
         }
 
     except HTTPException:
-        # On laisse passer les HTTPException déjà formatées (elles contiennent le correlation_id)
+        # On laisse passer les HTTPException déjà formatées (du service)
         raise
     except Exception as e:
         # Toute autre erreur non gérée doit renvoyer une réponse JSON claire
