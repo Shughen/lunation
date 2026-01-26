@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 
 interface LunarInterpretationLoaderProps {
@@ -17,8 +17,17 @@ export default function LunarInterpretationLoader({
   // Animation pour la barre de progression (sans native driver pour width)
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // Animation pour les points de chargement (...)
-  const dotsAnim = useRef(new Animated.Value(0)).current;
+  // State pour les points de chargement (...)
+  const [dotsCount, setDotsCount] = useState(0);
+
+  useEffect(() => {
+    // Animation des points via interval (plus simple et fiable)
+    const dotsInterval = setInterval(() => {
+      setDotsCount((prev) => (prev + 1) % 4);
+    }, 500);
+
+    return () => clearInterval(dotsInterval);
+  }, []);
 
   useEffect(() => {
     // Rotation du sablier (flip toutes les 2 secondes)
@@ -77,31 +86,6 @@ export default function LunarInterpretationLoader({
       ])
     ).start();
 
-    // Animation des points (...)
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(dotsAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotsAnim, {
-          toValue: 2,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotsAnim, {
-          toValue: 3,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotsAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
   const rotate = rotateAnim.interpolate({
@@ -121,8 +105,7 @@ export default function LunarInterpretationLoader({
 
   // Affichage conditionnel des points
   const getDots = () => {
-    const numDots = Math.floor(dotsAnim._value);
-    return '.'.repeat(numDots);
+    return '.'.repeat(dotsCount);
   };
 
   return (
@@ -183,9 +166,9 @@ export default function LunarInterpretationLoader({
       {/* Message de chargement */}
       <View style={styles.textContainer}>
         <Text style={styles.mainText}>{message}</Text>
-        <Animated.Text style={styles.dotsText}>
+        <Text style={styles.dotsText}>
           {getDots()}
-        </Animated.Text>
+        </Text>
       </View>
 
       {/* Barre de progression indéterminée */}

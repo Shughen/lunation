@@ -132,8 +132,8 @@ export function DailyRitualCard() {
 
   const handleCtaPress = () => {
     haptics.light();
-    // Navigation vers le rapport mensuel de révolution lunaire
-    router.push('/lunar/report');
+    // Navigation vers le hub lunaire avec focus sur le climat du jour
+    router.push('/lunar?focus=daily_climate');
   };
 
   const handleJournalPress = () => {
