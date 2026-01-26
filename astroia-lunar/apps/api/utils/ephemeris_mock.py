@@ -20,6 +20,11 @@ try:
         get_moon_longitude,
         get_sun_longitude,
         degree_to_sign,
+        calculate_houses,
+        get_ascendant,
+        get_planet_house,
+        get_all_planet_positions,
+        calculate_all_aspects,
         SWISS_EPHEMERIS_AVAILABLE as SWE_AVAILABLE
     )
     SWISS_EPHEMERIS_AVAILABLE = SWE_AVAILABLE
@@ -132,9 +137,9 @@ def generate_mock_natal_chart(
         },
         "aspects": [
             {
-                "from_planet": "Sun",
-                "to_planet": "Moon",
-                "aspect_type": "trine",
+                "planet1": "Sun",
+                "planet2": "Moon",
+                "type": "trine",
                 "orb": round(abs(sun_longitude - moon_longitude) % 120, 2)
             }
         ]
@@ -167,7 +172,7 @@ def generate_mock_lunar_return(
         Structure similaire à l'API Ephemeris avec données minimales
     """
     year, month = map(int, target_month.split("-"))
-    
+
     # Calculer la longitude écliptique natale complète (0-360°)
     # Si natal_moon_degree est déjà une longitude absolue (> 30), l'utiliser directement
     # Sinon, calculer depuis le signe et le degré dans le signe
@@ -183,24 +188,24 @@ def generate_mock_lunar_return(
             f"Calcul longitude depuis signe: {natal_moon_sign} ({sign_index}) + "
             f"degre={natal_moon_degree} = {natal_moon_longitude:.2f}°"
         )
-    
-    # Date de départ pour la recherche (milieu du mois)
-    search_start = datetime(year, month, 15, 12, 0, 0, tzinfo=dt_timezone.utc)
+
+    # Date de départ pour la recherche (DÉBUT du mois pour couvrir tout le mois)
+    search_start = datetime(year, month, 1, 0, 0, 0, tzinfo=dt_timezone.utc)
     
     if SWISS_EPHEMERIS_AVAILABLE:
-        # Calcul réel du Lunar Return
+        # Calcul réel du Lunar Return avec Swiss Ephemeris
         logger.info(
             f"🎭 MODE MOCK DEV - Calcul réel Lunar Return pour {target_month} "
             f"(λ_natal={natal_moon_longitude:.2f}°)"
         )
-        
+
         return_dt = find_lunar_return(
             natal_moon_longitude=natal_moon_longitude,
             start_dt=search_start,
-            search_window_hours=48,
+            search_window_hours=744,  # 31 jours pour couvrir tout le mois
             tolerance_seconds=60
         )
-        
+
         if return_dt is None:
             # Fallback si la recherche échoue
             logger.warning(
@@ -212,18 +217,51 @@ def generate_mock_lunar_return(
             logger.info(
                 f"✅ Lunar Return calculé: {return_dt.isoformat()}"
             )
-        
-        # Calculer les positions à ce moment
+
+        # Calculer les positions planétaires à ce moment
         moon_pos = get_moon_position(return_dt)
         sun_pos = get_sun_position(return_dt)
-        
-        # Ascendant approximatif (basé sur l'heure)
-        ascendant_sign_index = return_dt.hour % len(_ASCENDANT_SIGNS)
-        ascendant_sign = _ASCENDANT_SIGNS[ascendant_sign_index]
-        
-        # Maison de la Lune (1-12, approximatif basé sur l'heure)
-        moon_house = (return_dt.hour % 12) + 1
-        
+
+        # Initialiser les variables avec valeurs par défaut
+        ascendant_degree = 10.5
+        all_planets = {}
+        all_aspects = []
+
+        # Calculer l'Ascendant RÉEL avec Swiss Ephemeris
+        asc_data = get_ascendant(return_dt, birth_latitude, birth_longitude)
+        if asc_data:
+            ascendant_sign = asc_data["sign"]
+            ascendant_degree = asc_data["degree"]
+            logger.info(f"✅ Ascendant calculé: {ascendant_sign} {ascendant_degree:.1f}°")
+        else:
+            # Fallback si échec
+            ascendant_sign_index = return_dt.hour % len(_ASCENDANT_SIGNS)
+            ascendant_sign = _ASCENDANT_SIGNS[ascendant_sign_index]
+            logger.warning(f"⚠️ Fallback Ascendant: {ascendant_sign}")
+
+        # Calculer les maisons RÉELLES avec Swiss Ephemeris
+        houses_data = calculate_houses(return_dt, birth_latitude, birth_longitude)
+        if houses_data:
+            # Calculer la maison de la Lune
+            moon_house = get_planet_house(moon_pos.longitude, houses_data.cusps)
+            logger.info(f"✅ Lune en Maison {moon_house}")
+        else:
+            moon_house = (return_dt.hour % 12) + 1
+            logger.warning(f"⚠️ Fallback Maison Lune: {moon_house}")
+
+        # Calculer TOUTES les positions planétaires
+        all_planets = get_all_planet_positions(return_dt)
+
+        # Ajouter les maisons aux planètes si on a les cusps
+        if houses_data:
+            for planet_name, planet_data in all_planets.items():
+                planet_data["house"] = get_planet_house(planet_data["longitude"], houses_data.cusps)
+
+        # Calculer les ASPECTS RÉELS
+        planet_longitudes = {name: data["longitude"] for name, data in all_planets.items()}
+        all_aspects = calculate_all_aspects(planet_longitudes, orb=8.0)
+        logger.info(f"✅ {len(all_aspects)} aspects calculés")
+
         return_datetime_str = return_dt.isoformat()
         
     else:
@@ -284,42 +322,57 @@ def generate_mock_lunar_return(
         moon_pos = None
         sun_pos = None
     
-    # Construire la réponse
-    result = {
-        "return_datetime": return_datetime_str,
-        "ascendant": {
-            "sign": ascendant_sign,
-            "degree": 10.5
-        },
-        "moon": {
-            "sign": moon_pos.sign if moon_pos else natal_moon_sign,
-            "degree": moon_pos.degree if moon_pos else natal_moon_degree,
-            "house": moon_house
-        },
-        "planets": {
-            "Moon": {
-                "sign": moon_pos.sign if moon_pos else natal_moon_sign,
-                "degree": moon_pos.degree if moon_pos else natal_moon_degree
+    # Construire la réponse avec données Swiss Ephemeris si disponibles
+    if SWISS_EPHEMERIS_AVAILABLE and moon_pos:
+        # Données complètes calculées (variables initialisées plus haut)
+        result = {
+            "return_datetime": return_datetime_str,
+            "ascendant": {
+                "sign": ascendant_sign,
+                "degree": ascendant_degree
             },
-        },
-        "houses": {
-            "1": {"sign": ascendant_sign, "degree": 10.5},
-        },
-        "aspects": [
-            {
-                "from_planet": "Moon",
-                "to_planet": "Sun",
-                "aspect_type": "trine",
-                "orb": 2.5
-            }
-        ]
-    }
-    
-    if sun_pos:
-        result["planets"]["Sun"] = {
-            "sign": sun_pos.sign,
-            "degree": sun_pos.degree
+            "moon": {
+                "sign": moon_pos.sign,
+                "degree": moon_pos.degree,
+                "house": moon_house,
+                "longitude": moon_pos.longitude
+            },
+            "planets": all_planets if all_planets else {
+                "Moon": {"sign": moon_pos.sign, "degree": moon_pos.degree},
+                "Sun": {"sign": sun_pos.sign, "degree": sun_pos.degree} if sun_pos else {}
+            },
+            "houses": {},
+            "aspects": all_aspects
         }
-    
+
+        # Ajouter les cusps des maisons si disponibles
+        if houses_data:
+            for i, cusp in enumerate(houses_data.cusps):
+                result["houses"][str(i + 1)] = {
+                    "cusp": round(cusp, 2),
+                    "sign": degree_to_sign(cusp)
+                }
+    else:
+        # Fallback placeholder
+        result = {
+            "return_datetime": return_datetime_str,
+            "ascendant": {
+                "sign": ascendant_sign,
+                "degree": 10.5
+            },
+            "moon": {
+                "sign": natal_moon_sign,
+                "degree": natal_moon_degree,
+                "house": moon_house
+            },
+            "planets": {
+                "Moon": {"sign": natal_moon_sign, "degree": natal_moon_degree},
+            },
+            "houses": {
+                "1": {"sign": ascendant_sign, "degree": 10.5},
+            },
+            "aspects": []
+        }
+
     return result
 

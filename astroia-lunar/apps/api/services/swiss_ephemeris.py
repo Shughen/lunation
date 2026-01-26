@@ -356,20 +356,30 @@ def find_lunar_return(
         jd = datetime_to_julian_day(current_dt)
         moon_lon = get_moon_longitude(jd)
         diff = angle_diff_signed(moon_lon, natal_lon)
-        
-        # Chercher un changement de signe (passage par 0)
+
+        # Chercher un changement de signe (passage par 0) avec diff < 30°
+        # Éviter les faux positifs quand on traverse ±180°
         if prev_diff is not None:
-            # Si on passe de négatif à positif ou vice versa, on a trouvé un bracket
-            if (prev_diff < 0 and diff >= 0) or (prev_diff > 0 and diff <= 0):
+            # Crossing bidirectionnel : la Lune peut traverser la position natale
+            # dans les deux sens selon sa vitesse et direction
+            # - prev_diff < 0 <= diff : passage de négatif à positif (approche depuis "avant")
+            # - prev_diff > 0 >= diff : passage de positif à négatif (approche depuis "après")
+            # Guard : abs(diff) < 30 pour éviter les faux positifs du saut ±180°
+            crossing_up = (prev_diff < 0 and diff >= 0)
+            crossing_down = (prev_diff > 0 and diff <= 0)
+            small_diffs = abs(prev_diff) < 30 and abs(diff) < 30
+
+            if (crossing_up or crossing_down) and small_diffs:
                 bracket_start = current_dt - timedelta(minutes=step_minutes)
                 bracket_end = current_dt
+                direction = "↑" if crossing_up else "↓"
                 logger.info(
-                    f"[LunarReturn] Bracket trouvé: "
+                    f"[LunarReturn] Bracket trouvé {direction}: "
                     f"{bracket_start.isoformat()} (diff={prev_diff:.4f}°) → "
                     f"{bracket_end.isoformat()} (diff={diff:.4f}°)"
                 )
                 break
-        
+
         prev_diff = diff
         current_dt += timedelta(minutes=step_minutes)
     
@@ -694,6 +704,236 @@ def get_lunar_mansion(moon_longitude: float) -> Dict[str, Any]:
         "degree_start": round(degree_start, 2),
         "degree_end": round(degree_end, 2)
     }
+
+
+# Named tuple for house calculations
+HouseData = namedtuple('HouseData', ['cusps', 'ascendant', 'mc', 'armc', 'vertex'])
+
+
+def calculate_houses(dt: datetime, latitude: float, longitude: float, house_system: str = 'P') -> Optional[HouseData]:
+    """
+    Calculate house cusps and angles (Ascendant, MC, etc.) for a given time and location.
+
+    Args:
+        dt: datetime (UTC)
+        latitude: Geographic latitude (-90 to +90)
+        longitude: Geographic longitude (-180 to +180)
+        house_system: House system code (default 'P' = Placidus)
+            - 'P' = Placidus
+            - 'K' = Koch
+            - 'R' = Regiomontanus
+            - 'E' = Equal
+            - 'W' = Whole Sign
+
+    Returns:
+        HouseData with:
+            - cusps: list of 12 house cusp degrees (house 1-12)
+            - ascendant: Ascendant degree (0-360)
+            - mc: Midheaven (MC) degree (0-360)
+            - armc: ARMC (sidereal time) in degrees
+            - vertex: Vertex degree (0-360)
+        Returns None if Swiss Ephemeris not available
+    """
+    if not SWISS_EPHEMERIS_AVAILABLE:
+        logger.warning("[Houses] Swiss Ephemeris non disponible")
+        return None
+
+    jd = datetime_to_julian_day(dt)
+
+    # swe.houses returns: (cusps_tuple, ascmc_tuple)
+    # cusps_tuple: 12 elements (index 0 = house 1/Asc, index 1 = house 2, ... index 11 = house 12)
+    # ascmc_tuple: 10 elements (0=Asc, 1=MC, 2=ARMC, 3=Vertex, 4=Equatorial Asc, etc.)
+    try:
+        cusps, ascmc = swe.houses(jd, latitude, longitude, house_system.encode('ascii'))
+
+        # Extract all 12 house cusps (indices 0-11)
+        house_cusps = list(cusps)
+
+        return HouseData(
+            cusps=house_cusps,
+            ascendant=ascmc[0],
+            mc=ascmc[1],
+            armc=ascmc[2],
+            vertex=ascmc[3]
+        )
+    except Exception as e:
+        logger.error(f"[Houses] Erreur calcul maisons: {e}")
+        return None
+
+
+def get_ascendant(dt: datetime, latitude: float, longitude: float) -> Optional[Dict[str, Any]]:
+    """
+    Get Ascendant sign and degree for a given time and location.
+
+    Args:
+        dt: datetime (UTC)
+        latitude: Geographic latitude
+        longitude: Geographic longitude
+
+    Returns:
+        {"sign": "Aries", "degree": 15.5, "absolute_longitude": 15.5} or None
+    """
+    houses = calculate_houses(dt, latitude, longitude)
+    if not houses:
+        return None
+
+    asc_lon = houses.ascendant
+    sign = degree_to_sign(asc_lon)
+    degree_in_sign = asc_lon % 30
+
+    return {
+        "sign": sign,
+        "degree": round(degree_in_sign, 2),
+        "absolute_longitude": round(asc_lon, 2)
+    }
+
+
+def get_planet_house(planet_longitude: float, house_cusps: List[float]) -> int:
+    """
+    Determine which house a planet is in based on its longitude and house cusps.
+
+    Args:
+        planet_longitude: Planet's ecliptic longitude (0-360)
+        house_cusps: List of 12 house cusp degrees (index 0 = house 1, index 11 = house 12)
+
+    Returns:
+        House number (1-12)
+    """
+    if not house_cusps or len(house_cusps) < 12:
+        logger.warning(f"[Houses] Invalid house cusps: {len(house_cusps) if house_cusps else 0} elements")
+        return 1
+
+    lon = normalize_angle_360(planet_longitude)
+
+    for i in range(12):
+        cusp_start = house_cusps[i]
+        cusp_end = house_cusps[(i + 1) % 12]
+
+        # Handle wrap-around (when cusp_end < cusp_start, house spans 0°)
+        if cusp_end < cusp_start:
+            if lon >= cusp_start or lon < cusp_end:
+                return i + 1
+        else:
+            if cusp_start <= lon < cusp_end:
+                return i + 1
+
+    # Fallback (shouldn't happen with valid data)
+    return 1
+
+
+def calculate_all_aspects(
+    planet_positions: Dict[str, float],
+    orb: float = 8.0
+) -> List[Dict[str, Any]]:
+    """
+    Calculate all aspects between planets.
+
+    Args:
+        planet_positions: Dict of planet name -> ecliptic longitude
+            e.g., {"Moon": 45.5, "Sun": 120.3, "Mercury": 100.2}
+        orb: Maximum orb for aspects (default 8°)
+
+    Returns:
+        List of aspects:
+        [
+            {
+                "planet1": "Moon",
+                "planet2": "Mercury",
+                "type": "square",
+                "orb": 2.5,
+                "applying": True
+            },
+            ...
+        ]
+    """
+    aspects = []
+    planets = list(planet_positions.keys())
+
+    # Define aspect types with their angles
+    aspect_types = {
+        'conjunction': 0,
+        'sextile': 60,
+        'square': 90,
+        'trine': 120,
+        'opposition': 180,
+    }
+
+    # Check all pairs
+    for i, p1 in enumerate(planets):
+        for p2 in planets[i + 1:]:
+            lon1 = planet_positions[p1]
+            lon2 = planet_positions[p2]
+
+            # Calculate angular distance
+            diff = abs(lon1 - lon2)
+            if diff > 180:
+                diff = 360 - diff
+
+            # Check against each aspect type
+            for aspect_name, aspect_angle in aspect_types.items():
+                aspect_orb = abs(diff - aspect_angle)
+                if aspect_orb <= orb:
+                    aspects.append({
+                        "planet1": p1,
+                        "planet2": p2,
+                        "type": aspect_name,
+                        "orb": round(aspect_orb, 2)
+                    })
+                    break  # Only one aspect per pair
+
+    return aspects
+
+
+def get_all_planet_positions(dt: datetime) -> Dict[str, Dict[str, Any]]:
+    """
+    Get positions of all major planets at a given time.
+
+    Args:
+        dt: datetime (UTC)
+
+    Returns:
+        Dict of planet positions:
+        {
+            "Sun": {"longitude": 120.5, "sign": "Leo", "degree": 0.5},
+            "Moon": {"longitude": 45.2, "sign": "Taurus", "degree": 15.2},
+            ...
+        }
+    """
+    if not SWISS_EPHEMERIS_AVAILABLE:
+        return {}
+
+    jd = datetime_to_julian_day(dt)
+
+    planets = [
+        (swe.SUN, "Sun"),
+        (swe.MOON, "Moon"),
+        (swe.MERCURY, "Mercury"),
+        (swe.VENUS, "Venus"),
+        (swe.MARS, "Mars"),
+        (swe.JUPITER, "Jupiter"),
+        (swe.SATURN, "Saturn"),
+        (swe.URANUS, "Uranus"),
+        (swe.NEPTUNE, "Neptune"),
+        (swe.PLUTO, "Pluto"),
+    ]
+
+    positions = {}
+    for planet_id, planet_name in planets:
+        try:
+            result = swe.calc_ut(jd, planet_id, swe.FLG_SWIEPH)
+            lon = result[0][0]
+            sign = degree_to_sign(lon)
+            degree_in_sign = lon % 30
+
+            positions[planet_name] = {
+                "longitude": round(lon, 2),
+                "sign": sign,
+                "degree": round(degree_in_sign, 2)
+            }
+        except Exception as e:
+            logger.warning(f"[Planets] Erreur calcul {planet_name}: {e}")
+
+    return positions
 
 
 # Cache for performance (optional)

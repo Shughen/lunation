@@ -116,9 +116,9 @@ class EphemerisClient:
     ) -> Dict[str, Any]:
         """
         Calcule la révolution lunaire pour un mois donné
-        
+
         La révolution lunaire = moment où la Lune revient à sa position natale
-        
+
         Returns:
             {
                 "return_datetime": "2025-11-15T14:32:00",
@@ -127,25 +127,26 @@ class EphemerisClient:
                 "aspects": [ ... ],
                 "planets": { ... }
             }
-        
+
         Raises:
             EphemerisAPIKeyError: Si la clé API n'est pas configurée et mock mode désactivé
         """
-        # Vérifier la clé API
+        # PRIORITÉ au mock si DEV_MOCK_EPHEMERIS=True (calcul Swiss Ephemeris local)
+        if self.mock_mode:
+            logger.info("🎭 DEV_MOCK_EPHEMERIS activé - utilisation de Swiss Ephemeris local")
+            from utils.ephemeris_mock import generate_mock_lunar_return
+            return generate_mock_lunar_return(
+                natal_moon_degree, natal_moon_sign, target_month,
+                birth_latitude, birth_longitude, timezone
+            )
+
+        # Vérifier la clé API si pas en mock mode
         if not self.is_configured:
-            if self.mock_mode:
-                # Mode mock DEV : générer des données fake
-                from utils.ephemeris_mock import generate_mock_lunar_return
-                return generate_mock_lunar_return(
-                    natal_moon_degree, natal_moon_sign, target_month,
-                    birth_latitude, birth_longitude, timezone
-                )
-            else:
-                # Clé manquante et mock désactivé : lever une exception propre
-                raise EphemerisAPIKeyError(
-                    "EPHEMERIS_API_KEY missing or placeholder. Configure it to compute lunar returns, "
-                    "or set DEV_MOCK_EPHEMERIS=1 for development."
-                )
+            # Clé manquante et mock désactivé : lever une exception propre
+            raise EphemerisAPIKeyError(
+                "EPHEMERIS_API_KEY missing or placeholder. Configure it to compute lunar returns, "
+                "or set DEV_MOCK_EPHEMERIS=1 for development."
+            )
         
         # Parser le mois cible
         year, month = map(int, target_month.split("-"))
