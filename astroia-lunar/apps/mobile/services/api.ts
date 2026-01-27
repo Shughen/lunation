@@ -158,6 +158,12 @@ if (DEV_AUTH_BYPASS && DEV_AUTH_HEADER.type === 'invalid') {
 // Intercepteur pour ajouter le token ou le header DEV_AUTH_BYPASS
 apiClient.interceptors.request.use(
   async (config) => {
+    // Si Authorization est déjà défini explicitement, ne pas le remplacer
+    // (utile pour getMeWithToken après inscription)
+    if (config.headers.Authorization) {
+      return config;
+    }
+
     if (DEV_AUTH_BYPASS && DEV_AUTH_HEADER.header) {
       // Mode bypass: utiliser X-Dev-User-Id ou X-Dev-External-Id selon le type
       config.headers[DEV_AUTH_HEADER.header] = DEV_AUTH_HEADER.value;
@@ -276,6 +282,17 @@ export const auth = {
 
   getMe: async () => {
     const response = await apiClient.get('/api/auth/me');
+    return response.data;
+  },
+
+  /**
+   * Récupère l'utilisateur en utilisant explicitement un token
+   * Utile après inscription pour bypasser DEV_AUTH_BYPASS
+   */
+  getMeWithToken: async (token: string) => {
+    const response = await apiClient.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   },
 };

@@ -85,7 +85,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.linkButton}
-            onPress={() => router.push('/onboarding')}
+            onPress={() => router.push('/register')}
           >
             <Text style={styles.linkText}>
               Pas encore de compte ? S'inscrire
