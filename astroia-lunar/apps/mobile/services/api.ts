@@ -295,6 +295,35 @@ export const auth = {
     });
     return response.data;
   },
+
+  /**
+   * Authentification OAuth (Google ou Apple)
+   * @param provider - 'google' ou 'apple'
+   * @param idToken - Token d'identification du provider
+   * @param userInfo - Infos utilisateur (Apple uniquement, premier login)
+   * @returns { access_token, is_new_user }
+   */
+  oauthLogin: async (
+    provider: 'google' | 'apple',
+    idToken: string,
+    userInfo?: { firstName?: string; lastName?: string }
+  ): Promise<{ access_token: string; is_new_user: boolean }> => {
+    const response = await apiClient.post('/api/auth/oauth', {
+      provider,
+      id_token: idToken,
+      user_info: userInfo ? {
+        first_name: userInfo.firstName,
+        last_name: userInfo.lastName,
+      } : undefined,
+    });
+
+    const { access_token } = response.data;
+    console.log('[Auth] OAuth token reçu:', access_token ? `${access_token.substring(0, 20)}...` : 'null');
+    await AsyncStorage.setItem('auth_token', access_token);
+    console.log('[Auth] OAuth token stocké dans AsyncStorage');
+
+    return response.data;
+  },
 };
 
 // === NATAL CHART ===

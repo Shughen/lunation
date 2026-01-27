@@ -60,22 +60,38 @@ export default function HomeScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const routingInFlightRef = useRef(false);
   const selfHealExecutedRef = useRef(false); // Guard anti-boucle pour self-heal
+  const hydrationTriggeredRef = useRef(false); // Guard pour déclencher hydratation une seule fois
 
   // Hook SWR pour charger la révolution lunaire en cours
   const { data: currentLunarReturn, mutate: refreshLunarReturn } = useCurrentLunarReturn();
 
+  // Effect d'hydratation - fire-and-forget, se déclenche une seule fois au mount
+  useEffect(() => {
+    if (!isOnboardingHydrated && !hydrationTriggeredRef.current) {
+      hydrationTriggeredRef.current = true;
+      console.log('[INDEX] 💧 Déclenchement hydratation...');
+      cleanupGhostFlags().then(() => hydrateOnboarding());
+    }
+  }, [isOnboardingHydrated, hydrateOnboarding]);
+
   // Guards de routing : vérifier auth, onboarding et profil complet
   useEffect(() => {
     const checkRouting = async () => {
-      // Guard absolu: ne pas router si reset en cours
+      // Guard 1: Attendre hydratation (effet séparé s'en charge)
+      if (!isOnboardingHydrated) {
+        console.log('[INDEX] ⏳ Attente hydratation...');
+        return;
+      }
+
+      // Guard 2: Ne pas router pendant reset
       if (isResetting) {
         console.log('[INDEX] ⏸️ Reset en cours, skip routing');
         return;
       }
 
-      // Guard absolu: éviter double-run pendant un routing en cours
+      // Guard 3: Éviter double-run pendant un routing en cours
       if (routingInFlightRef.current) {
-        console.log('[INDEX] ⏸️ Routing déjà en cours, skip double-run');
+        console.log('[INDEX] ⏸️ Routing déjà en cours, skip');
         return;
       }
 
@@ -83,22 +99,6 @@ export default function HomeScreen() {
       routingInFlightRef.current = true;
 
       try {
-        // Migration one-shot: nettoyer flags fantômes AVANT hydratation
-        if (!isOnboardingHydrated) {
-          await cleanupGhostFlags();
-        }
-
-        // Guard absolu: hydratation BLOQUANTE
-        if (!isOnboardingHydrated) {
-          console.log('[INDEX] ⏳ Hydratation en cours...');
-          await hydrateOnboarding();
-          console.log('[INDEX] ✅ Hydratation terminée');
-          // IMPORTANT: Le state sera mis à jour et déclenchera un re-render via subscription
-          // Relâcher le guard pour permettre au prochain render de faire le routing
-          routingInFlightRef.current = false;
-          return; // Sortir immédiatement, le prochain render verra hydrated=true
-        }
-
         console.log('[INDEX] 📍 Début checkRouting');
         console.log('[INDEX] 📊 État onboarding:', {
           hasSeenWelcomeScreen,
@@ -162,8 +162,8 @@ export default function HomeScreen() {
 
         // A) Vérifier auth (sauf si DEV_AUTH_BYPASS actif)
         if (!isBypassActive && !isAuthenticated) {
-          console.log('[INDEX] → Redirection /login (pas authentifié)');
-          router.replace('/login');
+          console.log('[INDEX] → Redirection /auth (pas authentifié)');
+          router.replace('/auth');
           // NE PAS setIsCheckingRouting(false) : garder loader actif pendant redirect
           return;
         }
@@ -208,7 +208,7 @@ export default function HomeScreen() {
         setIsCheckingRouting(false);
       } catch (error) {
         console.error('[INDEX] ❌ Erreur dans checkRouting:', error);
-        router.replace('/login');
+        router.replace('/auth');
         // NE PAS setIsCheckingRouting(false) : garder loader actif
       } finally {
         // Relâcher le flag in-flight (permet re-run si deps changent)
@@ -226,16 +226,17 @@ export default function HomeScreen() {
     hasCompletedProfile,
     hasSeenDisclaimer,
     hasCompletedOnboarding,
-    hydrateOnboarding,
     resetProfileFlag,
     profileData,
     router,
+    // NOTE: hydrateOnboarding retiré des deps (géré par effet séparé)
   ]);
 
-  // Réinitialiser le guard self-heal quand l'hydratation change (pour permettre re-vérification après reset)
+  // Réinitialiser les guards quand l'hydratation change (pour permettre re-vérification après reset)
   useEffect(() => {
     if (!isOnboardingHydrated) {
       selfHealExecutedRef.current = false;
+      hydrationTriggeredRef.current = false; // Permettre re-hydratation après reset
     }
   }, [isOnboardingHydrated]);
 
@@ -299,7 +300,7 @@ export default function HomeScreen() {
   }
 
   // En mode DEV_AUTH_BYPASS, afficher directement le contenu principal
-  // Sinon, si pas authentifié, les guards redirigeront vers /login
+  // Sinon, si pas authentifié, les guards redirigeront vers /auth
   if (!isAuthenticated && !isDevAuthBypassActive()) {
     return (
       <LinearGradientComponent colors={colors.darkBg} style={styles.container}>

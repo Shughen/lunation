@@ -11,8 +11,12 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    
+    hashed_password = Column(String, nullable=True)  # Nullable pour OAuth users
+
+    # OAuth fields
+    auth_provider = Column(String(20), nullable=True)  # "google", "apple", None pour email
+    provider_id = Column(String(255), nullable=True)  # ID unique du provider OAuth
+
     # Données de naissance
     birth_date = Column(String, nullable=True)  # YYYY-MM-DD
     birth_time = Column(String, nullable=True)  # HH:MM

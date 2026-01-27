@@ -10,10 +10,11 @@ from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Literal
 from uuid import UUID
 from types import SimpleNamespace
 import logging
+import httpx
 
 from database import get_db
 from models.user import User
@@ -61,6 +62,26 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
+class OAuthUserInfo(BaseModel):
+    """Info utilisateur optionnelle (Apple uniquement, premier login)"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+
+class OAuthLoginRequest(BaseModel):
+    """Requête de login OAuth (Google ou Apple)"""
+    provider: Literal["google", "apple"]
+    id_token: str
+    user_info: Optional[OAuthUserInfo] = None  # Apple uniquement
+
+
+class OAuthLoginResponse(BaseModel):
+    """Réponse de login OAuth"""
+    access_token: str
+    token_type: str = "bearer"
+    is_new_user: bool
+
+
 # === HELPERS ===
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -78,6 +99,91 @@ def create_access_token(data: dict) -> str:
     if "sub" in to_encode and isinstance(to_encode["sub"], int):
         to_encode["sub"] = str(to_encode["sub"])
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+# === OAUTH TOKEN VERIFICATION ===
+async def verify_google_token(id_token: str) -> dict:
+    """
+    Vérifie un ID token Google et retourne les informations utilisateur.
+
+    Returns:
+        dict avec keys: sub (provider_id), email, email_verified, name, picture
+    """
+    try:
+        # Utiliser l'endpoint tokeninfo de Google pour valider le token
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+            )
+
+            if response.status_code != 200:
+                logger.warning(f"Google token validation failed: {response.status_code}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token Google invalide"
+                )
+
+            data = response.json()
+
+            # Vérifier que l'email est vérifié
+            if not data.get("email_verified", "false") == "true":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Email Google non vérifié"
+                )
+
+            return {
+                "sub": data["sub"],
+                "email": data["email"],
+                "name": data.get("name"),
+                "picture": data.get("picture"),
+            }
+    except httpx.RequestError as e:
+        logger.error(f"Google token verification network error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Impossible de vérifier le token Google"
+        )
+
+
+async def verify_apple_token(id_token: str, user_info: Optional[OAuthUserInfo] = None) -> dict:
+    """
+    Vérifie un ID token Apple et retourne les informations utilisateur.
+
+    Note: Apple ne fournit le nom qu'au premier login, d'où le paramètre user_info optionnel.
+
+    Returns:
+        dict avec keys: sub (provider_id), email
+    """
+    try:
+        # Décoder le token JWT Apple (sans vérification de signature pour l'instant)
+        # En production, il faudrait vérifier avec les clés publiques Apple
+        # https://appleid.apple.com/auth/keys
+        unverified_payload = jwt.decode(
+            id_token,
+            options={"verify_signature": False, "verify_aud": False}
+        )
+
+        email = unverified_payload.get("email")
+        sub = unverified_payload.get("sub")
+
+        if not email or not sub:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token Apple invalide: email ou sub manquant"
+            )
+
+        return {
+            "sub": sub,
+            "email": email,
+            "name": f"{user_info.first_name or ''} {user_info.last_name or ''}".strip() if user_info else None,
+        }
+    except JWTError as e:
+        logger.error(f"Apple token decode error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token Apple invalide"
+        )
 
 
 async def resolve_dev_user(
@@ -456,8 +562,24 @@ async def login(
     # Trouver l'utilisateur
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(form_data.password, user.hashed_password):
+
+    # Vérifier si l'utilisateur existe et a un mot de passe (pas un compte OAuth pur)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Si l'utilisateur est un compte OAuth sans mot de passe
+    if user.hashed_password is None:
+        provider = user.auth_provider or "social"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ce compte utilise la connexion {provider.capitalize()}. Veuillez vous connecter via {provider.capitalize()}.",
+        )
+
+    if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect",
@@ -468,6 +590,84 @@ async def login(
     access_token = create_access_token(data={"sub": user.id})
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/oauth", response_model=OAuthLoginResponse)
+async def oauth_login(
+    request: OAuthLoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Login/Register via OAuth provider (Google ou Apple).
+
+    - Vérifie le id_token avec le provider
+    - Crée l'utilisateur si nouveau
+    - Retourne JWT + flag is_new_user
+    """
+    # Vérifier le token selon le provider
+    if request.provider == "google":
+        oauth_user = await verify_google_token(request.id_token)
+    elif request.provider == "apple":
+        oauth_user = await verify_apple_token(request.id_token, request.user_info)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Provider non supporté: {request.provider}"
+        )
+
+    provider_id = oauth_user["sub"]
+    email = oauth_user["email"]
+
+    # Chercher un utilisateur existant avec ce provider_id
+    result = await db.execute(
+        select(User).where(
+            User.auth_provider == request.provider,
+            User.provider_id == provider_id
+        )
+    )
+    user = result.scalar_one_or_none()
+
+    is_new_user = False
+
+    if not user:
+        # Vérifier si un compte existe déjà avec cet email
+        result = await db.execute(
+            select(User).where(User.email == email)
+        )
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            # Lier le compte OAuth au compte existant
+            existing_user.auth_provider = request.provider
+            existing_user.provider_id = provider_id
+            user = existing_user
+            logger.info(f"OAuth: compte {email} lié à {request.provider}")
+        else:
+            # Créer un nouveau compte
+            user = User(
+                email=email,
+                hashed_password=None,  # Pas de mot de passe pour OAuth
+                auth_provider=request.provider,
+                provider_id=provider_id,
+            )
+            db.add(user)
+            is_new_user = True
+            logger.info(f"OAuth: nouveau compte créé pour {email} via {request.provider}")
+
+        await db.commit()
+        await db.refresh(user)
+
+    # Générer le JWT
+    access_token = create_access_token(data={"sub": user.id})
+
+    # is_new_user = True si le user vient d'être créé OU si son profil est incomplet
+    is_new_user = is_new_user or user.birth_date is None
+
+    return OAuthLoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        is_new_user=is_new_user
+    )
 
 
 @router.get("/me", response_model=UserResponse)

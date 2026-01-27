@@ -10,7 +10,9 @@
       "web"
     ],
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-apple-authentication",
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},
@@ -22,6 +24,7 @@
     "ios": {
       "bundleIdentifier": "com.shughen85.astroialunar",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
