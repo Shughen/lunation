@@ -62,20 +62,30 @@ export default function AuthScreen() {
   const [oauthAvailable, setOauthAvailable] = useState(false);
 
   // === Google OAuth (conditionnel) ===
-  const googleAuth = Google?.useAuthRequest?.({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
-  });
+  // Vérifier si les Client IDs sont configurés
+  const googleClientIdsConfigured = !!(
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB
+  );
+
+  // Ne pas appeler useAuthRequest si Google n'est pas disponible ou non configuré
+  const googleAuth = Google && googleClientIdsConfigured
+    ? Google.useAuthRequest({
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+      })
+    : null;
 
   const googleRequest = googleAuth?.[0];
   const googleResponse = googleAuth?.[1];
   const googlePromptAsync = googleAuth?.[2];
 
-  // Vérifier si OAuth est disponible
+  // Vérifier si OAuth est disponible (module + config)
   useEffect(() => {
-    setOauthAvailable(!!Google && !!WebBrowser);
-  }, []);
+    setOauthAvailable(!!Google && !!WebBrowser && googleClientIdsConfigured);
+  }, [googleClientIdsConfigured]);
 
   // Gérer la réponse Google
   useEffect(() => {
