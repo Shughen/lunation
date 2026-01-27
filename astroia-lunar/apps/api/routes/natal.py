@@ -3,7 +3,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import date, time, datetime
@@ -13,6 +13,7 @@ import httpx
 from database import get_db
 from models.user import User
 from models.natal_chart import NatalChart
+from models.lunar_return import LunarReturn
 from routes.auth import get_current_user
 from services.ephemeris_rapidapi import create_natal_chart
 from services.natal_reading_service import parse_positions_from_natal_chart, parse_aspects_from_natal_chart
@@ -446,6 +447,17 @@ async def calculate_natal_chart(
         existing_chart.timezone = detected_timezone
         chart = existing_chart
         logger.debug(f"💾 Thème natal mis à jour - natal_chart_id={chart.id}")
+
+        # 🔄 IMPORTANT: Supprimer les lunar_returns existants car les données de naissance ont changé
+        # Les cycles lunaires seront régénérés automatiquement au prochain accès
+        try:
+            delete_stmt = delete(LunarReturn).where(LunarReturn.user_id == current_user.id)
+            delete_result = await db.execute(delete_stmt)
+            deleted_count = delete_result.rowcount if hasattr(delete_result, 'rowcount') else 0
+            if deleted_count and deleted_count > 0:
+                logger.info(f"🗑️ {deleted_count} lunar_return(s) supprimé(s) car thème natal modifié - user_id={current_user.id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur suppression lunar_returns: {e} - ils seront régénérés au prochain accès")
     else:
         # Création
         chart = NatalChart(
