@@ -1,7 +1,7 @@
 {
-  "name": "astroia-lunar",
+  "name": "lunation",
   "version": "1.0.0",
-  "description": "Application de révolutions lunaires mensuelles",
+  "description": "Application de revolutions lunaires mensuelles",
   "scripts": {
     "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000",
     "dev:mobile": "cd apps/mobile && npx expo start",
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ton-username/astroia-lunar.git"
+    "url": "https://github.com/Shughen/lunation.git"
   },
   "keywords": [
     "astrology",

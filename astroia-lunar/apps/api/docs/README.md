@@ -18,9 +18,14 @@ Ce répertoire contient la documentation technique détaillée des fonctionnalit
 
 ### Guides Production
 
-- **[DEPLOYMENT_PRODUCTION.md](./DEPLOYMENT_PRODUCTION.md)** - Guide déploiement production
-- **[PROMETHEUS_METRICS.md](./PROMETHEUS_METRICS.md)** - Monitoring production (6 métriques + 12 alertes)
-- **[AB_TESTING_GUIDE.md](./AB_TESTING_GUIDE.md)** - Méthodologie A/B testing
+- **[DEPLOYMENT_PRODUCTION.md](./DEPLOYMENT_PRODUCTION.md)** - Guide deploiement production (Claude/Anthropic)
+- **[DEPLOYMENT_RENDER.md](./DEPLOYMENT_RENDER.md)** - Guide deploiement Backend sur Render
+- **[PROMETHEUS_METRICS.md](./PROMETHEUS_METRICS.md)** - Monitoring production (6 metriques + 12 alertes)
+- **[AB_TESTING_GUIDE.md](./AB_TESTING_GUIDE.md)** - Methodologie A/B testing
+
+### Guide Mobile Distribution
+
+- **[../mobile/docs/GOOGLE_PLAY_DEPLOYMENT.md](../../mobile/docs/GOOGLE_PLAY_DEPLOYMENT.md)** - Distribution Google Play (Internal Testing)
 
 ### Guides Techniques Spécialisés
 

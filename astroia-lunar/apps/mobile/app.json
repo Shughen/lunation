@@ -1,14 +1,22 @@
 {
   "expo": {
     "name": "Lunation",
-    "slug": "astroia-lunar",
+    "slug": "lunation",
     "version": "1.0.0",
-    "scheme": "astroia-lunar",
+    "scheme": "lunation",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
       "android",
       "web"
     ],
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
@@ -31,7 +39,14 @@
     },
     "android": {
       "package": "com.shughen85.astroialunar",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a2e"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

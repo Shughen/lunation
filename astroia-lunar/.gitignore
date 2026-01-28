@@ -74,6 +74,10 @@ coverage/
 apps/mobile/android/
 apps/mobile/ios/Pods/
 
+# === GOOGLE PLAY CREDENTIALS ===
+google-service-account.json
+apps/mobile/google-service-account.json
+
 # === E2E SCREENSHOTS ===
 *.png
 !assets/**/*.png
