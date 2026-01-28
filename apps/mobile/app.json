@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Lunation",
-    "slug": "astroia-lunar",
-    "scheme": "astroia-lunar",
+    "slug": "lunation",
+    "scheme": "lunation",
     "platforms": [
       "ios",
       "android",
