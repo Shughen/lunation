@@ -25,7 +25,9 @@
 - **Expo ~54**, React Native 0.81, Expo Router v6
 - **Zustand** (state) + **SWR** (data fetching) + **Axios** (HTTP)
 - **i18n** FR/EN support
-- **Écrans** : Home, Lunar report, Natal chart, Transits, Journal
+- **Tab Navigator** : 5 onglets (Home, Calendar, Horoscope, Rituals, Profile)
+- **Stack screens** : Lunar report, Natal chart, Transits, Journal
+- **Doc détaillée** : `apps/mobile/docs/SCREENS.md`
 
 ### Intégrations Externes
 
@@ -182,6 +184,9 @@ Système de commandes locales dans `.claude/commands/` pour charger du contexte 
 - `apps/api/docs/PROMETHEUS_METRICS.md` — Monitoring production
 - `apps/api/docs/DEPLOYMENT_PRODUCTION.md` — Guide déploiement
 - `apps/api/docs/AB_TESTING_GUIDE.md` — Méthodologie A/B testing
+
+**Mobile** :
+- `apps/mobile/docs/SCREENS.md` — Documentation des écrans et navigation
 
 **Index complet** : `apps/api/docs/README.md`
 
