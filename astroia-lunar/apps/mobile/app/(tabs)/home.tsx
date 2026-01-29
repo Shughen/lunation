@@ -1,33 +1,36 @@
 /**
- * Home Tab Screen
- * Main dashboard with lunar data and widgets
+ * Home Tab Screen - "Mon Cycle"
+ * Dashboard avec Hero Lunar Card et Bottom Sheet quotidien
+ *
+ * Architecture 3 tabs:
+ * - Hero: Revolution Lunaire Mensuelle (60% ecran)
+ * - TodayMiniCard: ouvre le bottom sheet
+ * - NatalMiniCard: raccourci vers le theme natal
+ * - TodayBottomSheet: rituel quotidien complet
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useAuthStore } from '../../stores/useAuthStore';
-import { useNotificationsStore } from '../../stores/useNotificationsStore';
-import { isDevAuthBypassActive } from '../../services/api';
+import { useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
-import { DailyRitualCard } from '../../components/DailyRitualCard';
-import { VocWidget } from '../../components/VocWidget';
-import { TransitsWidget } from '../../components/TransitsWidget';
-import { CurrentLunarCard } from '../../components/CurrentLunarCard';
-import { JournalPrompt } from '../../components/JournalPrompt';
-import { setupNotificationTapListener, shouldReschedule } from '../../services/notificationScheduler';
-import { useCurrentLunarReturn } from '../../hooks/useLunarData';
+import { useCurrentLunarReturn, useVocStatus, useMansionToday } from '../../hooks/useLunarData';
+import { useLunar } from '../../contexts/LunarProvider';
 import { haptics } from '../../services/haptics';
+
+// Components
+import { VocBanner } from '../../components/VocBanner';
+import { HeroLunarCard } from '../../components/HeroLunarCard';
+import { TodayMiniCard } from '../../components/TodayMiniCard';
+import { NatalMiniCard } from '../../components/NatalMiniCard';
+import { TodayBottomSheet, TodayBottomSheetRef } from '../../components/TodayBottomSheet';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
@@ -36,23 +39,17 @@ const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, c
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
-  const { notificationsEnabled, hydrated, loadPreferences, scheduleAllNotifications } = useNotificationsStore();
-
+  const bottomSheetRef = useRef<TodayBottomSheetRef>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Hook SWR pour charger la révolution lunaire en cours
+  // Data hooks
   const { data: currentLunarReturn, mutate: refreshLunarReturn } = useCurrentLunarReturn();
+  const { current: lunarData, helpers } = useLunar();
+  const { data: vocStatus } = useVocStatus();
+  const { data: mansionData } = useMansionToday();
 
-  // Hydratation store notifications au mount
-  useEffect(() => {
-    if (!hydrated) {
-      loadPreferences();
-    }
-  }, [hydrated, loadPreferences]);
-
-  // Détecter l'état du réseau
+  // Network state
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsOnline(state.isConnected ?? true);
@@ -60,127 +57,103 @@ export default function HomeScreen() {
     return () => unsubscribe();
   }, []);
 
-  // Setup listener tap notifications au mount
-  useEffect(() => {
-    const subscription = setupNotificationTapListener((screen: string) => {
-      console.log(`[HOME] Tap notification → ${screen}`);
-      router.push(screen as any);
-    });
-    return () => subscription.remove();
-  }, [router]);
-
-  // Re-scheduler notifications au focus si nécessaire
-  useFocusEffect(
-    useCallback(() => {
-      if (isAuthenticated || isDevAuthBypassActive()) {
-        // Refresh révolution lunaire (SWR le gère avec cache)
-        refreshLunarReturn();
-
-        // Re-scheduler notifications si nécessaire (max 1x/24h)
-        if (notificationsEnabled && hydrated) {
-          (async () => {
-            const should = await shouldReschedule();
-            if (should) {
-              console.log('[HOME] Re-scheduling notifications (>24h depuis dernier)');
-              await scheduleAllNotifications();
-            }
-          })();
-        }
-      }
-    }, [isAuthenticated, notificationsEnabled, hydrated, scheduleAllNotifications, refreshLunarReturn])
-  );
-
-  // Pull-to-refresh handler
+  // Pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshLunarReturn();
     setRefreshing(false);
   }, [refreshLunarReturn]);
 
+  // Open bottom sheet at 50%
+  const handleTodayPress = useCallback(() => {
+    haptics.light();
+    bottomSheetRef.current?.snapToIndex(1);
+  }, []);
+
+  // Navigate to profile (which now contains natal chart)
+  const handleNatalPress = useCallback(() => {
+    haptics.light();
+    router.push('/(tabs)/profile');
+  }, [router]);
+
   return (
-    <LinearGradientComponent colors={colors.darkBg} style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Lunation</Text>
-          <Text style={styles.subtitle}>Ton rituel lunaire quotidien</Text>
-        </View>
-
-        {/* Carte Mode Hors Connexion */}
-        {!isOnline && (
-          <View style={styles.offlineCard}>
-            <Text style={styles.offlineTitle}>Mode hors ligne</Text>
-            <Text style={styles.offlineText}>
-              Ton rituel et ton journal restent accessibles. Les donnees viennent du cache local.
-            </Text>
-          </View>
-        )}
-
-        {/* Carte Revolution Lunaire (HERO) */}
-        <CurrentLunarCard
-          lunarReturn={currentLunarReturn}
-          loading={false}
-          onRefresh={refreshLunarReturn}
-        />
-
-        {/* Carte Rituel Quotidien */}
-        <DailyRitualCard />
-
-        {/* Widget Void of Course */}
-        <VocWidget />
-
-        {/* Widget Transits Majeurs */}
-        <TransitsWidget />
-
-        {/* Widget Journal Prompt */}
-        <JournalPrompt />
-
-        {/* Quick Access Card - Natal Chart */}
-        <TouchableOpacity
-          style={[styles.quickAccessCard, !isOnline && styles.cardDisabled]}
-          onPress={() => {
-            haptics.light();
-            if (!isOnline) {
-              Alert.alert('Hors ligne', 'Cette fonctionnalite necessite une connexion Internet.');
-              return;
-            }
-            router.push('/natal-chart');
-          }}
-          disabled={!isOnline}
+    <View style={styles.flex1}>
+      <LinearGradientComponent colors={colors.darkBg} style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
         >
-          <Text style={styles.quickAccessIcon}>*</Text>
-          <View style={styles.quickAccessContent}>
-            <Text style={styles.quickAccessTitle}>Theme natal</Text>
-            <Text style={styles.quickAccessDesc}>Decouvre ton ciel de naissance</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Lunation</Text>
+            <Text style={styles.subtitle}>Ton rituel lunaire</Text>
           </View>
-          <Text style={styles.quickAccessArrow}></Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </LinearGradientComponent>
+
+          {/* Offline Banner */}
+          {!isOnline && (
+            <View style={styles.offlineCard}>
+              <Text style={styles.offlineTitle}>Mode hors ligne</Text>
+              <Text style={styles.offlineText}>
+                Certaines fonctionnalites peuvent etre limitees.
+              </Text>
+            </View>
+          )}
+
+          {/* VoC Banner (conditionnelle) */}
+          <VocBanner vocStatus={vocStatus} />
+
+          {/* HERO: Revolution Lunaire Mensuelle (60% ecran) */}
+          <HeroLunarCard
+            lunarReturn={currentLunarReturn}
+            loading={false}
+          />
+
+          {/* Mini Cards */}
+          <TodayMiniCard
+            moonPhase={lunarData?.moon?.phase}
+            moonSign={lunarData?.moon?.sign}
+            onPress={handleTodayPress}
+          />
+
+          <NatalMiniCard onPress={handleNatalPress} />
+
+          {/* Extra bottom padding for scroll */}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* Bottom Sheet */}
+        <TodayBottomSheet
+          ref={bottomSheetRef}
+          vocStatus={vocStatus}
+          lunarReturn={currentLunarReturn}
+          mansion={mansionData}
+        />
+      </LinearGradientComponent>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
   scrollContent: {
     paddingTop: 60,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 100, // Extra padding for tab bar
+    paddingBottom: 100,
   },
   header: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   title: {
@@ -198,6 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(183, 148, 246, 0.08)',
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(183, 148, 246, 0.2)',
@@ -212,38 +186,5 @@ const styles = StyleSheet.create({
     ...fonts.bodySmall,
     color: colors.textMuted,
     lineHeight: 18,
-  },
-  quickAccessCard: {
-    backgroundColor: colors.cardBg,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginTop: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(183, 148, 246, 0.1)',
-  },
-  cardDisabled: {
-    opacity: 0.5,
-  },
-  quickAccessIcon: {
-    fontSize: 32,
-    marginRight: spacing.md,
-  },
-  quickAccessContent: {
-    flex: 1,
-  },
-  quickAccessTitle: {
-    ...fonts.h3,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  quickAccessDesc: {
-    ...fonts.bodySmall,
-    color: colors.textMuted,
-  },
-  quickAccessArrow: {
-    ...fonts.h2,
-    color: colors.accent,
   },
 });

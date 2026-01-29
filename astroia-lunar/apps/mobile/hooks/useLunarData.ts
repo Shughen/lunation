@@ -37,6 +37,30 @@ interface VocStatus {
   upcoming: VocWindow[];
 }
 
+// ===== Types Mansion =====
+interface MansionData {
+  number: number;
+  name: string;
+  interpretation: string;
+}
+
+interface MansionTodayResponse {
+  date: string;
+  mansion_id: number;
+  data: {
+    mansion: MansionData;
+    upcoming_changes: Array<{
+      change_time: string;
+      from_mansion: MansionData;
+      to_mansion: MansionData;
+    }>;
+    calendar_summary?: Record<string, any>;
+  };
+  cached: boolean;
+}
+
+export type { VocStatus, MansionTodayResponse, MansionData };
+
 interface AspectInfo {
   transit_planet: string;
   natal_planet: string;
@@ -171,6 +195,45 @@ export function useMajorTransits() {
     {
       ...swrConfig,
       refreshInterval: 0, // Pas de refresh automatique
+      revalidateOnMount: true,
+    }
+  );
+}
+
+// ===== Hook: Mansion lunaire du jour =====
+/**
+ * Hook pour récupérer la mansion lunaire du jour
+ * Cache: 10 minutes (données stables sur la journée)
+ *
+ * @returns { data, error, isLoading, mutate }
+ */
+export function useMansionToday() {
+  const { isAuthenticated } = useAuthStore();
+
+  // Ne faire la requête que si authentifié ou en mode bypass
+  const shouldFetch = isAuthenticated || isDevAuthBypassActive();
+
+  return useSWR<MansionTodayResponse | null>(
+    shouldFetch ? 'mansion-today' : null,
+    async () => {
+      try {
+        const response = await apiClient.get('/api/lunar/mansion/today');
+        return response.data;
+      } catch (error: any) {
+        // Si 404 (pas de cache), retourner null (fallback côté UI)
+        if (error.response?.status === 404) {
+          return null;
+        }
+        // Log uniquement en dev
+        if (__DEV__) {
+          console.log('[useMansionToday] Mansion non disponible:', error);
+        }
+        return null;
+      }
+    },
+    {
+      ...swrConfig,
+      refreshInterval: 10 * 60 * 1000, // Refresh toutes les 10 minutes
       revalidateOnMount: true,
     }
   );

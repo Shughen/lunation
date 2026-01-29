@@ -1,9 +1,9 @@
 /**
  * Calendar Tab Screen
- * Monthly view with lunar phases
+ * Monthly view with lunar phases and VoC windows
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -117,11 +117,65 @@ function generateCalendarDays(year: number, month: number): CalendarDay[] {
 // Key phases to highlight
 const KEY_PHASES = ['new', 'full', 'first_quarter', 'last_quarter'];
 
+// Hook to fetch VoC windows for the week
+function useVocWindows() {
+  const [vocWindows, setVocWindows] = useState<Array<{
+    start_at: string;
+    end_at: string;
+  }>>([]);
+
+  useEffect(() => {
+    const fetchVocWindows = async () => {
+      try {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/lunar/voc/status`);
+        if (response.ok) {
+          const data = await response.json();
+          // Extract upcoming windows from API response
+          if (data.upcoming && data.upcoming.length > 0) {
+            setVocWindows(data.upcoming.slice(0, 5));
+          } else if (data.next) {
+            // Fallback: use next VoC window if upcoming is empty
+            setVocWindows([data.next]);
+          }
+        }
+      } catch (error) {
+        console.log('[Calendar] VoC windows unavailable');
+      }
+    };
+
+    fetchVocWindows();
+  }, []);
+
+  return vocWindows;
+}
+
+// Format VoC window for display
+function formatVocWindow(window: { start_at: string; end_at: string }): { date: string; time: string } {
+  const start = new Date(window.start_at);
+  const end = new Date(window.end_at);
+
+  const dateStr = start.toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+
+  const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+  const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+
+  return {
+    date: dateStr.charAt(0).toUpperCase() + dateStr.slice(1),
+    time: `${startTime} - ${endTime}`,
+  };
+}
+
 export default function CalendarScreen() {
   const router = useRouter();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const vocWindows = useVocWindows();
 
   const calendarDays = useMemo(
     () => generateCalendarDays(currentYear, currentMonth),
@@ -264,6 +318,30 @@ export default function CalendarScreen() {
             Voir le rapport de {MONTH_NAMES[currentMonth]}
           </Text>
         </TouchableOpacity>
+
+        {/* VoC Windows Section */}
+        {vocWindows.length > 0 && (
+          <View style={styles.vocSection}>
+            <Text style={styles.vocSectionTitle}>Fenetres VoC cette semaine</Text>
+            <Text style={styles.vocSectionSubtitle}>
+              Periodes a eviter pour les decisions importantes
+            </Text>
+            {vocWindows.map((window, index) => {
+              const formatted = formatVocWindow(window);
+              return (
+                <View key={index} style={styles.vocWindowCard}>
+                  <View style={styles.vocWindowIcon}>
+                    <Text style={styles.vocWindowIconText}>!</Text>
+                  </View>
+                  <View style={styles.vocWindowInfo}>
+                    <Text style={styles.vocWindowDate}>{formatted.date}</Text>
+                    <Text style={styles.vocWindowTime}>{formatted.time}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </LinearGradientComponent>
   );
@@ -407,5 +485,62 @@ const styles = StyleSheet.create({
   quickAccessText: {
     ...fonts.body,
     color: colors.accent,
+  },
+  // VoC Section styles
+  vocSection: {
+    backgroundColor: colors.cardBg,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.vocBorder,
+  },
+  vocSectionTitle: {
+    ...fonts.body,
+    color: colors.vocWarning,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  vocSectionSubtitle: {
+    ...fonts.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  vocWindowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.vocBg,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  vocWindowIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.vocWarning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  vocWindowIconText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1a0b2e',
+  },
+  vocWindowInfo: {
+    flex: 1,
+  },
+  vocWindowDate: {
+    ...fonts.body,
+    color: colors.text,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  vocWindowTime: {
+    ...fonts.caption,
+    color: colors.textMuted,
   },
 });

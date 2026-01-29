@@ -1,18 +1,18 @@
 # Lunation Mobile - Documentation des Ecrans
 
+**Version:** 3.1 (Daily Features 29/01/2026)
+
 ## Architecture de Navigation
 
 ```
 app/
 ├── index.tsx                 # Routing guards (auth, onboarding)
 ├── _layout.tsx               # Root Stack Navigator
-├── (tabs)/                   # Tab Navigator (5 onglets)
+├── (tabs)/                   # Tab Navigator (3 onglets)
 │   ├── _layout.tsx           # Configuration tabs
-│   ├── home.tsx              # Accueil
-│   ├── calendar.tsx          # Calendrier lunaire
-│   ├── horoscope.tsx         # Horoscope du jour
-│   ├── rituals.tsx           # Rituels quotidiens
-│   └── profile.tsx           # Profil utilisateur
+│   ├── home.tsx              # "Mon Cycle" - Dashboard principal
+│   ├── calendar.tsx          # "Calendrier" - Phases + VoC windows
+│   └── profile.tsx           # "Profil" - Theme natal + parametres
 ├── auth.tsx                  # Authentification (modal)
 ├── welcome.tsx               # Ecran bienvenue (modal)
 ├── onboarding/               # Flow onboarding (modal)
@@ -28,182 +28,329 @@ app/
 **Fichier** : `app/(tabs)/_layout.tsx`
 
 ### Configuration
-- 5 onglets avec icones SVG custom
+- 3 onglets avec icones SVG custom
 - Style : fond `#1a0b2e`, accent or `#ffd700` pour onglet actif
 - Hauteur : 70px + safe area iOS
 
 ### Onglets
 | Onglet | Route | Icone | Description |
 |--------|-------|-------|-------------|
-| Accueil | `/home` | Maison + lune | Dashboard principal |
-| Calendrier | `/calendar` | Calendrier + point lune | Vue mensuelle |
-| Horoscope | `/horoscope` | Oeil mystique | Horoscope du jour |
-| Rituels | `/rituals` | Ampoule | Rituels quotidiens |
-| Profil | `/profile` | Silhouette | Parametres utilisateur |
+| Mon Cycle | `/home` | Lune croissante | Dashboard principal + bottom sheet |
+| Calendrier | `/calendar` | Calendrier + point lune | Vue mensuelle + VoC windows |
+| Profil | `/profile` | Silhouette | Theme natal + parametres |
 
 ---
 
 ## Ecrans Tabs
 
-### 1. Home (`home.tsx`)
+### 1. Home "Mon Cycle" (`home.tsx`)
 
-**Role** : Dashboard principal avec widgets lunaires
+**Role** : Dashboard principal avec Hero lunar et bottom sheet rituel quotidien
+
+**Architecture UI** :
+```
+┌─────────────────────────────────────┐
+│           Lunation                  │
+│       Ton rituel lunaire            │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │      VocBanner (si actif)       │ │
+│ │   ⚠️ Void of Course jusqu'a...  │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │                                 │ │
+│ │       HeroLunarCard             │ │
+│ │       (60% ecran)               │ │
+│ │                                 │ │
+│ │   Revolution Lunaire Janvier    │ │
+│ │   Lune en Taurus ☽              │ │
+│ │   Ascendant: Cancer             │ │
+│ │                                 │ │
+│ │   [Stabilite] [Ancrage] [...]   │ │
+│ │                                 │
+│ │   [   Voir mon mois   ] ────────┼──► /lunar/report
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ TodayMiniCard          ▲        │ │
+│ │ Lune Gibbeuse en Gemeaux        │──► TodayBottomSheet
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ NatalMiniCard          ▶        │ │
+│ │ Mon theme natal                 │──► tab Profil
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
 
 **Composants utilises** :
-- `CurrentLunarCard` - Revolution lunaire en cours (hero)
-- `DailyRitualCard` - Rituel du jour
-- `VocWidget` - Statut Void of Course
-- `TransitsWidget` - Transits majeurs
-- `JournalPrompt` - Invitation journal
+- `VocBanner` - Banniere amber Void of Course (conditionnelle)
+- `HeroLunarCard` - Hero card 60% ecran revolution lunaire
+- `TodayMiniCard` - Mini card phase du jour → ouvre bottom sheet
+- `NatalMiniCard` - Raccourci vers theme natal
+- `TodayBottomSheet` - Modal slide-up avec rituel complet
 
 **Donnees** :
 - `useCurrentLunarReturn()` - SWR hook pour revolution lunaire
 - `useLunar()` - Context pour donnees lunaires temps reel
+- `useVocStatus()` - SWR hook pour statut Void of Course (cache 5min)
+- `useMansionToday()` - SWR hook pour mansion lunaire du jour (cache 10min)
 
 **Features** :
 - Pull-to-refresh
-- Detection mode hors ligne
-- Notification tap listener
-- Quick access vers theme natal
+- Detection mode hors ligne (banner)
+- Bottom sheet modal avec animation spring
 
 ---
 
-### 2. Calendar (`calendar.tsx`)
+### 2. TodayBottomSheet (`components/TodayBottomSheet.tsx`)
 
-**Role** : Vue mensuelle avec phases lunaires
+**Role** : Modal slide-up contenant le rituel quotidien complet
+
+**Architecture UI** :
+```
+┌─────────────────────────────────────┐
+│              ━━━━━                  │  ← Handle
+│                                     │
+│  🌔  Mercredi 29 janvier            │
+│      Lune Gibbeuse en Gemeaux       │  [Badge]
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ ⚠️ Void of Course               │ │  ← Si actif
+│ │    Jusqu'a 14:30                │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│  GUIDANCE DU JOUR                   │
+│  "Periode de perfectionnement..."   │
+│  [Patience] [Detail] [Focus]        │
+│                                     │
+│  ENERGIES DU JOUR                   │
+│  ┌───────────────┐ ┌───────────────┐│
+│  │Energie Creative│ │  Intuition   ││
+│  │    ████░░ 72%  │ │  █████░ 85%  ││
+│  └───────────────┘ └───────────────┘│
+│                                     │
+│  MANSION LUNAIRE                    │
+│  ┌─────────────────────────────────┐│
+│  │ #3  Al-Thurayya                 ││
+│  │     Chance et fortune           ││
+│  └─────────────────────────────────┘│
+│                                     │
+│  RITUELS SUGGERES                   │
+│  ☑️ Perfectionnement - Affinez...   │
+│  ☐ Gratitude anticipee - Remerciez..│
+│  ☐ Preparation - Preparez...        │
+│                                     │
+│  [  Ecrire dans mon journal  ]      │  → JournalEntryModal
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Implementation technique** :
+```typescript
+// Modal native React Native (pas @gorhom/bottom-sheet)
+<Modal visible={visible} transparent animationType="none">
+  <TouchableWithoutFeedback onPress={handleClose}>
+    <View style={styles.overlay}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+        {/* Content */}
+      </Animated.View>
+    </View>
+  </TouchableWithoutFeedback>
+</Modal>
+
+// Expose methods via forwardRef
+useImperativeHandle(ref, () => ({
+  snapToIndex: (index) => { /* Animated.spring */ },
+  close: () => { /* Animated.timing */ },
+}));
+```
+
+**Composants utilises** :
+- `MoonPhaseIcon` - Icone phase lunaire
+- `ZodiacBadge` - Badge signe zodiacal
+- `ProgressBar` - Jauge energie animee
+- `KeywordChip` - Badge mot-cle
+- `RitualCheckItem` - Checkbox rituel animee
+- `JournalEntryModal` - Modal ecriture journal
+
+**Donnees calculees** :
+| Donnee | Source |
+|--------|--------|
+| Phase francais | `getMoonPhaseFrench(phase)` |
+| Signe francais | `getZodiacSignFrench(sign)` |
+| Guidance | `getPhaseGuidance(phase)` |
+| Mots-cles | `PHASE_KEYWORDS[phase]` |
+| Rituels | `PHASE_RITUALS[phase]` |
+| Energies | `getHoroscopeMetrics(sign, phase, aspects)` |
+| Mansion | `useMansionToday()` API avec fallback hardcode |
+
+---
+
+### 3. Calendar (`calendar.tsx`)
+
+**Role** : Vue mensuelle avec phases lunaires et fenetres VoC
+
+**Structure UI** :
+```
+┌─────────────────────────────────────┐
+│       ◀  Janvier 2026  ▶            │
+│                                     │
+│  L   M   M   J   V   S   D          │
+│  🌒  🌒  🌓  🌓  🌔  🌔  🌕          │
+│  6   7   8   9   10  11  12         │
+│  ...                                │
+│                                     │
+│  LEGENDE                            │
+│  🌑 Nouvelle  🌓 1er Quartier       │
+│  🌕 Pleine    🌗 Dernier Quartier   │
+│                                     │
+│  FENETRES VOC CETTE SEMAINE         │
+│  ┌─────────────────────────────────┐│
+│  │ 📅 Mer 29 Jan  14:30 - 18:45   ││
+│  │ 📅 Ven 31 Jan  09:15 - 11:30   ││
+│  │ 📅 Dim 2 Fev   22:00 - 02:15   ││
+│  └─────────────────────────────────┘│
+└─────────────────────────────────────┘
+```
 
 **Composants** :
 - Navigation mois (precedent/suivant)
-- Grille 7x6 jours
+- Grille 7x6 jours avec phases
 - Legende phases principales
+- Section VoC windows (nouveau v3.0)
+
+**Hooks** :
+- `useVocWindows()` - Recupere les fenetres VoC via `/api/lunar/voc/status`
+  - Parse `data.upcoming` pour les fenetres a venir
+  - Fallback sur `data.next` si `upcoming` vide
 
 **Calculs locaux** :
 - `getMoonPhase(date)` - Calcule la phase lunaire pour chaque jour
   - Base : cycle synodique de 29.53 jours
   - Reference : nouvelle lune du 6 janvier 2000
 
-**Interactions** :
-- Tap sur jour → navigation vers `/lunar-month/{YYYY-MM}`
-- Tap sur titre mois → retour a aujourd'hui
-
-**Affichage phases** :
-| Phase | Emoji |
-|-------|-------|
-| Nouvelle Lune | 🌑 |
-| Premier Croissant | 🌒 |
-| Premier Quartier | 🌓 |
-| Gibbeuse Croissante | 🌔 |
-| Pleine Lune | 🌕 |
-| Gibbeuse Decroissante | 🌖 |
-| Dernier Quartier | 🌗 |
-| Dernier Croissant | 🌘 |
-
 ---
 
-### 3. Horoscope (`horoscope.tsx`)
+### 4. Profile (`profile.tsx`)
 
-**Role** : Horoscope lunaire quotidien personnalise
+**Role** : Theme natal integre + parametres utilisateur
 
 **Structure UI** :
 ```
 ┌─────────────────────────────────────┐
-│       Horoscope Lunaire             │
+│           Mon Profil                │
+│                                     │
 │         [ZodiacBadge]               │
-│    Date · Phase lunaire             │
+│         Prenom Nom                  │
+│         email@example.com           │
 │                                     │
-│ ┌─────────────────────────────────┐ │
-│ │ Guidance du Jour                │ │
-│ │ Texte d'orientation...          │ │
-│ │ Mots-cles: [Chip] [Chip]        │ │
-│ └─────────────────────────────────┘ │
+│  MON THEME NATAL                    │
+│  ┌─────────────────────────────────┐│
+│  │  BIG 3                          ││
+│  │  ☉ Soleil: Lion                 ││
+│  │  ☽ Lune: Scorpion               ││
+│  │  ↑ Ascendant: Verseau           ││
+│  └─────────────────────────────────┘│
 │                                     │
-│ [ProgressBar Energie]  [ProgressBar]│
+│  ┌────────┐ ┌────────┐ ┌────────┐  │
+│  │Mercure │ │ Venus  │ │ Mars   │  │
+│  │Vierge  │ │Balance │ │Belier  │  │
+│  └────────┘ └────────┘ └────────┘  │
+│  ┌────────┐                        │
+│  │Jupiter │                        │
+│  │Sagitt. │                        │
+│  └────────┘                        │
 │                                     │
-│ [DomainCard Amour] [DomainCard Pro] │
+│  [   Voir theme complet   ] ────────┼──► /natal-chart
 │                                     │
-│ [LuckyElements]                     │
+│  PARAMETRES                         │
+│  ┌─────────────────────────────────┐│
+│  │ 🔔 Notifications        [ON]   ││
+│  │ 🌐 Langue               FR     ││
+│  └─────────────────────────────────┘│
 │                                     │
-│      [Partager mon horoscope]       │
+│  [   Se deconnecter   ]             │
 └─────────────────────────────────────┘
 ```
 
-**Composants dedies** :
-- `ProgressBar` - Barre de progression animee
-- `KeywordChip` - Badge mot-cle
-- `DomainCard` - Carte domaine (Amour/Carriere)
-- `LuckyElements` - Elements chanceux
-
-**Donnees** :
-- `useLunar()` - Phase et signe lunaire
-- `useCurrentLunarReturn()` - Aspects du mois
-
-**Calculs locaux** (`utils/horoscopeCalculations.ts`) :
-| Metrique | Source |
-|----------|--------|
-| Energie Creative | Phase lunaire + aspects favorables |
-| Intuition | Signe lunaire (boost si eau) + aspects Neptune |
-| Nombres chanceux | Jour du mois (algo simple) |
-| Couleur | Element du signe (Feu→Rouge, Eau→Violet...) |
-| Pierre | Mapping signe → pierre traditionnelle |
-| Heures | Mapping element → plage horaire |
-
-**Note** : Les "elements chanceux" sont des calculs simplifies a but inspirationnel, pas de l'astrologie traditionnelle.
-
----
-
-### 4. Rituals (`rituals.tsx`)
-
-**Role** : Rituels quotidiens adaptes a la phase lunaire
-
-**Structure** :
-- Header avec phase actuelle et progression
-- Liste de 3 rituels (checkable)
-- Section reflexion du jour avec prompt
-- Tip card
-
-**Rituels par phase** :
-| Phase | Theme |
-|-------|-------|
-| Nouvelle Lune | Intentions, visualisation, nettoyage |
-| Croissant | Action, affirmations, planification |
-| Premier Quartier | Decision, perseverance |
-| Gibbeuse | Perfectionnement, gratitude |
-| Pleine Lune | Celebration, liberation |
-| Gibbeuse Dec. | Partage, reflexion |
-| Dernier Quartier | Lacher-prise, tri |
-| Decroissant | Repos, introspection |
-
-**Interactions** :
-- Toggle rituel complete (state local, non persiste)
-- Ouvrir journal modal
-
-**Composants** :
-- `JournalEntryModal` - Modal d'ecriture journal
-- `MoonPhaseIcon` - Icone phase lunaire
-
----
-
-### 5. Profile (`profile.tsx`)
-
-**Role** : Informations utilisateur et parametres
-
 **Sections** :
-1. **Carte profil** - Avatar (ZodiacBadge basee sur signe solaire), nom, email
-2. **Informations naissance** - Date, heure, lieu
-3. **Notifications** - Toggle avec demande permission
-4. **Actions** - Deconnexion, suppression donnees locales
+1. **Carte profil** - Avatar (ZodiacBadge), nom, email
+2. **Mon Theme Natal** (nouveau v3.0)
+   - Big 3 : Soleil, Lune, Ascendant
+   - Grille 4 planetes : Mercure, Venus, Mars, Jupiter
+   - CTA vers theme complet
+3. **Parametres** - Notifications, langue
+4. **Actions** - Deconnexion
 
 **Donnees** :
 - `useAuthStore()` - Utilisateur authentifie
-- `useOnboardingStore()` - Donnees profil onboarding
+- `useNatalChart()` - Theme natal complet
 - `useNotificationsStore()` - Preferences notifications
-
-**Calcul signe solaire** :
-- Fonction `getSunSign(birthDate)` basee sur date de naissance
 
 ---
 
-## Composants Partages
+## Composants Nouveaux (v3.0)
+
+### VocBanner (`components/VocBanner.tsx`)
+```tsx
+<VocBanner vocStatus={{
+  now: { is_active: true, end_at: '2026-01-29T14:30:00' }
+}} />
+```
+- Banniere amber avec icone alerte
+- Affiche heure de fin du VoC
+- Conditionnel : ne s'affiche que si VoC actif
+
+### HeroLunarCard (`components/HeroLunarCard.tsx`)
+```tsx
+<HeroLunarCard
+  lunarReturn={currentLunarReturn}
+  loading={false}
+/>
+```
+- Occupe 60% de l'ecran
+- Elements decoratifs (blur circles)
+- Themes du mois (3 KeywordChips)
+- CTA gradient vers `/lunar/report`
+
+### TodayMiniCard (`components/TodayMiniCard.tsx`)
+```tsx
+<TodayMiniCard
+  moonPhase="waxing_gibbous"
+  moonSign="Gemini"
+  onPress={() => bottomSheetRef.current?.snapToIndex(1)}
+/>
+```
+- Card horizontale compacte
+- Phase + signe du jour
+- Chevron up indiquant le bottom sheet
+
+### NatalMiniCard (`components/NatalMiniCard.tsx`)
+```tsx
+<NatalMiniCard onPress={() => router.push('/(tabs)/profile')} />
+```
+- Raccourci vers theme natal
+- Icone roue astrologique
+- Chevron right
+
+### RitualCheckItem (`components/RitualCheckItem.tsx`)
+```tsx
+<RitualCheckItem
+  title="Meditation d'intention"
+  description="Visualisez vos objectifs"
+  checked={isCompleted}
+  onToggle={() => toggleRitual(title)}
+/>
+```
+- Checkbox avec animation scale
+- Haptic feedback
+- State local (non persiste)
+
+---
+
+## Composants Conserves
 
 ### ProgressBar (`components/ProgressBar.tsx`)
 ```tsx
@@ -211,63 +358,35 @@ app/
   label="Energie Creative"
   value={86}
   color={colors.gold}
-  showPercentage={true}
-  animate={true}
 />
 ```
 
 ### KeywordChip (`components/KeywordChip.tsx`)
 ```tsx
-<KeywordChip label="Action" variant="accent" />
+<KeywordChip label="Action" variant="gold" />
 // variants: 'default' | 'accent' | 'gold'
 ```
 
-### DomainCard (`components/DomainCard.tsx`)
+### MoonPhaseIcon (`components/icons/MoonPhaseIcon.tsx`)
 ```tsx
-<DomainCard
-  domain="love"  // 'love' | 'career' | 'health' | 'finance'
-  title="Amour"
-  description="Periode favorable..."
-  subtitle="Compatibilite +"
-/>
+<MoonPhaseIcon phase="full_moon" size={36} />
 ```
 
-### LuckyElements (`components/LuckyElements.tsx`)
+### ZodiacBadge (`components/icons/ZodiacIcon.tsx`)
 ```tsx
-<LuckyElements
-  numbers={[7, 14]}
-  color="Rouge"
-  colorHex="#FF6B6B"
-  stone="Diamant"
-  favorableHours="14h-16h"
-/>
+<ZodiacBadge sign="Taurus" size={40} />
 ```
 
 ---
 
-## Utilitaires
+## Fichiers Supprimes (v3.0)
 
-### horoscopeCalculations.ts
+| Fichier | Raison |
+|---------|--------|
+| `app/(tabs)/horoscope.tsx` | Fusionne dans TodayBottomSheet |
+| `app/(tabs)/rituals.tsx` | Fusionne dans TodayBottomSheet |
 
-**Fonctions exportees** :
-```typescript
-// Metriques completes
-getHoroscopeMetrics(moonSign, lunarPhase, aspects) → HoroscopeMetrics
-
-// Metriques individuelles
-calculateCreativeEnergy(lunarPhase, aspects) → number (0-100)
-calculateIntuition(moonSign, aspects) → number (0-100)
-getLuckyElements(moonSign, dayOfMonth) → LuckyElements
-
-// Traductions
-getZodiacSignFrench(sign) → string
-getMoonPhaseFrench(phase) → string
-
-// Contenu
-getPhaseGuidance(phase) → string
-getLoveInsight(moonSign) → string
-getCareerInsight(moonSign) → string
-```
+Le contenu de ces ecrans est maintenant accessible via le bottom sheet sur Home.
 
 ---
 
@@ -289,25 +408,46 @@ index.tsx (Guards)
     ▼
 /(tabs)/home ◄────────────────────┐
     │                             │
+    ├─ TodayMiniCard → Bottom Sheet (modal)
+    ├─ NatalMiniCard → Tab Profil ┤
+    ├─ HeroLunarCard → /lunar/report
+    │                             │
     ├─ Tab Calendrier ────────────┤
-    ├─ Tab Horoscope ─────────────┤
-    ├─ Tab Rituels ───────────────┤
     └─ Tab Profil ────────────────┘
          │
+         ├─ Theme natal → /natal-chart
          ├─ Deconnexion → /welcome
          └─ Reset donnees → /welcome
 ```
 
 ---
 
-## Points d'Attention
+## Hooks SWR (`hooks/useLunarData.ts`)
 
-1. **Donnees hors ligne** : Home detecte le reseau et affiche un banner
-2. **Cache SWR** : Les hooks utilisent SWR avec deduplication 60s
-3. **Haptics** : Feedback tactile sur toutes les interactions
-4. **Safe Area** : Tab bar ajustee pour iOS (24px bottom padding)
-5. **Calculs locaux** : Elements chanceux = approximations, pas d'astrologie reelle
+| Hook | Endpoint | Cache | Description |
+|------|----------|-------|-------------|
+| `useCurrentLunarReturn()` | `/api/lunar-returns/current` | On mount | Revolution lunaire en cours |
+| `useVocStatus()` | `/api/lunar/voc/status` | 5 min | Statut Void of Course + upcoming windows |
+| `useMansionToday()` | `/api/lunar/mansion/today` | 10 min | Mansion lunaire du jour |
+| `useMajorTransits()` | `/api/transits/overview` | On mount | Transits majeurs du mois |
+
+**Types exportes** :
+- `VocStatus` - Statut VoC avec now/next/upcoming
+- `MansionTodayResponse` - Reponse API mansion avec fallback
+- `MansionData` - Donnees mansion (number, name, interpretation)
 
 ---
 
-*Derniere mise a jour : 29 janvier 2026*
+## Points d'Attention
+
+1. **Bottom Sheet natif** : Utilise Modal + Animated (pas @gorhom/bottom-sheet)
+2. **Donnees hors ligne** : Home detecte le reseau et affiche un banner
+3. **Cache SWR** : Les hooks utilisent SWR avec deduplication 60s
+4. **Haptics** : Feedback tactile sur toutes les interactions
+5. **Safe Area** : Tab bar ajustee pour iOS (24px bottom padding)
+6. **VoC conditionnel** : Banner et section ne s'affichent que si API disponible
+7. **Mansion fallback** : Si API non dispo, utilise donnees hardcodees basees sur le jour du mois
+
+---
+
+*Derniere mise a jour : 29 janvier 2026 (Daily Features v3.1)*
