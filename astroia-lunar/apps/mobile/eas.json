@@ -16,6 +16,10 @@
     },
     "production": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://lunation-7m3w.onrender.com",
+        "EXPO_PUBLIC_DEV_AUTH_BYPASS": "false"
+      },
       "android": {
         "buildType": "app-bundle"
       }

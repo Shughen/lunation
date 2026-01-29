@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Lunation",
-    "slug": "lunation",
+    "slug": "astroia-lunar",
     "version": "1.0.0",
     "scheme": "lunation",
     "orientation": "portrait",
@@ -19,7 +19,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-apple-authentication",
       "expo-web-browser"
     ],
     "extra": {
