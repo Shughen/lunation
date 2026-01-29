@@ -1,6 +1,6 @@
 /**
  * Profile Tab Screen
- * User information and settings
+ * User information, natal chart summary, and settings
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +14,7 @@ import {
   Alert,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +26,7 @@ import { useResetStore } from '../../stores/useResetStore';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { ZodiacBadge } from '../../components/icons/ZodiacIcon';
 import { haptics } from '../../services/haptics';
+import { useNatalChart, findPlanetSign } from '../../hooks/useNatalData';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
@@ -53,6 +55,35 @@ function getSunSign(birthDate: string | undefined): string {
   return 'Pisces';
 }
 
+// French names for zodiac signs
+const ZODIAC_FRENCH: Record<string, string> = {
+  Aries: 'Bélier',
+  Taurus: 'Taureau',
+  Gemini: 'Gémeaux',
+  Cancer: 'Cancer',
+  Leo: 'Lion',
+  Virgo: 'Vierge',
+  Libra: 'Balance',
+  Scorpio: 'Scorpion',
+  Sagittarius: 'Sagittaire',
+  Capricorn: 'Capricorne',
+  Aquarius: 'Verseau',
+  Pisces: 'Poissons',
+};
+
+// Planet item component
+function PlanetItem({ label, sign, signFr }: { label: string; sign: string; signFr: string }) {
+  return (
+    <View style={styles.planetItem}>
+      <ZodiacBadge sign={sign} size={28} />
+      <View style={styles.planetInfo}>
+        <Text style={styles.planetLabel}>{label}</Text>
+        <Text style={styles.planetSign}>{signFr}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const profileData = useOnboardingStore((state) => state.profileData);
@@ -66,6 +97,9 @@ export default function ProfileScreen() {
   const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
   const { isResetting, setIsResetting } = useResetStore();
 
+  // Récupérer le thème natal depuis l'API
+  const { data: natalChartData, isLoading: isLoadingNatal } = useNatalChart();
+
   useEffect(() => {
     if (!hydrated) {
       loadPreferences();
@@ -78,7 +112,19 @@ export default function ProfileScreen() {
   const birthTimeRaw = user?.birth_time || profileData?.birthTime;
   const birthTime = birthTimeRaw ? String(birthTimeRaw) : undefined;
   const birthPlace = user?.birth_place_name || profileData?.birthPlace;
-  const sunSign = getSunSign(birthDate);
+
+  // Prénom depuis l'onboarding (ou fallback sur email)
+  const displayName = profileData?.name || user?.email?.split('@')[0] || 'Utilisateur';
+
+  // Utiliser les vraies données du thème natal depuis l'API
+  // L'API retourne: { sun_sign, moon_sign, ascendant, planets: { sun: {sign, degree, house}, ... } }
+  const sunSign = natalChartData?.sun_sign || findPlanetSign(natalChartData?.planets, 'sun') || getSunSign(birthDate);
+  const moonSign = natalChartData?.moon_sign || findPlanetSign(natalChartData?.planets, 'moon') || 'Aries';
+  const ascendant = natalChartData?.ascendant || 'Aries';
+  const mercury = findPlanetSign(natalChartData?.planets, 'mercury') || sunSign;
+  const venus = findPlanetSign(natalChartData?.planets, 'venus') || 'Taurus';
+  const mars = findPlanetSign(natalChartData?.planets, 'mars') || 'Aries';
+  const jupiter = findPlanetSign(natalChartData?.planets, 'jupiter') || 'Sagittarius';
 
   const handleNotificationToggle = async (value: boolean) => {
     haptics.selection();
@@ -90,11 +136,11 @@ export default function ProfileScreen() {
       if (!success && value) {
         Alert.alert(
           'Permission requise',
-          'Veuillez autoriser les notifications dans les parametres de votre appareil.',
+          'Veuillez autoriser les notifications dans les paramètres de votre appareil.',
           [
             { text: 'Annuler', style: 'cancel' },
             {
-              text: 'Ouvrir Parametres',
+              text: 'Ouvrir Paramètres',
               onPress: () => {
                 if (Platform.OS === 'ios') {
                   Linking.openURL('app-settings:');
@@ -108,7 +154,7 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('[Profile] Error toggling notifications:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez reessayer.');
+      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsTogglingNotifications(false);
     }
@@ -116,10 +162,10 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     haptics.medium();
-    Alert.alert('Deconnexion', 'Etes-vous sur de vouloir vous deconnecter ?', [
+    Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
       {
-        text: 'Deconnexion',
+        text: 'Déconnexion',
         style: 'destructive',
         onPress: async () => {
           await logout();
@@ -132,13 +178,13 @@ export default function ProfileScreen() {
   const handleResetUserData = () => {
     haptics.warning();
     Alert.alert(
-      'Supprimer mes donnees locales',
-      'Cette action va supprimer toutes vos donnees locales :\n\n' +
+      'Supprimer mes données locales',
+      'Cette action va supprimer toutes vos données locales :\n\n' +
         '- Onboarding et profil\n' +
         '- Journal personnel\n' +
         '- Cache lunaire\n' +
-        '- Preferences\n\n' +
-        'Vous serez redirige vers l\'ecran d\'accueil.',
+        '- Préférences\n\n' +
+        'Vous serez redirigé vers l\'écran d\'accueil.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -161,8 +207,13 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleViewNatalChart = () => {
+    haptics.light();
+    router.push('/natal-chart');
+  };
+
   const formatBirthDate = (dateStr: string | undefined) => {
-    if (!dateStr) return 'Non renseigne';
+    if (!dateStr) return 'Non renseigné';
     try {
       return new Date(dateStr).toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -187,10 +238,57 @@ export default function ProfileScreen() {
           <View style={styles.avatarSection}>
             <ZodiacBadge sign={sunSign} size={80} />
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user?.email?.split('@')[0] || 'Utilisateur'}</Text>
+              <Text style={styles.userName}>{displayName}</Text>
               <Text style={styles.userEmail}>{user?.email || ''}</Text>
             </View>
           </View>
+        </View>
+
+        {/* Natal Chart Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mon Thème Natal</Text>
+
+          {/* Big 3 */}
+          <View style={styles.big3Container}>
+            <View style={styles.big3Item}>
+              <ZodiacBadge sign={sunSign} size={48} />
+              <Text style={styles.big3Label}>Soleil</Text>
+              <Text style={styles.big3Value}>{ZODIAC_FRENCH[sunSign] || sunSign}</Text>
+            </View>
+            <View style={styles.big3Item}>
+              <ZodiacBadge sign={moonSign} size={48} />
+              <Text style={styles.big3Label}>Lune</Text>
+              <Text style={styles.big3Value}>{ZODIAC_FRENCH[moonSign] || moonSign}</Text>
+            </View>
+            <View style={styles.big3Item}>
+              <ZodiacBadge sign={ascendant} size={48} />
+              <Text style={styles.big3Label}>Ascendant</Text>
+              <Text style={styles.big3Value}>{ZODIAC_FRENCH[ascendant] || ascendant}</Text>
+            </View>
+          </View>
+
+          {/* Planets Grid */}
+          {isLoadingNatal ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.accent} />
+            </View>
+          ) : (
+            <View style={styles.planetsGrid}>
+              <PlanetItem label="Mercure" sign={mercury} signFr={ZODIAC_FRENCH[mercury] || mercury} />
+              <PlanetItem label="Vénus" sign={venus} signFr={ZODIAC_FRENCH[venus] || venus} />
+              <PlanetItem label="Mars" sign={mars} signFr={ZODIAC_FRENCH[mars] || mars} />
+              <PlanetItem label="Jupiter" sign={jupiter} signFr={ZODIAC_FRENCH[jupiter] || jupiter} />
+            </View>
+          )}
+
+          {/* CTA */}
+          <TouchableOpacity
+            style={styles.natalCtaButton}
+            onPress={handleViewNatalChart}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.natalCtaText}>Voir le theme complet</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Birth Info Section */}
@@ -225,7 +323,7 @@ export default function ProfileScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Activer les notifications</Text>
               <Text style={styles.settingDescription}>
-                Rappels pour les fenetres VoC et nouveaux cycles lunaires
+                Rappels pour les fenêtres VoC et nouveaux cycles lunaires
               </Text>
             </View>
 
@@ -247,7 +345,7 @@ export default function ProfileScreen() {
             onPress={handleLogout}
             disabled={isResetting}
           >
-            <Text style={styles.logoutButtonText}>Deconnexion</Text>
+            <Text style={styles.logoutButtonText}>Déconnexion</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -256,7 +354,7 @@ export default function ProfileScreen() {
             disabled={isResetting}
           >
             <Text style={styles.resetButtonText}>
-              {isResetting ? 'Suppression...' : 'Supprimer mes donnees locales'}
+              {isResetting ? 'Suppression...' : 'Supprimer mes données locales'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -327,6 +425,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: spacing.md,
   },
+  // Big 3 styles
+  big3Container: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(183, 148, 246, 0.1)',
+  },
+  big3Item: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  big3Label: {
+    ...fonts.caption,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  big3Value: {
+    ...fonts.body,
+    color: colors.text,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  // Loading
+  loadingContainer: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  // Planets grid
+  planetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.lg,
+  },
+  planetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '50%',
+    paddingVertical: spacing.sm,
+  },
+  planetInfo: {
+    marginLeft: spacing.sm,
+  },
+  planetLabel: {
+    ...fonts.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  planetSign: {
+    ...fonts.bodySmall,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  natalCtaButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  natalCtaText: {
+    ...fonts.button,
+    color: '#000000',
+    fontWeight: '600',
+  },
+  // Info rows
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
