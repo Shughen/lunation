@@ -52,6 +52,8 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="login" />
             <Stack.Screen name="register" />
+            {/* Tab Navigator - main app content after onboarding */}
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             {/* Natal Chart screens - Stack routes (not tabs) for birth chart calculation and display */}
             <Stack.Screen name="natal-chart/index" />
             <Stack.Screen name="natal-chart/result" />
