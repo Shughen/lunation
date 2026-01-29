@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1290" height="2796" viewBox="0 0 1290 2796" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d0615"/>
+      <stop offset="50%" style="stop-color:#1a0b2e"/>
+      <stop offset="100%" style="stop-color:#2d1b4e"/>
+    </linearGradient>
+    <linearGradient id="moonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d1b4e"/>
+      <stop offset="100%" style="stop-color:#b794f6"/>
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(45,27,78,0.6)"/>
+      <stop offset="100%" style="stop-color:rgba(26,11,46,0.8)"/>
+    </linearGradient>
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd700"/>
+      <stop offset="100%" style="stop-color:#f0a500"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1290" height="2796" fill="url(#bgGradient)"/>
+
+  <!-- Decorative stars -->
+  <circle cx="120" cy="250" r="2" fill="#b794f6" opacity="0.4"/>
+  <circle cx="1100" cy="400" r="2.5" fill="#ffd700" opacity="0.3"/>
+  <circle cx="200" cy="1500" r="2" fill="#b794f6" opacity="0.35"/>
+  <circle cx="1080" cy="2100" r="3" fill="#ffd700" opacity="0.25"/>
+
+  <!-- Status bar -->
+  <text x="80" y="80" font-family="SF Pro Display, -apple-system, sans-serif" font-size="34" fill="#ffffff">9:41</text>
+  <rect x="1050" y="55" width="160" height="40" rx="20" fill="#ffffff" opacity="0.3"/>
+
+  <!-- Header -->
+  <text x="80" y="200" font-family="Poppins, sans-serif" font-size="28" fill="#b794f6">←</text>
+  <text x="645" y="200" font-family="Poppins, sans-serif" font-size="42" font-weight="300" letter-spacing="4" fill="#ffffff" text-anchor="middle">Horoscope Lunaire</text>
+
+  <!-- Zodiac Sign Selector -->
+  <g transform="translate(645, 380)">
+    <!-- Selected sign highlight -->
+    <circle cx="0" cy="0" r="85" fill="rgba(183,148,246,0.15)" stroke="#b794f6" stroke-width="2"/>
+
+    <!-- Aries symbol -->
+    <text x="0" y="15" font-family="serif" font-size="72" fill="#ffd700" text-anchor="middle">♈</text>
+    <text x="0" y="60" font-family="Poppins, sans-serif" font-size="28" font-weight="400" fill="#ffffff" text-anchor="middle">Bélier</text>
+  </g>
+
+  <!-- Other signs (horizontal scroll indicator) -->
+  <text x="180" y="380" font-family="serif" font-size="48" fill="rgba(255,255,255,0.3)">♓</text>
+  <text x="320" y="380" font-family="serif" font-size="48" fill="rgba(255,255,255,0.4)">♈</text>
+  <text x="970" y="380" font-family="serif" font-size="48" fill="rgba(255,255,255,0.4)">♉</text>
+  <text x="1110" y="380" font-family="serif" font-size="48" fill="rgba(255,255,255,0.3)">♊</text>
+
+  <!-- Date indicator -->
+  <text x="645" y="520" font-family="Poppins, sans-serif" font-size="28" fill="#b794f6" text-anchor="middle">29 Janvier 2026 · Lune Croissante</text>
+
+  <!-- Main Horoscope Card -->
+  <rect x="80" y="580" width="1130" height="600" rx="35" fill="url(#cardGradient)" stroke="rgba(255,215,0,0.3)" stroke-width="2"/>
+
+  <!-- Card Header -->
+  <text x="130" y="660" font-family="Poppins, sans-serif" font-size="32" fill="#ffd700">Guidance du Jour</text>
+
+  <!-- Horoscope Text -->
+  <text x="130" y="740" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">La lune croissante dans votre secteur de</text>
+  <text x="130" y="790" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">la créativité vous pousse à exprimer vos</text>
+  <text x="130" y="840" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">idées avec audace.</text>
+
+  <text x="130" y="920" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">C'est le moment idéal pour initier de</text>
+  <text x="130" y="970" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">nouveaux projets et prendre des risques</text>
+  <text x="130" y="1020" font-family="Poppins, sans-serif" font-size="32" font-weight="300" fill="#ffffff">calculés dans vos entreprises.</text>
+
+  <!-- Keywords -->
+  <text x="130" y="1110" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Mots-clés:</text>
+  <rect x="260" y="1085" width="140" height="40" rx="20" fill="rgba(183,148,246,0.2)" stroke="#b794f6" stroke-width="1"/>
+  <text x="330" y="1113" font-family="Poppins, sans-serif" font-size="22" fill="#b794f6" text-anchor="middle">Action</text>
+  <rect x="420" y="1085" width="160" height="40" rx="20" fill="rgba(183,148,246,0.2)" stroke="#b794f6" stroke-width="1"/>
+  <text x="500" y="1113" font-family="Poppins, sans-serif" font-size="22" fill="#b794f6" text-anchor="middle">Courage</text>
+  <rect x="600" y="1085" width="180" height="40" rx="20" fill="rgba(183,148,246,0.2)" stroke="#b794f6" stroke-width="1"/>
+  <text x="690" y="1113" font-family="Poppins, sans-serif" font-size="22" fill="#b794f6" text-anchor="middle">Nouveauté</text>
+
+  <!-- Energy Meters -->
+  <rect x="80" y="1240" width="545" height="200" rx="25" fill="url(#cardGradient)" stroke="rgba(183,148,246,0.2)" stroke-width="1"/>
+  <text x="130" y="1310" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Énergie Créative</text>
+  <rect x="130" y="1340" width="440" height="16" rx="8" fill="rgba(183,148,246,0.2)"/>
+  <rect x="130" y="1340" width="380" height="16" rx="8" fill="url(#goldGradient)"/>
+  <text x="545" y="1410" font-family="Poppins, sans-serif" font-size="28" fill="#ffd700" text-anchor="end">86%</text>
+
+  <rect x="665" y="1240" width="545" height="200" rx="25" fill="url(#cardGradient)" stroke="rgba(183,148,246,0.2)" stroke-width="1"/>
+  <text x="715" y="1310" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Intuition</text>
+  <rect x="715" y="1340" width="440" height="16" rx="8" fill="rgba(183,148,246,0.2)"/>
+  <rect x="715" y="1340" width="310" height="16" rx="8" fill="url(#moonGradient)"/>
+  <text x="1130" y="1410" font-family="Poppins, sans-serif" font-size="28" fill="#b794f6" text-anchor="end">70%</text>
+
+  <!-- Love & Career Section -->
+  <rect x="80" y="1500" width="545" height="280" rx="25" fill="url(#cardGradient)" stroke="rgba(183,148,246,0.2)" stroke-width="1"/>
+  <text x="130" y="1570" font-family="Poppins, sans-serif" font-size="28" fill="#ffd700">💕 Amour</text>
+  <text x="130" y="1630" font-family="Poppins, sans-serif" font-size="26" fill="#ffffff">Période favorable aux</text>
+  <text x="130" y="1670" font-family="Poppins, sans-serif" font-size="26" fill="#ffffff">nouvelles rencontres.</text>
+  <text x="130" y="1730" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Compatibilité: ♌ ♐ ♒</text>
+
+  <rect x="665" y="1500" width="545" height="280" rx="25" fill="url(#cardGradient)" stroke="rgba(183,148,246,0.2)" stroke-width="1"/>
+  <text x="715" y="1570" font-family="Poppins, sans-serif" font-size="28" fill="#ffd700">💼 Carrière</text>
+  <text x="715" y="1630" font-family="Poppins, sans-serif" font-size="26" fill="#ffffff">Idéal pour proposer</text>
+  <text x="715" y="1670" font-family="Poppins, sans-serif" font-size="26" fill="#ffffff">vos idées innovantes.</text>
+  <text x="715" y="1730" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Jours favorables: Mer, Ven</text>
+
+  <!-- Lucky Elements -->
+  <rect x="80" y="1840" width="1130" height="160" rx="25" fill="url(#cardGradient)" stroke="rgba(255,215,0,0.2)" stroke-width="1"/>
+  <text x="130" y="1910" font-family="Poppins, sans-serif" font-size="24" fill="#ffd700">✨ Éléments Chanceux</text>
+
+  <text x="130" y="1970" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Nombre</text>
+  <text x="130" y="2000" font-family="Poppins, sans-serif" font-size="28" fill="#ffffff">7, 14</text>
+
+  <text x="350" y="1970" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Couleur</text>
+  <rect x="350" y="1980" width="30" height="30" rx="5" fill="#ff4444"/>
+  <text x="390" y="2000" font-family="Poppins, sans-serif" font-size="28" fill="#ffffff">Rouge</text>
+
+  <text x="580" y="1970" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Pierre</text>
+  <text x="580" y="2000" font-family="Poppins, sans-serif" font-size="28" fill="#ffffff">Diamant</text>
+
+  <text x="780" y="1970" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6">Heure</text>
+  <text x="780" y="2000" font-family="Poppins, sans-serif" font-size="28" fill="#ffffff">14h-16h</text>
+
+  <!-- Share Button -->
+  <rect x="400" y="2080" width="490" height="80" rx="40" fill="url(#moonGradient)"/>
+  <text x="645" y="2133" font-family="Poppins, sans-serif" font-size="28" font-weight="400" fill="#ffffff" text-anchor="middle">Partager mon horoscope</text>
+
+  <!-- Bottom Navigation -->
+  <rect x="0" y="2550" width="1290" height="246" fill="rgba(13,6,21,0.95)"/>
+  <line x1="0" y1="2550" x2="1290" y2="2550" stroke="rgba(183,148,246,0.2)" stroke-width="1"/>
+
+  <!-- Nav Icons - Horoscope active -->
+  <g transform="translate(215, 2620)">
+    <circle cx="0" cy="0" r="25" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <circle cx="10" cy="-7" r="20" fill="rgba(13,6,21,0.95)"/>
+    <text x="0" y="70" font-family="Poppins, sans-serif" font-size="24" fill="rgba(255,255,255,0.5)" text-anchor="middle">Accueil</text>
+  </g>
+
+  <g transform="translate(430, 2620)">
+    <rect x="-20" y="-25" width="40" height="35" rx="5" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <line x1="-20" y1="-15" x2="20" y2="-15" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <text x="0" y="70" font-family="Poppins, sans-serif" font-size="24" fill="rgba(255,255,255,0.5)" text-anchor="middle">Calendrier</text>
+  </g>
+
+  <g transform="translate(645, 2620)">
+    <circle cx="0" cy="-5" r="20" fill="none" stroke="#b794f6" stroke-width="3"/>
+    <circle cx="0" cy="-5" r="5" fill="#b794f6"/>
+    <text x="0" y="70" font-family="Poppins, sans-serif" font-size="24" fill="#b794f6" text-anchor="middle">Horoscope</text>
+  </g>
+
+  <g transform="translate(860, 2620)">
+    <circle cx="0" cy="-5" r="8" fill="#ffd700" opacity="0.5"/>
+    <line x1="0" y1="-5" x2="0" y2="15" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <text x="0" y="70" font-family="Poppins, sans-serif" font-size="24" fill="rgba(255,255,255,0.5)" text-anchor="middle">Rituels</text>
+  </g>
+
+  <g transform="translate(1075, 2620)">
+    <circle cx="0" cy="-10" r="15" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <ellipse cx="0" cy="20" rx="20" ry="12" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3"/>
+    <text x="0" y="70" font-family="Poppins, sans-serif" font-size="24" fill="rgba(255,255,255,0.5)" text-anchor="middle">Profil</text>
+  </g>
+
+  <rect x="495" y="2746" width="300" height="10" rx="5" fill="rgba(255,255,255,0.3)"/>
+</svg>

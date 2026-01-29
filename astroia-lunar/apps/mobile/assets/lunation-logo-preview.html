@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunation Logo - Brand Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #0d0615 0%, #1a0b2e 50%, #2d1b4e 100%);
+            min-height: 100vh;
+            color: #ffffff;
+            padding: 40px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-weight: 300;
+            font-size: 2.5rem;
+            letter-spacing: 8px;
+            text-align: center;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #b794f6, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            text-align: center;
+            color: #b794f6;
+            font-weight: 300;
+            margin-bottom: 60px;
+            letter-spacing: 3px;
+        }
+        .logo-section {
+            margin-bottom: 60px;
+        }
+        .section-title {
+            font-size: 0.9rem;
+            letter-spacing: 4px;
+            color: #b794f6;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+        .logo-card {
+            background: rgba(26, 11, 46, 0.8);
+            border: 1px solid rgba(183, 148, 246, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .logo-card img, .logo-card svg {
+            max-width: 100%;
+            height: auto;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+        .color-palette {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .color-swatch {
+            text-align: center;
+        }
+        .color-box {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .color-name {
+            font-size: 0.75rem;
+            color: #b794f6;
+            letter-spacing: 1px;
+        }
+        .color-hex {
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.6);
+        }
+        .small-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+        }
+        .icon-preview {
+            width: 100px;
+            height: 100px;
+        }
+        .favicon-preview {
+            width: 32px;
+            height: 32px;
+        }
+        .inline-svg {
+            width: 100%;
+            max-width: 400px;
+        }
+        .stacked-svg {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LUNATION</h1>
+        <p class="subtitle">Brand Identity Guide</p>
+
+        <!-- Logo Complet Horizontal -->
+        <div class="logo-section">
+            <h2 class="section-title">1. Logo Complet (Horizontal)</h2>
+            <div class="logo-card">
+                <svg class="inline-svg" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="moonGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#2d1b4e"/>
+                            <stop offset="100%" style="stop-color:#b794f6"/>
+                        </linearGradient>
+                        <filter id="starGlow1" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                    <rect width="400" height="120" fill="#1a0b2e"/>
+                    <g transform="translate(50, 60) rotate(-15)">
+                        <circle cx="0" cy="0" r="35" fill="url(#moonGradient1)"/>
+                        <circle cx="15" cy="-10" r="28" fill="#1a0b2e"/>
+                    </g>
+                    <circle cx="78" cy="28" r="4" fill="#ffd700" filter="url(#starGlow1)"/>
+                    <circle cx="85" cy="22" r="1.5" fill="#ffd700" opacity="0.7"/>
+                    <circle cx="72" cy="20" r="1" fill="#ffd700" opacity="0.5"/>
+                    <text x="115" y="68" font-family="'Poppins', sans-serif" font-size="36" font-weight="300" letter-spacing="6" fill="#ffffff">LUNATION</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo Compact Stacked -->
+        <div class="logo-section">
+            <h2 class="section-title">2. Logo Compact (Empilé)</h2>
+            <div class="logo-card">
+                <svg class="stacked-svg" viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="moonGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#2d1b4e"/>
+                            <stop offset="100%" style="stop-color:#b794f6"/>
+                        </linearGradient>
+                        <filter id="starGlow2" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                    <rect width="200" height="180" fill="#1a0b2e"/>
+                    <g transform="translate(100, 70) rotate(-15)">
+                        <circle cx="0" cy="0" r="45" fill="url(#moonGradient2)"/>
+                        <circle cx="18" cy="-12" r="36" fill="#1a0b2e"/>
+                    </g>
+                    <circle cx="136" cy="30" r="5" fill="#ffd700" filter="url(#starGlow2)"/>
+                    <circle cx="145" cy="22" r="2" fill="#ffd700" opacity="0.7"/>
+                    <circle cx="128" cy="20" r="1.2" fill="#ffd700" opacity="0.5"/>
+                    <text x="100" y="155" font-family="'Poppins', sans-serif" font-size="22" font-weight="300" letter-spacing="5" fill="#ffffff" text-anchor="middle">LUNATION</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Icon & Favicon -->
+        <div class="logo-section">
+            <h2 class="section-title">3. App Icon & Favicon</h2>
+            <div class="logo-card">
+                <div class="small-preview">
+                    <div style="text-align: center;">
+                        <svg class="icon-preview" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="moonGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#2d1b4e"/>
+                                    <stop offset="100%" style="stop-color:#b794f6"/>
+                                </linearGradient>
+                                <filter id="starGlow3" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+                                    <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
+                            </defs>
+                            <rect width="1024" height="1024" rx="180" ry="180" fill="#1a0b2e"/>
+                            <g transform="translate(512, 512) rotate(-15)">
+                                <circle cx="0" cy="0" r="320" fill="url(#moonGradient3)"/>
+                                <circle cx="130" cy="-90" r="260" fill="#1a0b2e"/>
+                            </g>
+                            <circle cx="720" cy="200" r="35" fill="#ffd700" filter="url(#starGlow3)"/>
+                            <circle cx="780" cy="150" r="12" fill="#ffd700" opacity="0.7"/>
+                            <circle cx="670" cy="140" r="8" fill="#ffd700" opacity="0.5"/>
+                        </svg>
+                        <p style="color: #b794f6; font-size: 0.8rem; margin-top: 10px;">App Icon (1024×1024)</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <svg class="favicon-preview" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="moonGradient4" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#2d1b4e"/>
+                                    <stop offset="100%" style="stop-color:#b794f6"/>
+                                </linearGradient>
+                            </defs>
+                            <rect width="32" height="32" rx="6" ry="6" fill="#1a0b2e"/>
+                            <g transform="translate(16, 16) rotate(-15)">
+                                <circle cx="0" cy="0" r="10" fill="url(#moonGradient4)"/>
+                                <circle cx="4" cy="-3" r="8" fill="#1a0b2e"/>
+                            </g>
+                            <circle cx="24" cy="7" r="2" fill="#ffd700"/>
+                        </svg>
+                        <p style="color: #b794f6; font-size: 0.8rem; margin-top: 10px;">Favicon (32×32)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="logo-section">
+            <h2 class="section-title">Palette de Couleurs</h2>
+            <div class="color-palette">
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #1a0b2e;"></div>
+                    <p class="color-name">Violet Profond</p>
+                    <p class="color-hex">#1a0b2e</p>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #2d1b4e;"></div>
+                    <p class="color-name">Violet Moyen</p>
+                    <p class="color-hex">#2d1b4e</p>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #b794f6;"></div>
+                    <p class="color-name">Lavande Accent</p>
+                    <p class="color-hex">#b794f6</p>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #ffd700;"></div>
+                    <p class="color-name">Or</p>
+                    <p class="color-hex">#ffd700</p>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #ffffff; border: 1px solid rgba(183,148,246,0.3);"></div>
+                    <p class="color-name">Blanc</p>
+                    <p class="color-hex">#ffffff</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
