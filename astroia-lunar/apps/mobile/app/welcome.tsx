@@ -24,7 +24,7 @@ import { useOnboardingStore } from '../stores/useOnboardingStore';
 import { colors, fonts, spacing, borderRadius } from '../constants/theme';
 import { goToNextOnboardingStep } from '../services/onboardingFlow';
 import { getOnboardingFlowState } from '../utils/onboardingHelpers';
-import { AnimatedMoon } from '../components/onboarding/AnimatedMoon';
+import { LunationLogo } from '../components/LunationLogo';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -107,10 +107,18 @@ export default function WelcomeScreen() {
     <LinearGradient colors={colors.darkBg} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.content}>
-          {/* Animation de la lune */}
-          <View style={styles.moonSection}>
-            <AnimatedMoon size={100} animationDuration={2000} showStars={true} />
-          </View>
+          {/* Logo Lunation */}
+          <Animated.View
+            style={[
+              styles.moonSection,
+              {
+                opacity: titleOpacity,
+                transform: [{ scale: buttonScale }],
+              },
+            ]}
+          >
+            <LunationLogo variant="stacked" size={160} />
+          </Animated.View>
 
           {/* Texte principal */}
           <View style={styles.textSection}>

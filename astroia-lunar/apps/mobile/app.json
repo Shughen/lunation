@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "lunation",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/lunation-icon-1024.png",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
@@ -13,9 +13,9 @@
       "web"
     ],
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/lunation-icon-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
+      "backgroundColor": "#1a0b2e"
     },
     "plugins": [
       "expo-router",
@@ -40,12 +40,12 @@
       "package": "com.shughen85.astroialunar",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a2e"
+        "foregroundImage": "./assets/lunation-icon-1024.png",
+        "backgroundColor": "#1a0b2e"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/lunation-favicon-32.svg"
     }
   }
 }

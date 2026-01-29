@@ -31,6 +31,7 @@ import { HeroLunarCard } from '../../components/HeroLunarCard';
 import { TodayMiniCard } from '../../components/TodayMiniCard';
 import { NatalMiniCard } from '../../components/NatalMiniCard';
 import { TodayBottomSheet, TodayBottomSheetRef } from '../../components/TodayBottomSheet';
+import { LunationLogo } from '../../components/LunationLogo';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
@@ -92,7 +93,7 @@ export default function HomeScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Lunation</Text>
+            <LunationLogo variant="horizontal" size={80} />
             <Text style={styles.subtitle}>Ton rituel lunaire</Text>
           </View>
 

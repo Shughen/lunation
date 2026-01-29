@@ -29,6 +29,7 @@ import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { goToNextOnboardingStep } from '../../services/onboardingFlow';
 import { getOnboardingFlowState } from '../../utils/onboardingHelpers';
 import { translateZodiacSign } from '../../utils/astrologyTranslations';
+import { LunationLogo } from '../../components/LunationLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -309,7 +310,7 @@ export default function OnboardingIndexScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header with Skip */}
         <View style={styles.header}>
-          <View style={{ width: 60 }} />
+          <LunationLogo variant="icon" size={32} />
           <Text style={styles.headerTitle}>Découvre Lunation</Text>
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
             <Text style={styles.skipText}>Passer</Text>
