@@ -244,7 +244,7 @@ export default function ConsentScreen() {
                 {accepted && <Text style={styles.checkboxCheck}>✓</Text>}
               </Animated.View>
               <Text style={styles.checkboxLabel}>
-                J'accepte la politique de confidentialite
+                J'accepte la politique de confidentialité
               </Text>
             </TouchableOpacity>
           </Animated.View>

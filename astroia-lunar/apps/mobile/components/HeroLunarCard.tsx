@@ -79,11 +79,14 @@ const formatMonthName = (returnDate: string): string => {
 /**
  * Formate la plage de dates du cycle lunaire
  */
-const formatDateRange = (returnDate: string): string => {
+const formatDateRange = (returnDate: string, endDate?: string): string => {
   const start = new Date(returnDate);
-  const end = new Date(start.getTime() + 29.5 * 24 * 60 * 60 * 1000);
+  const end = endDate ? new Date(endDate) : new Date(start.getTime() + 29.5 * 24 * 60 * 60 * 1000);
 
-  return `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+  const startStr = start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
+  const endStr = end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
+
+  return `${startStr} - ${endStr}`;
 };
 
 export function HeroLunarCard({ lunarReturn, loading, onPress }: HeroLunarCardProps) {
@@ -138,7 +141,7 @@ export function HeroLunarCard({ lunarReturn, loading, onPress }: HeroLunarCardPr
 
   // Derive display data
   const monthName = formatMonthName(lunarReturn.return_date);
-  const dateRange = formatDateRange(lunarReturn.return_date);
+  const dateRange = formatDateRange(lunarReturn.return_date, lunarReturn.end_date);
   const moonSign = lunarReturn.moon_sign ? translateZodiacSign(lunarReturn.moon_sign) : 'Non disponible';
   const lunarAscendant = lunarReturn.lunar_ascendant ? translateZodiacSign(lunarReturn.lunar_ascendant) : 'Non disponible';
 

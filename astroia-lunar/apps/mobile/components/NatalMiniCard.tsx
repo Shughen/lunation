@@ -58,7 +58,7 @@ export function NatalMiniCard({ onPress }: NatalMiniCardProps) {
         <AstroWheelIcon />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>Mon theme natal</Text>
+        <Text style={styles.title}>Mon thème natal</Text>
         <Text style={styles.subtitle}>Voir mon ciel de naissance</Text>
       </View>
       <Text style={styles.chevron}>{'>'}</Text>

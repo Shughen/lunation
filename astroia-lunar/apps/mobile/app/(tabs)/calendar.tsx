@@ -152,22 +152,44 @@ function useVocWindows() {
 }
 
 // Format VoC window for display
-function formatVocWindow(window: { start_at: string; end_at: string }): { date: string; time: string } {
+function formatVocWindow(window: { start_at: string; end_at: string }): {
+  date: string;
+  time: string;
+  duration: string;
+} {
   const start = new Date(window.start_at);
   const end = new Date(window.end_at);
 
-  const dateStr = start.toLocaleDateString('fr-FR', {
+  const isSameDay = start.toDateString() === end.toDateString();
+
+  // Format date
+  const startDateStr = start.toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  const endDateStr = end.toLocaleDateString('fr-FR', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
 
+  const dateStr = isSameDay
+    ? startDateStr
+    : `${startDateStr} → ${endDateStr}`;
+
+  // Format heures
   const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
   const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+
+  // Calcul durée en heures
+  const durationMs = end.getTime() - start.getTime();
+  const durationHours = (durationMs / (1000 * 60 * 60)).toFixed(1);
 
   return {
     date: dateStr.charAt(0).toUpperCase() + dateStr.slice(1),
     time: `${startTime} - ${endTime}`,
+    duration: `${durationHours}h`,
   };
 }
 
@@ -217,10 +239,18 @@ export default function CalendarScreen() {
     router.push(`/lunar-month/${monthStr}`);
   };
 
-  // Find key phase days for the legend
-  const keyPhaseDays = calendarDays.filter(
-    (d) => d.isCurrentMonth && KEY_PHASES.includes(d.moonPhase.phase)
-  );
+  // Find key phase days for the legend (deduplicated by phase type)
+  const keyPhaseDays = useMemo(() => {
+    const seen = new Set<string>();
+    return calendarDays
+      .filter((d) => d.isCurrentMonth && KEY_PHASES.includes(d.moonPhase.phase))
+      .filter((d) => {
+        if (seen.has(d.moonPhase.phase)) return false;
+        seen.add(d.moonPhase.phase);
+        return true;
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [calendarDays]);
 
   return (
     <LinearGradientComponent colors={colors.darkBg} style={styles.container}>
@@ -279,7 +309,14 @@ export default function CalendarScreen() {
                 {day.day}
               </Text>
               {day.isCurrentMonth && (
-                <Text style={styles.moonEmoji}>{day.moonPhase.emoji}</Text>
+                <Text
+                  style={[
+                    styles.moonEmoji,
+                    KEY_PHASES.includes(day.moonPhase.phase) && styles.moonEmojiMain,
+                  ]}
+                >
+                  {day.moonPhase.emoji}
+                </Text>
               )}
             </TouchableOpacity>
           ))}
@@ -323,9 +360,9 @@ export default function CalendarScreen() {
         {/* VoC Windows Section */}
         {vocWindows.length > 0 && (
           <View style={styles.vocSection}>
-            <Text style={styles.vocSectionTitle}>Fenetres VoC cette semaine</Text>
+            <Text style={styles.vocSectionTitle}>Fenêtres VoC cette semaine</Text>
             <Text style={styles.vocSectionSubtitle}>
-              Periodes a eviter pour les decisions importantes
+              Périodes à éviter pour les décisions importantes
             </Text>
             {vocWindows.map((window, index) => {
               const formatted = formatVocWindow(window);
@@ -336,7 +373,9 @@ export default function CalendarScreen() {
                   </View>
                   <View style={styles.vocWindowInfo}>
                     <Text style={styles.vocWindowDate}>{formatted.date}</Text>
-                    <Text style={styles.vocWindowTime}>{formatted.time}</Text>
+                    <Text style={styles.vocWindowTime}>
+                      {formatted.time} ({formatted.duration})
+                    </Text>
                   </View>
                 </View>
               );
@@ -435,6 +474,10 @@ const styles = StyleSheet.create({
   moonEmoji: {
     fontSize: 12,
     marginTop: 2,
+  },
+  moonEmojiMain: {
+    fontSize: 16,
+    opacity: 1,
   },
   legendCard: {
     backgroundColor: colors.cardBg,
