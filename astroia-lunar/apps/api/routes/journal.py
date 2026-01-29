@@ -31,46 +31,22 @@ async def create_journal_entry(
     """
     Crée une nouvelle entrée de journal.
 
+    - Plusieurs entrées par jour autorisées (journal classique)
     - Lie automatiquement l'entrée au cycle lunaire actif si month fourni
-    - Une seule entrée par jour par utilisateur
-    - Si une entrée existe déjà pour la date, elle est mise à jour
     """
     try:
-        # Vérifier si une entrée existe déjà pour cette date
-        stmt = select(JournalEntry).where(
-            and_(
-                JournalEntry.user_id == current_user.id,
-                JournalEntry.date == entry_data.date
-            )
+        new_entry = JournalEntry(
+            user_id=current_user.id,
+            date=entry_data.date,
+            mood=entry_data.mood,
+            note=entry_data.note,
+            month=entry_data.month
         )
-        result = await db.execute(stmt)
-        existing_entry = result.scalar_one_or_none()
-
-        if existing_entry:
-            # Mettre à jour l'entrée existante
-            existing_entry.mood = entry_data.mood
-            existing_entry.note = entry_data.note
-            if entry_data.month:
-                existing_entry.month = entry_data.month
-            existing_entry.updated_at = datetime.utcnow()
-            await db.commit()
-            await db.refresh(existing_entry)
-            logger.info(f"✅ Journal entry updated: user_id={current_user.id}, date={entry_data.date}")
-            return existing_entry
-        else:
-            # Créer une nouvelle entrée
-            new_entry = JournalEntry(
-                user_id=current_user.id,
-                date=entry_data.date,
-                mood=entry_data.mood,
-                note=entry_data.note,
-                month=entry_data.month
-            )
-            db.add(new_entry)
-            await db.commit()
-            await db.refresh(new_entry)
-            logger.info(f"✅ Journal entry created: user_id={current_user.id}, date={entry_data.date}")
-            return new_entry
+        db.add(new_entry)
+        await db.commit()
+        await db.refresh(new_entry)
+        logger.info(f"✅ Journal entry created: user_id={current_user.id}, date={entry_data.date}, id={new_entry.id}")
+        return new_entry
 
     except Exception as e:
         logger.error(f"❌ Error creating journal entry: {e}")

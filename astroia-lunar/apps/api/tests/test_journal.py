@@ -69,22 +69,22 @@ async def test_create_journal_entry_with_dev_bypass_succeeds(setup_test_db):
 
 
 @pytest.mark.asyncio
-async def test_update_existing_journal_entry(setup_test_db):
+async def test_multiple_entries_same_day(setup_test_db):
     """
-    Test: Mettre à jour une entrée existante (même date).
-    Doit retourner 201 et mettre à jour l'entrée.
+    Test: Créer plusieurs entrées le même jour (journal classique).
+    Chaque POST crée une nouvelle entrée, pas de mise à jour.
     """
-    initial_payload = {
+    first_payload = {
         "date": "2026-01-17",
         "mood": "neutral",
-        "note": "Journée normale",
+        "note": "Première pensée",
         "month": "2026-01"
     }
 
-    updated_payload = {
+    second_payload = {
         "date": "2026-01-17",
         "mood": "excited",
-        "note": "Finalement super journée!",
+        "note": "Deuxième pensée",
         "month": "2026-01"
     }
 
@@ -92,30 +92,38 @@ async def test_update_existing_journal_entry(setup_test_db):
          patch('config.settings.APP_ENV', 'development'):
 
         async with AsyncClient(app=app, base_url="http://test") as client:
-            # Créer l'entrée initiale
+            # Créer la première entrée
             response1 = await client.post(
                 "/api/journal/entry",
-                json=initial_payload,
+                json=first_payload,
                 headers={"X-Dev-User-Id": "1"}
             )
             assert response1.status_code == 201
-            entry_id = response1.json()["id"]
+            first_id = response1.json()["id"]
 
-            # Mettre à jour l'entrée (même date)
+            # Créer la deuxième entrée (même date)
             response2 = await client.post(
                 "/api/journal/entry",
-                json=updated_payload,
+                json=second_payload,
                 headers={"X-Dev-User-Id": "1"}
             )
 
             assert response2.status_code == 201
             data = response2.json()
 
-            # Doit avoir le même ID (mise à jour, pas création)
-            assert data["id"] == entry_id
+            # Doit avoir un ID différent (nouvelle entrée)
+            assert data["id"] != first_id
             assert data["mood"] == "excited"
-            assert data["note"] == "Finalement super journée!"
-            assert "updated_at" in data
+            assert data["note"] == "Deuxième pensée"
+
+            # Vérifier qu'on a bien 2 entrées
+            entries_response = await client.get(
+                "/api/journal/entries",
+                headers={"X-Dev-User-Id": "1"}
+            )
+            entries_data = entries_response.json()
+            jan17_entries = [e for e in entries_data["entries"] if e["date"] == "2026-01-17"]
+            assert len(jan17_entries) == 2
 
 
 @pytest.mark.asyncio
