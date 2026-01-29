@@ -25,6 +25,7 @@ import { MarkdownText } from '../../components/MarkdownText';
 import LunarInterpretationLoader from '../../components/LunarInterpretationLoader';
 import { showNetworkErrorAlert, getHumanErrorMessage } from '../../utils/errorHandler';
 import { translateZodiacSign, translateAstrologyText } from '../../utils/astrologyTranslations';
+import { tPlanet, tAspect } from '../../i18n/astro.format';
 import type { AspectV4 } from '../../types/api';
 import { haptics } from '../../services/haptics';
 
@@ -326,7 +327,7 @@ export default function LunarReportScreen() {
           >
             <View style={styles.aspectHeader}>
               <Text style={styles.aspectPlanets}>
-                {aspect.planet1} {getAspectSymbol(aspect.type)} {aspect.planet2}
+                {tPlanet(aspect.planet1)} {getAspectSymbol(aspect.type)} {tPlanet(aspect.planet2)}
               </Text>
               <Text style={styles.aspectOrb}>
                 {Math.abs(aspect.orb).toFixed(1)}°
@@ -335,7 +336,7 @@ export default function LunarReportScreen() {
 
             {aspect.copy?.summary && (
               <Text style={styles.aspectSummary} numberOfLines={2}>
-                {aspect.copy.summary}
+                {translateAstrologyText(aspect.copy.summary)}
               </Text>
             )}
 

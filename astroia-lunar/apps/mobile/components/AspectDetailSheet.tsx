@@ -23,7 +23,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AspectV4 } from '../types/api';
 import { colors } from '../constants/theme';
-import { tSign } from '../i18n/astro.format';
+import { tSign, tPlanet } from '../i18n/astro.format';
+import { translateAstrologyText } from '../utils/astrologyTranslations';
 
 interface AspectDetailSheetProps {
   visible: boolean;
@@ -104,7 +105,7 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
               <View style={styles.metadataRow}>
                 <Text style={styles.metadataLabel}>Planètes :</Text>
                 <Text style={styles.metadataValue}>
-                  {aspect.planet1} ({sign1}, {house1}) ↔ {aspect.planet2} ({sign2}, {house2})
+                  {tPlanet(aspect.planet1)} ({sign1}, {house1}) ↔ {tPlanet(aspect.planet2)} ({sign2}, {house2})
                 </Text>
               </View>
 
@@ -144,7 +145,7 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
                 {/* Section 1: Summary */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>✨ En bref</Text>
-                  <Text style={styles.summaryText}>{aspect.copy.summary}</Text>
+                  <Text style={styles.summaryText}>{translateAstrologyText(aspect.copy.summary)}</Text>
                 </View>
 
                 {/* Section 2: Why (bullets factuels) */}
@@ -153,7 +154,7 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
                   {aspect.copy.why.map((bullet, index) => (
                     <View key={index} style={styles.bulletRow}>
                       <Text style={styles.bulletDot}>•</Text>
-                      <Text style={styles.bulletText}>{bullet}</Text>
+                      <Text style={styles.bulletText}>{translateAstrologyText(bullet)}</Text>
                     </View>
                   ))}
                 </View>
@@ -161,14 +162,14 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
                 {/* Section 3: Manifestation (tone v4 professionnel) */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>🌟 Manifestations concrètes</Text>
-                  <Text style={styles.manifestationText}>{aspect.copy.manifestation}</Text>
+                  <Text style={styles.manifestationText}>{translateAstrologyText(aspect.copy.manifestation)}</Text>
                 </View>
 
                 {/* Section 4: Advice (optionnel) */}
                 {aspect.copy.advice && (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>💡 Conseil pratique</Text>
-                    <Text style={styles.adviceText}>{aspect.copy.advice}</Text>
+                    <Text style={styles.adviceText}>{translateAstrologyText(aspect.copy.advice)}</Text>
                   </View>
                 )}
               </>
