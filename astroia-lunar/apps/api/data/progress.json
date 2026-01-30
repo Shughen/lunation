@@ -1,11 +1,12 @@
 {
-  "total_aspects": 130,
-  "completed_batches": 14,
-  "total_batches": 14,
-  "aspects_inserted": 130,
+  "total_aspects": 215,
+  "completed_batches": 22,
+  "total_batches": 22,
+  "aspects_inserted": 215,
   "progress_percent": 100.0,
   "total_cost_usd": 0,
-  "last_batch_at": "2026-01-30T22:00:00Z",
+  "last_batch_at": "2026-01-30T23:30:00Z",
+  "note": "130 aspects prioritaires + 85 aspects secondaires = 215 aspects v5 générés manuellement",
   "batches": [
     {
       "number": 1,
@@ -117,7 +118,71 @@
       "pairs": ["jupiter-saturn", "saturn-neptune"],
       "cost_usd": 0,
       "committed_at": "2026-01-30T22:00:00Z",
-      "notes": "Jupiter-Saturn: rêve + structure, Saturn-Neptune: réel + imaginaire. FINAL - 130/130 COMPLÉTÉS."
+      "notes": "Jupiter-Saturn: rêve + structure, Saturn-Neptune: réel + imaginaire. FIN ASPECTS PRIORITAIRES - 130/130."
+    },
+    {
+      "number": 15,
+      "aspects": 10,
+      "pairs": ["mercury-venus", "mercury-uranus"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:00:00Z",
+      "notes": "Extension aspects secondaires 1/8. Mercury-Venus: communication + charme, Mercury-Uranus: intellect + innovation."
+    },
+    {
+      "number": 16,
+      "aspects": 10,
+      "pairs": ["mercury-neptune", "mercury-pluto"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:05:00Z",
+      "notes": "Extension 2/8. Mercury-Neptune: esprit + imaginaire, Mercury-Pluto: intellect + profondeur."
+    },
+    {
+      "number": 17,
+      "aspects": 10,
+      "pairs": ["venus-uranus", "venus-neptune"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:10:00Z",
+      "notes": "Extension 3/8. Venus-Uranus: amour + liberté, Venus-Neptune: désir + rêve."
+    },
+    {
+      "number": 18,
+      "aspects": 10,
+      "pairs": ["venus-pluto", "mars-neptune"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:15:00Z",
+      "notes": "Extension 4/8. Venus-Pluto: amour + obsession, Mars-Neptune: action + dissolution."
+    },
+    {
+      "number": 19,
+      "aspects": 10,
+      "pairs": ["mars-pluto", "jupiter-uranus"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:20:00Z",
+      "notes": "Extension 5/8. Mars-Pluto: action + transformation, Jupiter-Uranus: expansion + rupture."
+    },
+    {
+      "number": 20,
+      "aspects": 10,
+      "pairs": ["jupiter-neptune", "jupiter-pluto"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:25:00Z",
+      "notes": "Extension 6/8. Jupiter-Neptune: foi + imaginaire, Jupiter-Pluto: ambition + pouvoir."
+    },
+    {
+      "number": 21,
+      "aspects": 10,
+      "pairs": ["saturn-uranus", "saturn-pluto"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:28:00Z",
+      "notes": "Extension 7/8. Saturn-Uranus: structure + liberté, Saturn-Pluto: limites + profondeur."
+    },
+    {
+      "number": 22,
+      "aspects": 15,
+      "pairs": ["uranus-neptune", "uranus-pluto", "neptune-pluto"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T23:30:00Z",
+      "notes": "Extension 8/8 FINAL. Uranus-Neptune: révolution + rêve, Uranus-Pluto: rupture + transformation, Neptune-Pluto: dissolution + pouvoir. TOUS LES 215 ASPECTS COMPLÉTÉS."
     }
   ]
 }
