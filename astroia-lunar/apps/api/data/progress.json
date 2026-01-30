@@ -1,11 +1,11 @@
 {
   "total_aspects": 130,
-  "completed_batches": 4,
+  "completed_batches": 5,
   "total_batches": 10,
-  "aspects_inserted": 30,
-  "progress_percent": 23.1,
+  "aspects_inserted": 40,
+  "progress_percent": 30.8,
   "total_cost_usd": 0,
-  "last_batch_at": "2026-01-30T20:00:00Z",
+  "last_batch_at": "2026-01-30T20:15:00Z",
   "batches": [
     {
       "number": 1,
@@ -38,6 +38,14 @@
       "cost_usd": 0,
       "committed_at": "2026-01-30T20:00:00Z",
       "notes": "Mercury: intellect/communication, Saturn: structure/discipline. Différenciation claire des énergies."
+    },
+    {
+      "number": 5,
+      "aspects": 10,
+      "pairs": ["sun-uranus", "sun-neptune"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T20:15:00Z",
+      "notes": "Uranus: rupture/innovation/liberté, Neptune: imaginaire/dissolution/transcendance. Aspects très différenciés."
     }
   ]
 }
