@@ -4,6 +4,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { deduplicateLocations } from '../../utils/locationDedup';
+import { rankLocationsByRelevance } from '../../utils/locationRanking';
+import i18n from '../../i18n';
 import {
   View,
   Text,
@@ -114,8 +116,9 @@ export default function ProfileSetupScreen() {
 
       const data: NominatimPlace[] = await response.json();
       const deduplicated = deduplicateLocations(data);
-      setSuggestions(deduplicated);
-      setShowSuggestions(deduplicated.length > 0);
+      const ranked = rankLocationsByRelevance(deduplicated, i18n.language);
+      setSuggestions(ranked);
+      setShowSuggestions(ranked.length > 0);
     } catch (error) {
       console.warn('[PROFILE-SETUP] Erreur recherche Nominatim:', error);
       setSuggestions([]);
