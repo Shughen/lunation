@@ -36,7 +36,7 @@ const PHASE_KEYWORDS: Record<string, string[]> = {
   new_moon: ['Intention', 'Nouveaute', 'Potentiel'],
   waxing_crescent: ['Action', 'Courage', 'Mouvement'],
   first_quarter: ['Decision', 'Perseverance', 'Force'],
-  waxing_gibbous: ['Perfectionnement', 'Patience', 'Detail'],
+  waxing_gibbous: ['Perfectionnement', 'Patience', 'Détail'],
   full_moon: ['Accomplissement', 'Celebration', 'Liberation'],
   waning_gibbous: ['Gratitude', 'Partage', 'Sagesse'],
   last_quarter: ['Lacher-prise', 'Transformation', 'Bilan'],
