@@ -184,8 +184,30 @@ def parse_markdown_to_copy(markdown_content: str) -> Dict[str, Any]:
 # Types d'aspects majeurs (v4 senior professionnel + sextile)
 MAJOR_ASPECT_TYPES = {'conjunction', 'opposition', 'square', 'trine', 'sextile'}
 
-# Orbe maximum pour v4 (strict)
-MAX_ORB_V4 = 6.0
+# Ordre de tri des aspects (comme Astrotheme : par type puis par orbe)
+# Plus le nombre est petit, plus l'aspect est important
+ASPECT_SORT_ORDER = {
+    'conjunction': 1,
+    'opposition': 2,
+    'square': 3,
+    'trine': 4,
+    'sextile': 5,
+    'quincunx': 6,
+    'quinconce': 6,
+    'semisquare': 7,
+    'semicarre': 7,
+    'sesquiquadrate': 8,
+    'sesquicarre': 8,
+    'biquintile': 9,
+    'semisextile': 10,
+}
+
+# Orbes variables selon standard Liz Greene (Astrodienst)
+MAX_ORB_STANDARD = 8.0  # 8° pour aspects standard
+MAX_ORB_LUMINARIES = 10.0  # 10° quand un luminaire (Soleil/Lune) est impliqué
+
+# Luminaires (Soleil et Lune)
+LUMINARIES = {'sun', 'moon', 'soleil', 'lune'}
 
 # Angles exacts attendus pour chaque type d'aspect
 EXPECTED_ANGLES: Dict[str, int] = {
@@ -378,13 +400,37 @@ HOUSE_LABELS = {
 
 # === FILTRAGE V4 ===
 
+def get_max_orb(planet1: str, planet2: str) -> float:
+    """
+    Retourne l'orbe maximum selon la présence de luminaires (standard Liz Greene/Astrodienst)
+
+    Règles:
+    - 10° si au moins un luminaire (Soleil ou Lune) est impliqué
+    - 8° pour tous les autres aspects
+
+    Args:
+        planet1: Nom de la première planète
+        planet2: Nom de la seconde planète
+
+    Returns:
+        Orbe maximum en degrés (8.0 ou 10.0)
+    """
+    p1_normalized = planet1.lower().replace('_', '').replace(' ', '').replace('-', '')
+    p2_normalized = planet2.lower().replace('_', '').replace(' ', '').replace('-', '')
+
+    # Vérifier si un des deux est un luminaire
+    if p1_normalized in LUMINARIES or p2_normalized in LUMINARIES:
+        return MAX_ORB_LUMINARIES  # 10°
+    return MAX_ORB_STANDARD  # 8°
+
+
 def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Filtre les aspects selon règles v4 (senior professionnel)
 
     Règles:
     - Types majeurs uniquement: conjunction, opposition, square, trine, sextile
-    - Orbe strict: <= 6°
+    - Orbe variable: 8° standard, 10° avec luminaires (Soleil/Lune)
     - Exclure Lilith, Chiron, Nœuds lunaires (mean_node, true_node)
 
     Args:
@@ -404,12 +450,7 @@ def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any
         if aspect_type not in MAJOR_ASPECT_TYPES:
             continue
 
-        # 2. Orbe <= 6°
-        orb = abs(aspect.get('orb', 999))
-        if orb > MAX_ORB_V4:
-            continue
-
-        # 3. Exclure points mineurs/karmiques
+        # 2. Exclure points mineurs/karmiques
         planet1 = aspect.get('planet1', '').lower().replace('_', '').replace(' ', '').replace('-', '')
         planet2 = aspect.get('planet2', '').lower().replace('_', '').replace(' ', '').replace('-', '')
 
@@ -419,10 +460,22 @@ def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any
         if any(excluded in planet2 for excluded in EXCLUDED_POINTS):
             continue
 
+        # 3. Vérifier orbe variable selon luminaires
+        max_orb = get_max_orb(aspect.get('planet1', ''), aspect.get('planet2', ''))
+        orb = abs(aspect.get('orb', 999))
+        if orb > max_orb:
+            continue
+
         filtered.append(aspect)
 
-    # Tri par orbe croissant (aspects les plus serrés en premier)
-    filtered.sort(key=lambda a: abs(a.get('orb', 999)))
+    # Tri comme Astrotheme : d'abord par type (ordre d'importance), puis par orbe
+    def sort_key(aspect):
+        aspect_type = aspect.get('type', '').lower()
+        type_priority = ASPECT_SORT_ORDER.get(aspect_type, 99)  # 99 pour types inconnus
+        orb = abs(aspect.get('orb', 999))
+        return (type_priority, orb)
+
+    filtered.sort(key=sort_key)
 
     return filtered
 

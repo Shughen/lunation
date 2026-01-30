@@ -17,9 +17,11 @@ from services.aspect_explanation_service import (
     enrich_aspects_v4,
     normalize_planet_name,
     get_planet_display_name,
+    get_max_orb,
     EXPECTED_ANGLES,
     MAJOR_ASPECT_TYPES,
-    MAX_ORB_V4
+    MAX_ORB_STANDARD,
+    MAX_ORB_LUMINARIES
 )
 
 
@@ -27,10 +29,10 @@ class TestV4Filtering:
     """Tests du filtrage v4 des aspects"""
 
     def test_filter_keeps_major_aspects_only(self):
-        """Filtre retient uniquement types majeurs (conjunction, opposition, square, trine)"""
+        """Filtre retient uniquement types majeurs (conjunction, opposition, square, trine, sextile)"""
         aspects = [
             {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.0},
-            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # Mineur
+            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # Majeur (inclus maintenant)
             {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 3.5},
             {'planet1': 'saturn', 'planet2': 'uranus', 'type': 'square', 'orb': 4.0},
             {'planet1': 'moon', 'planet2': 'neptune', 'type': 'quincunx', 'orb': 2.0},  # Mineur
@@ -41,22 +43,24 @@ class TestV4Filtering:
         # Vérifier que seuls les types majeurs sont retenus
         types = {a['type'] for a in filtered}
         assert types.issubset(MAJOR_ASPECT_TYPES)
-        assert len(filtered) == 3  # conjunction, trine, square
+        assert len(filtered) == 4  # conjunction, sextile, trine, square
 
-    def test_filter_respects_max_orb_6(self):
-        """Filtre exclut aspects avec orbe > 6°"""
+    def test_filter_respects_variable_orbs(self):
+        """Filtre applique orbes variables: 8° standard, 10° avec luminaires"""
         aspects = [
-            {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.5},    # ✅
-            {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 6.0},      # ✅ exactement 6
-            {'planet1': 'saturn', 'planet2': 'uranus', 'type': 'square', 'orb': 7.0},    # ❌ > 6
-            {'planet1': 'venus', 'planet2': 'neptune', 'type': 'opposition', 'orb': 5.8},# ✅
+            {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.5},    # ✅ luminaires
+            {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 7.5},      # ✅ < 8°
+            {'planet1': 'saturn', 'planet2': 'uranus', 'type': 'square', 'orb': 8.5},    # ❌ > 8°
+            {'planet1': 'venus', 'planet2': 'neptune', 'type': 'opposition', 'orb': 5.8},# ✅ < 8°
+            {'planet1': 'sun', 'planet2': 'neptune', 'type': 'trine', 'orb': 9.5},       # ✅ luminaire < 10°
+            {'planet1': 'mars', 'planet2': 'neptune', 'type': 'trine', 'orb': 9.5},      # ❌ > 8°, pas de luminaire
         ]
 
         filtered = filter_major_aspects_v4(aspects)
 
-        # Vérifier que tous les orbes sont ≤ 6°
-        assert all(abs(a['orb']) <= MAX_ORB_V4 for a in filtered)
-        assert len(filtered) == 3  # 2.5, 6.0, 5.8
+        # Vérifier que les aspects respectent les orbes variables
+        # Sun-Moon (2.5°), Mars-Jupiter (7.5°), Venus-Neptune (5.8°), Sun-Neptune (9.5°)
+        assert len(filtered) == 4
 
     def test_filter_excludes_lilith_all_variants(self):
         """Filtre exclut Lilith sous toutes ses variantes"""
@@ -80,19 +84,24 @@ class TestV4Filtering:
 
         assert len(filtered) == 2  # Seulement sun-moon et saturn-pluto
 
-    def test_filter_sorts_by_orb_ascending(self):
-        """Filtre trie aspects par orbe croissant"""
+    def test_filter_sorts_by_type_then_orb_astrotheme(self):
+        """Filtre trie comme Astrotheme: par type d'abord, puis par orbe"""
         aspects = [
             {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 5.0},
             {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 1.5},
             {'planet1': 'venus', 'planet2': 'saturn', 'type': 'square', 'orb': 3.0},
+            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'conjunction', 'orb': 2.0},
         ]
 
         filtered = filter_major_aspects_v4(aspects)
 
-        orbs = [abs(a['orb']) for a in filtered]
-        assert orbs == sorted(orbs)  # Vérifie tri croissant
-        assert orbs[0] == 1.5  # Premier aspect = orbe le plus petit
+        # Vérifier ordre des types: conjunction, square, trine
+        types = [a['type'] for a in filtered]
+        assert types == ['conjunction', 'conjunction', 'square', 'trine']
+
+        # Vérifier que les conjonctions sont triées par orbe (2.0 avant 5.0)
+        conj_orbs = [a['orb'] for a in filtered if a['type'] == 'conjunction']
+        assert conj_orbs == [2.0, 5.0]
 
 
 class TestV4Metadata:
@@ -267,10 +276,11 @@ class TestV4Integration:
     def test_enrich_aspects_complete_workflow(self):
         """Workflow complet: filtrage → métadonnées → copy"""
         raw_aspects = [
-            {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.0},
-            {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 4.5},
-            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},  # ❌ Mineur
-            {'planet1': 'saturn', 'planet2': 'pluto', 'type': 'square', 'orb': 7.5},     # ❌ Orbe > 6
+            {'planet1': 'sun', 'planet2': 'moon', 'type': 'conjunction', 'orb': 2.0},     # ✅
+            {'planet1': 'mars', 'planet2': 'jupiter', 'type': 'trine', 'orb': 4.5},       # ✅
+            {'planet1': 'mercury', 'planet2': 'venus', 'type': 'sextile', 'orb': 1.0},    # ✅ Majeur (inclus maintenant)
+            {'planet1': 'saturn', 'planet2': 'pluto', 'type': 'square', 'orb': 7.5},      # ✅ < 8°
+            {'planet1': 'mars', 'planet2': 'uranus', 'type': 'square', 'orb': 9.0},       # ❌ > 8° sans luminaire
             {'planet1': 'lilith', 'planet2': 'neptune', 'type': 'opposition', 'orb': 3.0}, # ❌ Lilith
         ]
 
@@ -279,12 +289,16 @@ class TestV4Integration:
             'moon': {'sign': 'Aries', 'house': 1, 'longitude': 17.0},
             'mars': {'sign': 'Leo', 'house': 5, 'longitude': 120.0},
             'jupiter': {'sign': 'Sagittarius', 'house': 9, 'longitude': 240.0},
+            'mercury': {'sign': 'Gemini', 'house': 3, 'longitude': 60.0},
+            'venus': {'sign': 'Taurus', 'house': 2, 'longitude': 45.0},
+            'saturn': {'sign': 'Capricorn', 'house': 10, 'longitude': 280.0},
+            'pluto': {'sign': 'Scorpio', 'house': 8, 'longitude': 220.0},
         }
 
         enriched = enrich_aspects_v4(raw_aspects, planets_data, limit=10)
 
-        # Vérifier filtrage
-        assert len(enriched) == 2  # Seulement conjunction et trine
+        # Vérifier filtrage: 4 aspects valides (conjunction, trine, sextile, square)
+        assert len(enriched) == 4
 
         # Vérifier structure enrichie
         for aspect in enriched:

@@ -246,16 +246,60 @@ export function buildSubjectPayload(
 }
 
 /**
+ * Ordre de tri des aspects (comme Astrotheme : par type puis par orbe)
+ * Plus le nombre est petit, plus l'aspect est important
+ */
+const ASPECT_SORT_ORDER: Record<string, number> = {
+  'conjunction': 1,
+  'opposition': 2,
+  'square': 3,
+  'trine': 4,
+  'sextile': 5,
+  'quincunx': 6,
+  'quinconce': 6,
+  'semisquare': 7,
+  'semicarre': 7,
+  'sesquiquadrate': 8,
+  'sesquicarre': 8,
+  'biquintile': 9,
+  'semisextile': 10,
+};
+
+/**
+ * Retourne l'orbe maximum selon la présence de luminaires (standard Liz Greene/Astrodienst)
+ *
+ * Règles:
+ * - 10° si au moins un luminaire (Soleil ou Lune) est impliqué
+ * - 8° pour tous les autres aspects
+ *
+ * @param planet1 - Nom de la première planète
+ * @param planet2 - Nom de la seconde planète
+ * @returns Orbe maximum en degrés (8 ou 10)
+ */
+function getMaxOrb(planet1: string, planet2: string): number {
+  const LUMINARIES = new Set(['sun', 'moon', 'soleil', 'lune']);
+
+  const p1Normalized = planet1.toLowerCase().replace(/[\s_-]+/g, '');
+  const p2Normalized = planet2.toLowerCase().replace(/[\s_-]+/g, '');
+
+  // Vérifier si un des deux est un luminaire
+  if (LUMINARIES.has(p1Normalized) || LUMINARIES.has(p2Normalized)) {
+    return 10.0;  // 10° avec luminaires
+  }
+  return 8.0;  // 8° standard
+}
+
+/**
  * Filtre les aspects selon les règles v4 (senior professionnel)
  *
  * Règles v4:
- * - Types majeurs uniquement: conjunction, opposition, square, trine
- * - Orbe strict: <= 6°
+ * - Types majeurs uniquement: conjunction, opposition, square, trine, sextile
+ * - Orbe variable: 8° standard, 10° avec luminaires (Soleil/Lune)
  * - Exclure Lilith (mean_lilith, lilith) des aspects affichés
  *
  * @param aspects - Liste brute des aspects
  * @param version - Version d'interprétation (2, 3, ou 4). Défaut: 4 (règles strictes)
- * @returns Aspects filtrés et triés par orbe croissant
+ * @returns Aspects filtrés et triés par type puis orbe (comme Astrotheme)
  */
 export function filterMajorAspectsV4(
   aspects: any[],
@@ -271,8 +315,7 @@ export function filterMajorAspectsV4(
   }
 
   // v4: filtrage strict
-  const MAJOR_ASPECT_TYPES = new Set(['conjunction', 'opposition', 'square', 'trine']);
-  const MAX_ORB = 6;
+  const MAJOR_ASPECT_TYPES = new Set(['conjunction', 'opposition', 'square', 'trine', 'sextile']);
 
   return aspects
     .filter((aspect) => {
@@ -282,13 +325,7 @@ export function filterMajorAspectsV4(
         return false;
       }
 
-      // 2. Orbe <= 6°
-      const orb = Math.abs(aspect.orb ?? 999);
-      if (orb > MAX_ORB) {
-        return false;
-      }
-
-      // 3. Exclure Lilith (mean_lilith, lilith)
+      // 2. Exclure Lilith (mean_lilith, lilith)
       const planet1 = aspect.planet1?.toLowerCase().replace(/[\s_-]+/g, '') ?? '';
       const planet2 = aspect.planet2?.toLowerCase().replace(/[\s_-]+/g, '') ?? '';
 
@@ -296,12 +333,30 @@ export function filterMajorAspectsV4(
         return false;
       }
 
+      // 3. Vérifier orbe variable selon luminaires
+      const maxOrb = getMaxOrb(aspect.planet1 ?? '', aspect.planet2 ?? '');
+      const orb = Math.abs(aspect.orb ?? 999);
+      if (orb > maxOrb) {
+        return false;
+      }
+
       return true;
     })
     .sort((a, b) => {
-      // Tri par orbe croissant (aspects les plus serrés en premier)
-      const orbA = Math.abs(a.orb ?? 999);
-      const orbB = Math.abs(b.orb ?? 999);
-      return orbA - orbB;
+      // Tri comme Astrotheme : d'abord par type (ordre d'importance), puis par orbe
+      const typeA = a.type?.toLowerCase() ?? '';
+      const typeB = b.type?.toLowerCase() ?? '';
+      const priorityA = ASPECT_SORT_ORDER[typeA] ?? 99;  // 99 pour types inconnus
+      const priorityB = ASPECT_SORT_ORDER[typeB] ?? 99;
+
+      // Si même type, trier par orbe
+      if (priorityA === priorityB) {
+        const orbA = Math.abs(a.orb ?? 999);
+        const orbB = Math.abs(b.orb ?? 999);
+        return orbA - orbB;
+      }
+
+      // Sinon trier par priorité du type
+      return priorityA - priorityB;
     });
 }

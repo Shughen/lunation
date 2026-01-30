@@ -805,7 +805,7 @@ def _build_major_aspects(lunar_return: Any) -> List[Dict[str, Any]]:
     try:
         from services.aspect_explanation_service import enrich_aspects_v4
 
-        enriched = enrich_aspects_v4(aspects, planets_data, limit=5)
+        enriched = enrich_aspects_v4(aspects, planets_data, limit=100)
         logger.info(f"[LunarReportBuilder] ✅ {len(enriched)} aspects enrichis v4")
         return enriched
 
