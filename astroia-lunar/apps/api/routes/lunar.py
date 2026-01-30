@@ -309,7 +309,7 @@ async def lunar_return_report(
                         result_user = await db.execute(stmt_user)
                         user_obj = result_user.scalar_one_or_none()
 
-                        if user_obj and user_obj.birth_date and user_obj.birth_time and user_obj.uuid:
+                        if user_obj and user_obj.birth_date and user_obj.birth_time and user_obj.id:
                             # Construire le payload pour transits
                             transit_payload = {
                                 "birth_date": user_obj.birth_date.isoformat(),
@@ -333,7 +333,7 @@ async def lunar_return_report(
                             }
 
                             transits_overview = TransitsOverview(
-                                user_id=user_obj.uuid,  # UUID de la table users
+                                user_id=user_obj.id,  # INTEGER user_id de la table users
                                 month=request.month,
                                 overview=overview_data
                             )

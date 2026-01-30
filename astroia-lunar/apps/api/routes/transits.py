@@ -226,58 +226,42 @@ async def get_transits_overview(
     Retourne les données en cache incluant les transits natals et LR du mois.
     Peut filtrer pour ne retourner que les aspects majeurs.
 
-    - **user_id**: ID de l'utilisateur (UUID ou integer string)
+    - **user_id**: ID de l'utilisateur (integer string)
     - **month**: Mois au format YYYY-MM
     - **major_only**: Si True, filtre uniquement les aspects majeurs (conjonction, opposition, carré, trigone)
 
-    En mode DEV_AUTH_BYPASS, utilise l'UUID du header X-Dev-User-Id au lieu de l'UUID de l'URL.
+    En mode DEV_AUTH_BYPASS, utilise l'ID du header X-Dev-User-Id.
     """
     try:
-        # === CONVERT user_id (str) to UUID ===
-        # Accept both UUID strings and integer IDs
+        # === CONVERT user_id (str) to INTEGER ===
         try:
-            if "-" in user_id:
-                # It's a UUID string
-                user_uuid = UUID(user_id)
-            else:
-                # It's an integer, look up the UUID from the users table
-                user_int = int(user_id)
-                stmt_user = select(User.uuid).where(User.id == user_int)
-                result_user = await db.execute(stmt_user)
-                user_uuid = result_user.scalar_one_or_none()
-                if not user_uuid:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"User {user_id} not found"
-                    )
+            user_id_int = int(user_id)
         except ValueError:
             raise HTTPException(
                 status_code=422,
-                detail=f"Invalid user_id format: {user_id}"
+                detail=f"Invalid user_id format: {user_id} (must be integer)"
             )
 
-        # === SECURITY CHECK: Verify user_uuid matches current_user ===
+        # === SECURITY CHECK: Verify user_id matches current_user ===
         # In production, users can only access their own transits
         if settings.APP_ENV != "development" or not settings.DEV_AUTH_BYPASS:
-            if user_uuid != current_user.uuid:
+            if user_id_int != current_user.id:
                 raise HTTPException(
                     status_code=403,
                     detail="Forbidden: cannot access other user's transits"
                 )
 
-        # En mode DEV_AUTH_BYPASS, utiliser l'UUID du header au lieu de l'UUID converti
-        # car current_user.id est INTEGER mais transits_overview.user_id est UUID
+        # En mode DEV_AUTH_BYPASS, utiliser l'ID du header si fourni
         if settings.APP_ENV == "development" and settings.DEV_AUTH_BYPASS and x_dev_user_id:
             try:
-                user_uuid = UUID(x_dev_user_id)
-                logger.debug(f"🔧 DEV_AUTH_BYPASS: utilisation UUID du header X-Dev-User-Id: {user_uuid}")
+                user_id_int = int(x_dev_user_id)
+                logger.debug(f"🔧 DEV_AUTH_BYPASS: utilisation user_id du header X-Dev-User-Id: {user_id_int}")
             except (ValueError, TypeError):
-                # Si l'UUID du header est invalide, utiliser celui converti précédemment
-                logger.warning(f"⚠️ UUID du header X-Dev-User-Id invalide, utilisation de l'UUID converti: {user_uuid}")
+                logger.warning(f"⚠️ user_id du header X-Dev-User-Id invalide, utilisation de l'ID de l'URL: {user_id_int}")
 
         stmt = select(TransitsOverview).where(
             and_(
-                TransitsOverview.user_id == user_uuid,
+                TransitsOverview.user_id == user_id_int,
                 TransitsOverview.month == month
             )
         )
@@ -287,7 +271,7 @@ async def get_transits_overview(
         if not overview:
             raise HTTPException(
                 status_code=404,
-                detail=f"Aucun transits overview trouvé pour user {user_uuid} et mois {month}"
+                detail=f"Aucun transits overview trouvé pour user {user_id_int} et mois {month}"
             )
 
         # Si major_only=True, filtrer les aspects dans les données avant de retourner
