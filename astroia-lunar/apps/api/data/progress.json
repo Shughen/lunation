@@ -1,11 +1,11 @@
 {
   "total_aspects": 130,
-  "completed_batches": 1,
+  "completed_batches": 4,
   "total_batches": 10,
-  "aspects_inserted": 10,
-  "progress_percent": 7.7,
+  "aspects_inserted": 30,
+  "progress_percent": 23.1,
   "total_cost_usd": 0,
-  "last_batch_at": "2026-01-30T15:00:00Z",
+  "last_batch_at": "2026-01-30T20:00:00Z",
   "batches": [
     {
       "number": 1,
@@ -14,6 +14,30 @@
       "cost_usd": 0,
       "committed_at": "2026-01-30T15:00:00Z",
       "notes": "Généré manuellement dans Claude Code - Version A hybride"
+    },
+    {
+      "number": 2,
+      "aspects": 10,
+      "pairs": ["venus-mars", "sun-jupiter"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T19:00:00Z",
+      "notes": "Améliorations: ouvertures variées, sextiles différenciés, trigones personnalisés"
+    },
+    {
+      "number": 3,
+      "aspects": 15,
+      "pairs": ["moon-uranus", "saturn-uranus", "sun-moon"],
+      "cost_usd": 0,
+      "status": "generated",
+      "notes": "Aspects générés, en attente insertion"
+    },
+    {
+      "number": 4,
+      "aspects": 10,
+      "pairs": ["sun-mercury", "sun-saturn"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T20:00:00Z",
+      "notes": "Mercury: intellect/communication, Saturn: structure/discipline. Différenciation claire des énergies."
     }
   ]
 }
