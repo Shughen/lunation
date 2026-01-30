@@ -213,7 +213,7 @@ async def lunar_return_transits(
 
 @router.get("/overview/{user_id}/{month}", response_model=TransitsOverviewDB)
 async def get_transits_overview(
-    user_id: UUID,
+    user_id: str,
     month: str,
     major_only: bool = False,
     current_user: User = Depends(get_current_user),
@@ -226,26 +226,58 @@ async def get_transits_overview(
     Retourne les données en cache incluant les transits natals et LR du mois.
     Peut filtrer pour ne retourner que les aspects majeurs.
 
-    - **user_id**: ID de l'utilisateur (UUID dans l'URL)
+    - **user_id**: ID de l'utilisateur (UUID ou integer string)
     - **month**: Mois au format YYYY-MM
     - **major_only**: Si True, filtre uniquement les aspects majeurs (conjonction, opposition, carré, trigone)
 
     En mode DEV_AUTH_BYPASS, utilise l'UUID du header X-Dev-User-Id au lieu de l'UUID de l'URL.
     """
     try:
-        # En mode DEV_AUTH_BYPASS, utiliser l'UUID du header au lieu de l'UUID de l'URL
+        # === CONVERT user_id (str) to UUID ===
+        # Accept both UUID strings and integer IDs
+        try:
+            if "-" in user_id:
+                # It's a UUID string
+                user_uuid = UUID(user_id)
+            else:
+                # It's an integer, look up the UUID from the users table
+                user_int = int(user_id)
+                stmt_user = select(User.uuid).where(User.id == user_int)
+                result_user = await db.execute(stmt_user)
+                user_uuid = result_user.scalar_one_or_none()
+                if not user_uuid:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"User {user_id} not found"
+                    )
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid user_id format: {user_id}"
+            )
+
+        # === SECURITY CHECK: Verify user_uuid matches current_user ===
+        # In production, users can only access their own transits
+        if settings.APP_ENV != "development" or not settings.DEV_AUTH_BYPASS:
+            if user_uuid != current_user.uuid:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Forbidden: cannot access other user's transits"
+                )
+
+        # En mode DEV_AUTH_BYPASS, utiliser l'UUID du header au lieu de l'UUID converti
         # car current_user.id est INTEGER mais transits_overview.user_id est UUID
         if settings.APP_ENV == "development" and settings.DEV_AUTH_BYPASS and x_dev_user_id:
             try:
-                user_id = UUID(x_dev_user_id)
-                logger.debug(f"🔧 DEV_AUTH_BYPASS: utilisation UUID du header X-Dev-User-Id: {user_id}")
+                user_uuid = UUID(x_dev_user_id)
+                logger.debug(f"🔧 DEV_AUTH_BYPASS: utilisation UUID du header X-Dev-User-Id: {user_uuid}")
             except (ValueError, TypeError):
-                # Si l'UUID du header est invalide, utiliser celui de l'URL
-                logger.warning(f"⚠️ UUID du header X-Dev-User-Id invalide, utilisation de l'UUID de l'URL: {user_id}")
-        
+                # Si l'UUID du header est invalide, utiliser celui converti précédemment
+                logger.warning(f"⚠️ UUID du header X-Dev-User-Id invalide, utilisation de l'UUID converti: {user_uuid}")
+
         stmt = select(TransitsOverview).where(
             and_(
-                TransitsOverview.user_id == user_id,
+                TransitsOverview.user_id == user_uuid,
                 TransitsOverview.month == month
             )
         )
@@ -255,7 +287,7 @@ async def get_transits_overview(
         if not overview:
             raise HTTPException(
                 status_code=404,
-                detail=f"Aucun transits overview trouvé pour user {user_id} et mois {month}"
+                detail=f"Aucun transits overview trouvé pour user {user_uuid} et mois {month}"
             )
 
         # Si major_only=True, filtrer les aspects dans les données avant de retourner
