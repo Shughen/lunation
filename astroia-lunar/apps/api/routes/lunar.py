@@ -17,6 +17,7 @@ from services import lunar_services
 from services.moon_position import get_current_moon_position
 from services.daily_climate import get_daily_climate
 from services import voc_cache_service
+from services import transits_services
 from schemas.lunar import (
     LunarReturnReportRequest,
     VoidOfCourseRequest,
@@ -24,6 +25,7 @@ from schemas.lunar import (
     LunarResponse
 )
 from models.lunar_pack import LunarReport, LunarVocWindow, LunarMansionDaily
+from models.transits import TransitsOverview
 from models.user import User
 from routes.auth import get_current_user
 
@@ -297,6 +299,57 @@ async def lunar_return_report(
                 # FIX: flush avant commit pour détecter les erreurs de contrainte AVANT commit
                 await db.flush()
                 await db.commit()
+
+                # === AUTO-CALCULATE TRANSITS (User requested) ===
+                # Calculer les transits pour le mois en cours si user_id disponible
+                if not existing_report:  # Seulement pour les nouveaux rapports
+                    try:
+                        # Récupérer les infos de l'utilisateur pour calculer les transits
+                        stmt_user = select(User).where(User.id == user_id)
+                        result_user = await db.execute(stmt_user)
+                        user_obj = result_user.scalar_one_or_none()
+
+                        if user_obj and user_obj.birth_date and user_obj.birth_time and user_obj.uuid:
+                            # Construire le payload pour transits
+                            transit_payload = {
+                                "birth_date": user_obj.birth_date.isoformat(),
+                                "birth_time": user_obj.birth_time.strftime("%H:%M:%S"),
+                                "birth_latitude": user_obj.birth_latitude,
+                                "birth_longitude": user_obj.birth_longitude,
+                                "transit_date": request.month + "-01"  # Premier jour du mois
+                            }
+
+                            # Calculer les transits natals
+                            transits_result = await transits_services.get_natal_transits(transit_payload)
+
+                            # Générer les insights avec filtrage des aspects majeurs
+                            insights = transits_services.generate_transit_insights(transits_result, major_only=True)
+
+                            # Sauvegarder dans TransitsOverview
+                            overview_data = {
+                                "natal_transits": transits_result,
+                                "insights": insights,
+                                "last_updated": datetime.now(timezone.utc).isoformat()
+                            }
+
+                            transits_overview = TransitsOverview(
+                                user_id=user_obj.uuid,  # UUID de la table users
+                                month=request.month,
+                                overview=overview_data
+                            )
+                            db.add(transits_overview)
+                            await db.flush()
+                            await db.commit()
+
+                            logger.info(f"✨ Transits auto-calculés pour {request.month}")
+                    except Exception as e:
+                        # Ne pas bloquer le lunar report si transits échouent
+                        logger.warning(f"⚠️ Échec auto-calcul transits: {str(e)}")
+                        # Rollback pour éviter les erreurs de transaction
+                        try:
+                            await db.rollback()
+                        except Exception:
+                            pass
 
             except Exception as e:
                 logger.error(f"❌ Erreur sauvegarde DB: {str(e)}")
