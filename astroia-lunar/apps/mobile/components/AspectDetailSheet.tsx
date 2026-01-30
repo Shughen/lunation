@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Markdown from 'react-native-markdown-display';
 import { AspectV4 } from '../types/api';
 import { colors } from '../constants/theme';
 import { tSign, tPlanet } from '../i18n/astro.format';
@@ -162,14 +163,18 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
                 {/* Section 3: Manifestation (tone v4 professionnel) */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>🌟 Manifestations concrètes</Text>
-                  <Text style={styles.manifestationText}>{translateAstrologyText(aspect.copy.manifestation)}</Text>
+                  <Markdown style={markdownStyles}>
+                    {translateAstrologyText(aspect.copy.manifestation)}
+                  </Markdown>
                 </View>
 
                 {/* Section 4: Advice (optionnel) */}
                 {aspect.copy.advice && (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>💡 Conseil pratique</Text>
-                    <Text style={styles.adviceText}>{translateAstrologyText(aspect.copy.advice)}</Text>
+                    <Markdown style={markdownStyles}>
+                      {translateAstrologyText(aspect.copy.advice)}
+                    </Markdown>
                   </View>
                 )}
 
@@ -177,7 +182,9 @@ export const AspectDetailSheet: React.FC<AspectDetailSheetProps> = ({
                 {aspect.copy.shadow && (
                   <View style={[styles.section, styles.shadowSection]}>
                     <Text style={styles.sectionTitle}>⚠️ Attention</Text>
-                    <Text style={styles.shadowText}>{translateAstrologyText(aspect.copy.shadow)}</Text>
+                    <Markdown style={markdownStyles}>
+                      {translateAstrologyText(aspect.copy.shadow)}
+                    </Markdown>
                   </View>
                 )}
               </>
@@ -353,3 +360,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+// Styles pour le rendu Markdown
+const markdownStyles = {
+  body: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: 8,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  strong: {
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  bullet_list: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  bullet_list_item: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  bullet_list_icon: {
+    marginRight: 8,
+    color: colors.accent,
+    fontSize: 15,
+  },
+  list_item: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+};
