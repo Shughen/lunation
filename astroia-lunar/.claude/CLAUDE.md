@@ -232,44 +232,49 @@ Système de commandes locales dans `.claude/commands/` pour charger du contexte 
   - T5: Indicateurs visuels phases (16px vs 12px)
   - T6: Section VoC améliorée (orthographe + durée + multi-jours)
 
-**Sprint 8** : 🔥 **EN COURS** - Refonte Aspects v5 (30/01/2026)
+**Sprint 8** : ✅ **TERMINÉ** - Refonte Aspects v5 (30/01/2026)
 - ✅ **Backend v5 complet**
   - Parser markdown v5 avec section "Attention" → `shadow`
   - Paramètre `version=5` par défaut dans `aspect_explanation_service.py`
   - Query param `aspect_version` dans `/api/natal-chart` (POST & GET)
+  - Fallback intelligent : v5 → v4 DB → templates (au lieu de v5 → templates)
+  - Filtrage Chiron + nœuds lunaires (exclus des aspects majeurs)
   - Tests unitaires : 6/6 passés ✨
 - ✅ **Mobile v5 complet**
   - Interface TypeScript : `shadow?: string` dans `AspectV4`
   - Section "⚠️ Attention" avec style amber warning
   - Affichage conditionnel (rétro-compatible v4)
+  - Rendu markdown (bold, listes) via react-native-markdown-display
+  - Fix profil : pas de fallbacks "Aries" si thème natal absent
 - ✅ **Génération aspects (méthode manuelle Claude Code, $0 API)**
-  - Batch 1 terminé : sun-venus, sun-mars (10 aspects insérés)
-  - Batch 2 généré : venus-mars, sun-jupiter (10 aspects prêts)
-  - Batches 3-10 : 110 aspects restants
-- ✅ **Correctifs post-publication** (30/01/2026)
-  - Fix crash app lors affichage thème natal (user_id UUID→INTEGER)
-  - Fix transits auto-calculés lors génération lunar report
-  - Fix typo français "Détail" keywords mobile
-  - Doc setup DEV_AUTH_BYPASS pour tests
-  - Script `validate_aspect_batch.py` : Validation qualité (longueurs, jargon)
-  - Script `insert_aspect_batch.py` : Insertion BD avec upsert + tracking
-  - Fichier `data/progress.json` : 0/130 aspects (prêt pour génération)
-- ⏳ **Génération batches** : 0/10 batches (130 aspects à générer)
+  - **225/225 aspects v5 générés** (22 batches, 100% complété)
+  - Toutes planètes couvertes (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto)
+  - 5 types d'aspects : conjunction, opposition, square, trine, sextile
+  - Format v5 : Brief → Insight → Concret → Conseil → Attention
+- ✅ **Correctifs finaux session 30/01** :
+  - Insertion 10 aspects manquants (Moon-Sun, Moon-Uranus)
+  - Fix profil mobile : affichage conditionnel thème natal
+  - Requête aspect_version=5 par défaut mobile
+  - Support markdown pour rendu aspects
+  - Doc complète : SESSION_2026-01-30_aspects_v5.md
 
-**Objectif Sprint 8** :
-- Réécrire 130 aspects prioritaires avec Claude Opus 4.5
-- Format v5 : Brief + Insight + Concret + Conseil + Attention (vs v4 technique)
-- Budget : $10-15 USD | Scope : Luminaires (Sun, Moon) + Relations (Venus, Mars)
+**Résultats Sprint 8** :
+- ✅ 225 aspects v5 (format bienveillant + section Attention)
+- ✅ 225 aspects v4 (fallback professionnel depuis DB)
+- ✅ Couverture 100% : toutes combinaisons planètes × aspects
+- ✅ Budget : $0 USD (génération manuelle dans Claude Code)
+- ✅ Qualité : Validation manuelle batch par batch
 
 **Derniers commits** :
 ```
-b622f30 - docs(api): document app crash fix and DB setup for DEV_AUTH_BYPASS
-d9f311f - fix(api): correct user_id type handling after UUID→INTEGER migration
-996f62c - feat(api): auto-calculate transits when generating new lunar report
-d5ceb3b - fix(api): accept integer user_id in transits overview endpoint
-00702dc - fix(mobile): correct French typo 'Detail' → 'Détail' in waxing gibbous keywords
+f87b612 - docs: update aspect v5 generation progress
+86d794f - feat(mobile): add markdown rendering in aspect details
+772dece - fix(mobile): display natal chart only when data available
+7514952 - feat(mobile): request aspect v5 by default in natal chart
+5b1164d - feat(api): improve aspect v5 fallback and filtering
+5f4a325 - feat(api): add script to insert missing Moon aspects v5
 ```
 
 ---
 
-**Dernière màj** : 2026-01-30 | **Version** : 8.0 (refonte aspects v5 - génération manuelle en cours, 20/130 aspects)
+**Dernière màj** : 2026-01-30 | **Version** : 8.1 (aspects v5 100% complétés - 225 aspects)
