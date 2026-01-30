@@ -383,9 +383,9 @@ def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any
     Filtre les aspects selon règles v4 (senior professionnel)
 
     Règles:
-    - Types majeurs uniquement: conjunction, opposition, square, trine
+    - Types majeurs uniquement: conjunction, opposition, square, trine, sextile
     - Orbe strict: <= 6°
-    - Exclure Lilith (mean_lilith, lilith, blackmoonlilith, etc.)
+    - Exclure Lilith, Chiron, Nœuds lunaires (mean_node, true_node)
 
     Args:
         aspects: Liste brute des aspects
@@ -393,6 +393,9 @@ def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any
     Returns:
         Aspects filtrés et triés par orbe croissant
     """
+    # Points à exclure (mineurs, karmiques, hypothétiques)
+    EXCLUDED_POINTS = ['lilith', 'chiron', 'meannode', 'truenode', 'node']
+
     filtered = []
 
     for aspect in aspects:
@@ -406,11 +409,14 @@ def filter_major_aspects_v4(aspects: List[Dict[str, Any]]) -> List[Dict[str, Any
         if orb > MAX_ORB_V4:
             continue
 
-        # 3. Exclure Lilith (toutes variantes)
+        # 3. Exclure points mineurs/karmiques
         planet1 = aspect.get('planet1', '').lower().replace('_', '').replace(' ', '').replace('-', '')
         planet2 = aspect.get('planet2', '').lower().replace('_', '').replace(' ', '').replace('-', '')
 
-        if 'lilith' in planet1 or 'lilith' in planet2:
+        # Vérifier si un des points exclus est présent
+        if any(excluded in planet1 for excluded in EXCLUDED_POINTS):
+            continue
+        if any(excluded in planet2 for excluded in EXCLUDED_POINTS):
             continue
 
         filtered.append(aspect)
@@ -853,12 +859,28 @@ async def enrich_aspects_v4_async(
                 # Parser le markdown en format copy
                 copy = parse_markdown_to_copy(markdown_content)
                 db_hits += 1
-                logger.debug(f"[AspectExplanation] DB hit: {planet1}-{planet2} {aspect_type}")
+                logger.debug(f"[AspectExplanation] DB hit v{version}: {planet1}-{planet2} {aspect_type}")
             else:
-                # Fallback sur templates
-                copy = build_aspect_explanation_v4(aspect, metadata)
-                template_fallbacks += 1
-                logger.debug(f"[AspectExplanation] Template fallback: {planet1}-{planet2} {aspect_type}")
+                # Fallback intelligent: essayer v4 si on demandait v5
+                if version >= 5:
+                    logger.debug(f"[AspectExplanation] v5 non trouvé, essai fallback v4: {planet1}-{planet2} {aspect_type}")
+                    markdown_content = await load_pregenerated_aspect_interpretation(
+                        planet1, planet2, aspect_type, db_session, version=2
+                    )
+                    if markdown_content:
+                        copy = parse_markdown_to_copy(markdown_content)
+                        db_hits += 1
+                        logger.debug(f"[AspectExplanation] Fallback v4 OK: {planet1}-{planet2} {aspect_type}")
+                    else:
+                        # Dernier recours: templates génériques
+                        copy = build_aspect_explanation_v4(aspect, metadata)
+                        template_fallbacks += 1
+                        logger.debug(f"[AspectExplanation] Template fallback: {planet1}-{planet2} {aspect_type}")
+                else:
+                    # Version 2-4 demandée mais pas trouvée → templates
+                    copy = build_aspect_explanation_v4(aspect, metadata)
+                    template_fallbacks += 1
+                    logger.debug(f"[AspectExplanation] Template fallback: {planet1}-{planet2} {aspect_type}")
 
             # Générer ID unique (hash stable basé sur planet1+planet2+type)
             aspect_id = hashlib.md5(

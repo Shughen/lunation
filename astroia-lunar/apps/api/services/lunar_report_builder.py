@@ -793,7 +793,7 @@ def _build_dominant_axes_enriched(lunar_return: Any) -> List[str]:
 
 
 def _build_major_aspects(lunar_return: Any) -> List[Dict[str, Any]]:
-    """Enrichit les aspects majeurs du cycle via enrich_aspects_v4"""
+    """Enrichit les aspects majeurs du cycle via enrich_aspects_v4 (sync - fallback v4)"""
     aspects = lunar_return.aspects or []
     planets_data = lunar_return.planets or {}
 
@@ -807,6 +807,38 @@ def _build_major_aspects(lunar_return: Any) -> List[Dict[str, Any]]:
 
         enriched = enrich_aspects_v4(aspects, planets_data, limit=5)
         logger.info(f"[LunarReportBuilder] ✅ {len(enriched)} aspects enrichis v4")
+        return enriched
+
+    except Exception as e:
+        logger.error(f"[LunarReportBuilder] ❌ Erreur enrichissement aspects: {e}", exc_info=True)
+        return []
+
+
+async def _build_major_aspects_async(
+    lunar_return: Any,
+    db: AsyncSession,
+    version: int = 5
+) -> List[Dict[str, Any]]:
+    """Enrichit les aspects majeurs du cycle via enrich_aspects_v4_async avec support v5"""
+    aspects = lunar_return.aspects or []
+    planets_data = lunar_return.planets or {}
+
+    if not aspects:
+        logger.warning("[LunarReportBuilder] Aucun aspect trouvé pour ce cycle")
+        return []
+
+    # Utiliser version async avec support v5
+    try:
+        from services.aspect_explanation_service import enrich_aspects_v4_async
+
+        enriched = await enrich_aspects_v4_async(
+            aspects,
+            planets_data,
+            db,
+            limit=5,
+            version=version
+        )
+        logger.info(f"[LunarReportBuilder] ✅ {len(enriched)} aspects enrichis v{version}")
         return enriched
 
     except Exception as e:
@@ -878,8 +910,11 @@ async def build_lunar_report_v4_async(
     # 3. AXES DOMINANTS (enrichis v4.1 - existant)
     dominant_axes = _build_dominant_axes_enriched(lunar_return)
 
-    # 4. ASPECTS MAJEURS (réutiliser enrich_aspects_v4)
-    major_aspects = _build_major_aspects(lunar_return)
+    # 4. ASPECTS MAJEURS (utiliser version async avec v5 si db disponible)
+    if db is not None:
+        major_aspects = await _build_major_aspects_async(lunar_return, db, version=5)
+    else:
+        major_aspects = _build_major_aspects(lunar_return)
 
     # 5. INTERPRÉTATION LUNAIRE (V2 avec nouveau generator)
     lunar_interpretation = {
