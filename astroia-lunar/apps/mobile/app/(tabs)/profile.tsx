@@ -118,13 +118,29 @@ export default function ProfileScreen() {
 
   // Utiliser les vraies données du thème natal depuis l'API
   // L'API retourne: { sun_sign, moon_sign, ascendant, planets: { sun: {sign, degree, house}, ... } }
-  const sunSign = natalChartData?.sun_sign || findPlanetSign(natalChartData?.planets, 'sun') || getSunSign(birthDate);
-  const moonSign = natalChartData?.moon_sign || findPlanetSign(natalChartData?.planets, 'moon') || 'Aries';
-  const ascendant = natalChartData?.ascendant || 'Aries';
-  const mercury = findPlanetSign(natalChartData?.planets, 'mercury') || sunSign;
-  const venus = findPlanetSign(natalChartData?.planets, 'venus') || 'Taurus';
-  const mars = findPlanetSign(natalChartData?.planets, 'mars') || 'Aries';
-  const jupiter = findPlanetSign(natalChartData?.planets, 'jupiter') || 'Sagittarius';
+  const hasNatalData = !!natalChartData && !!natalChartData.sun_sign;
+
+  const sunSign = hasNatalData
+    ? (natalChartData.sun_sign || findPlanetSign(natalChartData.planets, 'sun') || getSunSign(birthDate))
+    : getSunSign(birthDate);
+  const moonSign = hasNatalData
+    ? (natalChartData.moon_sign || findPlanetSign(natalChartData.planets, 'moon'))
+    : undefined;
+  const ascendant = hasNatalData
+    ? natalChartData.ascendant
+    : undefined;
+  const mercury = hasNatalData
+    ? findPlanetSign(natalChartData.planets, 'mercury')
+    : undefined;
+  const venus = hasNatalData
+    ? findPlanetSign(natalChartData.planets, 'venus')
+    : undefined;
+  const mars = hasNatalData
+    ? findPlanetSign(natalChartData.planets, 'mars')
+    : undefined;
+  const jupiter = hasNatalData
+    ? findPlanetSign(natalChartData.planets, 'jupiter')
+    : undefined;
 
   const handleNotificationToggle = async (value: boolean) => {
     haptics.selection();
@@ -248,47 +264,67 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Mon Thème Natal</Text>
 
-          {/* Big 3 */}
-          <View style={styles.big3Container}>
-            <View style={styles.big3Item}>
-              <ZodiacBadge sign={sunSign} size={48} />
-              <Text style={styles.big3Label}>Soleil</Text>
-              <Text style={styles.big3Value}>{ZODIAC_FRENCH[sunSign] || sunSign}</Text>
-            </View>
-            <View style={styles.big3Item}>
-              <ZodiacBadge sign={moonSign} size={48} />
-              <Text style={styles.big3Label}>Lune</Text>
-              <Text style={styles.big3Value}>{ZODIAC_FRENCH[moonSign] || moonSign}</Text>
-            </View>
-            <View style={styles.big3Item}>
-              <ZodiacBadge sign={ascendant} size={48} />
-              <Text style={styles.big3Label}>Ascendant</Text>
-              <Text style={styles.big3Value}>{ZODIAC_FRENCH[ascendant] || ascendant}</Text>
-            </View>
-          </View>
-
-          {/* Planets Grid */}
           {isLoadingNatal ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={styles.loadingText}>Chargement de votre thème...</Text>
+            </View>
+          ) : !hasNatalData ? (
+            <View style={styles.emptyNatalContainer}>
+              <Text style={styles.emptyNatalText}>
+                Vous n'avez pas encore calculé votre thème natal complet.
+              </Text>
+              <TouchableOpacity
+                style={styles.natalCtaButton}
+                onPress={handleViewNatalChart}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.natalCtaText}>Calculer mon thème natal</Text>
+              </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.planetsGrid}>
-              <PlanetItem label="Mercure" sign={mercury} signFr={ZODIAC_FRENCH[mercury] || mercury} />
-              <PlanetItem label="Vénus" sign={venus} signFr={ZODIAC_FRENCH[venus] || venus} />
-              <PlanetItem label="Mars" sign={mars} signFr={ZODIAC_FRENCH[mars] || mars} />
-              <PlanetItem label="Jupiter" sign={jupiter} signFr={ZODIAC_FRENCH[jupiter] || jupiter} />
-            </View>
-          )}
+            <>
+              {/* Big 3 */}
+              <View style={styles.big3Container}>
+                <View style={styles.big3Item}>
+                  <ZodiacBadge sign={sunSign} size={48} />
+                  <Text style={styles.big3Label}>Soleil</Text>
+                  <Text style={styles.big3Value}>{ZODIAC_FRENCH[sunSign] || sunSign}</Text>
+                </View>
+                {moonSign && (
+                  <View style={styles.big3Item}>
+                    <ZodiacBadge sign={moonSign} size={48} />
+                    <Text style={styles.big3Label}>Lune</Text>
+                    <Text style={styles.big3Value}>{ZODIAC_FRENCH[moonSign] || moonSign}</Text>
+                  </View>
+                )}
+                {ascendant && (
+                  <View style={styles.big3Item}>
+                    <ZodiacBadge sign={ascendant} size={48} />
+                    <Text style={styles.big3Label}>Ascendant</Text>
+                    <Text style={styles.big3Value}>{ZODIAC_FRENCH[ascendant] || ascendant}</Text>
+                  </View>
+                )}
+              </View>
 
-          {/* CTA */}
-          <TouchableOpacity
-            style={styles.natalCtaButton}
-            onPress={handleViewNatalChart}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.natalCtaText}>Voir le thème complet</Text>
-          </TouchableOpacity>
+              {/* Planets Grid */}
+              <View style={styles.planetsGrid}>
+                {mercury && <PlanetItem label="Mercure" sign={mercury} signFr={ZODIAC_FRENCH[mercury] || mercury} />}
+                {venus && <PlanetItem label="Vénus" sign={venus} signFr={ZODIAC_FRENCH[venus] || venus} />}
+                {mars && <PlanetItem label="Mars" sign={mars} signFr={ZODIAC_FRENCH[mars] || mars} />}
+                {jupiter && <PlanetItem label="Jupiter" sign={jupiter} signFr={ZODIAC_FRENCH[jupiter] || jupiter} />}
+              </View>
+
+              {/* CTA */}
+              <TouchableOpacity
+                style={styles.natalCtaButton}
+                onPress={handleViewNatalChart}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.natalCtaText}>Voir le thème complet</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Birth Info Section */}
@@ -455,6 +491,23 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: spacing.lg,
     alignItems: 'center',
+  },
+  loadingText: {
+    ...fonts.bodySmall,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  // Empty natal chart state
+  emptyNatalContainer: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyNatalText: {
+    ...fonts.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 22,
   },
   // Planets grid
   planetsGrid: {
