@@ -1,11 +1,11 @@
 {
   "total_aspects": 130,
-  "completed_batches": 10,
-  "total_batches": 10,
-  "aspects_inserted": 90,
-  "progress_percent": 69.2,
+  "completed_batches": 14,
+  "total_batches": 14,
+  "aspects_inserted": 130,
+  "progress_percent": 100.0,
   "total_cost_usd": 0,
-  "last_batch_at": "2026-01-30T21:30:00Z",
+  "last_batch_at": "2026-01-30T22:00:00Z",
   "batches": [
     {
       "number": 1,
@@ -85,7 +85,39 @@
       "pairs": ["venus-jupiter", "venus-saturn"],
       "cost_usd": 0,
       "committed_at": "2026-01-30T21:30:00Z",
-      "notes": "Venus-Jupiter: expansion affective, Venus-Saturn: amour structuré. DERNIER BATCH - 90 aspects prioritaires complétés."
+      "notes": "Venus-Jupiter: expansion affective, Venus-Saturn: amour structuré. Fin batches prioritaires (Sun, Moon, Venus)."
+    },
+    {
+      "number": 11,
+      "aspects": 10,
+      "pairs": ["mars-mercury", "mars-jupiter"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T21:45:00Z",
+      "notes": "Mars-Mercury: action + intellect, Mars-Jupiter: audace + optimisme. Énergie combinée."
+    },
+    {
+      "number": 12,
+      "aspects": 10,
+      "pairs": ["mars-saturn", "mars-uranus"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T21:50:00Z",
+      "notes": "Mars-Saturn: discipline + frustration, Mars-Uranus: innovation + rupture. Contraste maximal."
+    },
+    {
+      "number": 13,
+      "aspects": 10,
+      "pairs": ["mercury-jupiter", "mercury-saturn"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T21:55:00Z",
+      "notes": "Mercury-Jupiter: expansion mentale, Mercury-Saturn: rigueur intellectuelle. Équilibre mental."
+    },
+    {
+      "number": 14,
+      "aspects": 10,
+      "pairs": ["jupiter-saturn", "saturn-neptune"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T22:00:00Z",
+      "notes": "Jupiter-Saturn: rêve + structure, Saturn-Neptune: réel + imaginaire. FINAL - 130/130 COMPLÉTÉS."
     }
   ]
 }
