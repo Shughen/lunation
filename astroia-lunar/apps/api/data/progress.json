@@ -1,11 +1,11 @@
 {
   "total_aspects": 130,
-  "completed_batches": 5,
+  "completed_batches": 6,
   "total_batches": 10,
-  "aspects_inserted": 40,
-  "progress_percent": 30.8,
+  "aspects_inserted": 50,
+  "progress_percent": 38.5,
   "total_cost_usd": 0,
-  "last_batch_at": "2026-01-30T20:15:00Z",
+  "last_batch_at": "2026-01-30T20:30:00Z",
   "batches": [
     {
       "number": 1,
@@ -46,6 +46,14 @@
       "cost_usd": 0,
       "committed_at": "2026-01-30T20:15:00Z",
       "notes": "Uranus: rupture/innovation/liberté, Neptune: imaginaire/dissolution/transcendance. Aspects très différenciés."
+    },
+    {
+      "number": 6,
+      "aspects": 10,
+      "pairs": ["sun-pluto", "moon-mercury"],
+      "cost_usd": 0,
+      "committed_at": "2026-01-30T20:30:00Z",
+      "notes": "Pluto: transformation/pouvoir/profondeur, Moon-Mercury: émotions + communication. Intensité et clarté."
     }
   ]
 }
