@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { haptics } from '../../services/haptics';
+import { MoonPhaseIcon } from '../../components/icons/MoonPhaseIcon';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
@@ -31,23 +32,130 @@ const MONTH_NAMES = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
 ];
 
-// Simple moon phase calculation (synodic month = 29.53 days)
+// Dates exactes des phases principales 2025-2027 (éphémérides vérifiées)
+// Format: 'YYYY-MM-DD' => phase
+const EXACT_PHASES: Record<string, string> = {
+  // Pleines Lunes 2025
+  '2025-01-13': 'full', '2025-02-12': 'full', '2025-03-14': 'full',
+  '2025-04-13': 'full', '2025-05-12': 'full', '2025-06-11': 'full',
+  '2025-07-10': 'full', '2025-08-09': 'full', '2025-09-07': 'full',
+  '2025-10-07': 'full', '2025-11-05': 'full', '2025-12-04': 'full',
+  // Pleines Lunes 2026
+  '2026-01-03': 'full', '2026-02-01': 'full', '2026-03-03': 'full',
+  '2026-04-02': 'full', '2026-05-01': 'full', '2026-05-31': 'full',
+  '2026-06-30': 'full', '2026-07-29': 'full', '2026-08-28': 'full',
+  '2026-09-26': 'full', '2026-10-26': 'full', '2026-11-24': 'full',
+  '2026-12-24': 'full',
+  // Pleines Lunes 2027 (dates vérifiées)
+  '2027-01-22': 'full', '2027-02-21': 'full', '2027-03-22': 'full',
+  '2027-04-21': 'full', '2027-05-20': 'full', '2027-06-19': 'full',
+  '2027-07-18': 'full', '2027-08-17': 'full', '2027-09-16': 'full',
+  '2027-10-15': 'full', '2027-11-14': 'full', '2027-12-13': 'full',
+  // Pleines Lunes 2028 (dates vérifiées - 13 pleines lunes, 2 en décembre)
+  '2028-01-12': 'full', '2028-02-10': 'full', '2028-03-11': 'full',
+  '2028-04-09': 'full', '2028-05-08': 'full', '2028-06-07': 'full',
+  '2028-07-06': 'full', '2028-08-05': 'full', '2028-09-04': 'full',
+  '2028-10-03': 'full', '2028-11-02': 'full', '2028-12-02': 'full',
+  '2028-12-31': 'full',
+  // Pleines Lunes 2029
+  '2029-01-30': 'full', '2029-02-28': 'full', '2029-03-30': 'full',
+  '2029-04-28': 'full', '2029-05-27': 'full', '2029-06-26': 'full',
+  '2029-07-25': 'full', '2029-08-24': 'full', '2029-09-22': 'full',
+  '2029-10-22': 'full', '2029-11-21': 'full', '2029-12-20': 'full',
+  // Pleines Lunes 2030
+  '2030-01-19': 'full', '2030-02-18': 'full', '2030-03-19': 'full',
+  '2030-04-18': 'full', '2030-05-17': 'full', '2030-06-15': 'full',
+  '2030-07-15': 'full', '2030-08-13': 'full', '2030-09-11': 'full',
+  '2030-10-11': 'full', '2030-11-10': 'full', '2030-12-09': 'full',
+  // Pleines Lunes 2031 (13 pleines lunes, 2 en septembre)
+  '2031-01-08': 'full', '2031-02-07': 'full', '2031-03-09': 'full',
+  '2031-04-07': 'full', '2031-05-07': 'full', '2031-06-05': 'full',
+  '2031-07-04': 'full', '2031-08-03': 'full', '2031-09-01': 'full',
+  '2031-09-30': 'full', '2031-10-30': 'full', '2031-11-29': 'full',
+  '2031-12-28': 'full',
+  // Pleines Lunes 2032
+  '2032-01-27': 'full', '2032-02-26': 'full', '2032-03-27': 'full',
+  '2032-04-25': 'full', '2032-05-25': 'full', '2032-06-23': 'full',
+  '2032-07-22': 'full', '2032-08-21': 'full', '2032-09-19': 'full',
+  '2032-10-18': 'full', '2032-11-17': 'full', '2032-12-16': 'full',
+  // Pleines Lunes 2033
+  '2033-01-15': 'full', '2033-02-14': 'full', '2033-03-16': 'full',
+  '2033-04-14': 'full', '2033-05-14': 'full', '2033-06-13': 'full',
+  '2033-07-12': 'full', '2033-08-10': 'full', '2033-09-09': 'full',
+  '2033-10-08': 'full', '2033-11-06': 'full', '2033-12-06': 'full',
+  // Pleines Lunes 2034 (13 pleines lunes, 2 en juillet)
+  '2034-01-04': 'full', '2034-02-03': 'full', '2034-03-05': 'full',
+  '2034-04-03': 'full', '2034-05-03': 'full', '2034-06-02': 'full',
+  '2034-07-01': 'full', '2034-07-31': 'full', '2034-08-29': 'full',
+  '2034-09-28': 'full', '2034-10-27': 'full', '2034-11-25': 'full',
+  '2034-12-25': 'full',
+  // Pleines Lunes 2035
+  '2035-01-23': 'full', '2035-02-22': 'full', '2035-03-23': 'full',
+  '2035-04-22': 'full', '2035-05-22': 'full', '2035-06-20': 'full',
+  '2035-07-20': 'full', '2035-08-19': 'full', '2035-09-17': 'full',
+  '2035-10-17': 'full', '2035-11-15': 'full', '2035-12-15': 'full',
+  // Nouvelles Lunes 2025
+  '2025-01-29': 'new', '2025-02-28': 'new', '2025-03-29': 'new',
+  '2025-04-27': 'new', '2025-05-26': 'new', '2025-06-25': 'new',
+  '2025-07-24': 'new', '2025-08-23': 'new', '2025-09-21': 'new',
+  '2025-10-21': 'new', '2025-11-20': 'new', '2025-12-20': 'new',
+  // Nouvelles Lunes 2026
+  '2026-01-18': 'new', '2026-02-17': 'new', '2026-03-19': 'new',
+  '2026-04-17': 'new', '2026-05-16': 'new', '2026-06-15': 'new',
+  '2026-07-14': 'new', '2026-08-12': 'new', '2026-09-11': 'new',
+  '2026-10-10': 'new', '2026-11-09': 'new', '2026-12-09': 'new',
+  // Nouvelles Lunes 2027
+  '2027-01-07': 'new', '2027-02-06': 'new', '2027-03-08': 'new',
+  '2027-04-06': 'new', '2027-05-06': 'new', '2027-06-04': 'new',
+  '2027-07-04': 'new', '2027-08-02': 'new', '2027-09-01': 'new',
+  '2027-09-30': 'new', '2027-10-30': 'new', '2027-11-28': 'new',
+  '2027-12-28': 'new',
+  // Premiers Quartiers 2026
+  '2026-01-10': 'first_quarter', '2026-02-09': 'first_quarter',
+  '2026-03-11': 'first_quarter', '2026-04-10': 'first_quarter',
+  '2026-05-09': 'first_quarter', '2026-06-07': 'first_quarter',
+  '2026-07-07': 'first_quarter', '2026-08-05': 'first_quarter',
+  '2026-09-04': 'first_quarter', '2026-10-03': 'first_quarter',
+  '2026-11-02': 'first_quarter', '2026-12-01': 'first_quarter',
+  '2026-12-31': 'first_quarter',
+  // Derniers Quartiers 2026
+  '2026-01-25': 'last_quarter', '2026-02-24': 'last_quarter',
+  '2026-03-25': 'last_quarter', '2026-04-24': 'last_quarter',
+  '2026-05-23': 'last_quarter', '2026-06-22': 'last_quarter',
+  '2026-07-21': 'last_quarter', '2026-08-20': 'last_quarter',
+  '2026-09-18': 'last_quarter', '2026-10-18': 'last_quarter',
+  '2026-11-17': 'last_quarter', '2026-12-16': 'last_quarter',
+};
+
+// Calcul des phases lunaires avec dates exactes + fallback approximatif
 function getMoonPhase(date: Date): { phase: string; emoji: string } {
-  // Known new moon reference: January 6, 2000
-  const knownNewMoon = new Date(2000, 0, 6).getTime();
+  // Formater la date pour lookup
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateKey = `${year}-${month}-${day}`;
+
+  // Vérifier si c'est une date exacte connue
+  const exactPhase = EXACT_PHASES[dateKey];
+  if (exactPhase) {
+    const emojis: Record<string, string> = {
+      'new': '🌑', 'first_quarter': '🌓', 'full': '🌕', 'last_quarter': '🌗'
+    };
+    return { phase: exactPhase, emoji: emojis[exactPhase] || '🌙' };
+  }
+
+  // Fallback: calcul approximatif pour les phases intermédiaires
+  const knownNewMoon = new Date('2024-12-30T15:48:00Z').getTime();
   const lunarCycle = 29.530588853;
-  const daysSinceNew = (date.getTime() - knownNewMoon) / (1000 * 60 * 60 * 24);
+  const dateAtNoon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const daysSinceNew = (dateAtNoon.getTime() - knownNewMoon) / (1000 * 60 * 60 * 24);
   const currentCycleDay = ((daysSinceNew % lunarCycle) + lunarCycle) % lunarCycle;
 
-  // Chaque phase = 29.53/8 ≈ 3.69 jours (seuils équilibrés)
-  if (currentCycleDay < 1.85) return { phase: 'new', emoji: '' };
-  if (currentCycleDay < 5.54) return { phase: 'waxing_crescent', emoji: '' };
-  if (currentCycleDay < 9.23) return { phase: 'first_quarter', emoji: '' };
-  if (currentCycleDay < 12.91) return { phase: 'waxing_gibbous', emoji: '' };
-  if (currentCycleDay < 16.60) return { phase: 'full', emoji: '' };
-  if (currentCycleDay < 20.29) return { phase: 'waning_gibbous', emoji: '' };
-  if (currentCycleDay < 23.97) return { phase: 'last_quarter', emoji: '' };
-  return { phase: 'waning_crescent', emoji: '' };
+  // Phases intermédiaires seulement (les principales sont gérées par EXACT_PHASES)
+  if (currentCycleDay < 7.38) return { phase: 'waxing_crescent', emoji: '🌒' };
+  if (currentCycleDay < 14.77) return { phase: 'waxing_gibbous', emoji: '🌔' };
+  if (currentCycleDay < 22.15) return { phase: 'waning_gibbous', emoji: '🌖' };
+  return { phase: 'waning_crescent', emoji: '🌘' };
 }
 
 interface CalendarDay {
@@ -288,58 +396,71 @@ export default function CalendarScreen() {
 
         {/* Calendar Grid */}
         <View style={styles.calendarGrid}>
-          {calendarDays.map((day, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.dayCell,
-                !day.isCurrentMonth && styles.dayCellInactive,
-                day.isToday && styles.dayCellToday,
-              ]}
-              onPress={() => handleDayPress(day)}
-              disabled={!day.isCurrentMonth}
-            >
-              <Text
+          {calendarDays.map((day, index) => {
+            const isKeyPhase = KEY_PHASES.includes(day.moonPhase.phase);
+            const iconPhase = day.moonPhase.phase === 'new' ? 'new_moon'
+              : day.moonPhase.phase === 'full' ? 'full_moon'
+              : day.moonPhase.phase;
+            return (
+              <TouchableOpacity
+                key={index}
                 style={[
-                  styles.dayNumber,
-                  !day.isCurrentMonth && styles.dayNumberInactive,
-                  day.isToday && styles.dayNumberToday,
+                  styles.dayCell,
+                  !day.isCurrentMonth && styles.dayCellInactive,
+                  day.isToday && styles.dayCellToday,
                 ]}
+                onPress={() => handleDayPress(day)}
+                disabled={!day.isCurrentMonth}
               >
-                {day.day}
-              </Text>
-              {day.isCurrentMonth && (
                 <Text
                   style={[
-                    styles.moonEmoji,
-                    KEY_PHASES.includes(day.moonPhase.phase) && styles.moonEmojiMain,
+                    styles.dayNumber,
+                    !day.isCurrentMonth && styles.dayNumberInactive,
+                    day.isToday && styles.dayNumberToday,
                   ]}
                 >
-                  {day.moonPhase.emoji}
+                  {day.day}
                 </Text>
-              )}
-            </TouchableOpacity>
-          ))}
+                {day.isCurrentMonth && (
+                  isKeyPhase ? (
+                    <MoonPhaseIcon phase={iconPhase} size={18} />
+                  ) : (
+                    <Text style={styles.moonEmoji}>
+                      {day.moonPhase.emoji}
+                    </Text>
+                  )
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Key Phases Legend */}
         <View style={styles.legendCard}>
           <Text style={styles.legendTitle}>Phases principales ce mois</Text>
           <View style={styles.legendGrid}>
-            {keyPhaseDays.slice(0, 4).map((day, index) => (
-              <View key={index} style={styles.legendItem}>
-                <Text style={styles.legendEmoji}>{day.moonPhase.emoji}</Text>
-                <Text style={styles.legendDate}>
-                  {day.day} {MONTH_NAMES[currentMonth].slice(0, 3)}
-                </Text>
-                <Text style={styles.legendPhase}>
-                  {day.moonPhase.phase === 'new' && 'Nouvelle Lune'}
-                  {day.moonPhase.phase === 'full' && 'Pleine Lune'}
-                  {day.moonPhase.phase === 'first_quarter' && '1er Quartier'}
-                  {day.moonPhase.phase === 'last_quarter' && 'Dernier Quartier'}
-                </Text>
-              </View>
-            ))}
+            {keyPhaseDays.slice(0, 4).map((day, index) => {
+              // Mapper les phases du calendrier vers MoonPhaseIcon
+              const iconPhase = day.moonPhase.phase === 'new' ? 'new_moon'
+                : day.moonPhase.phase === 'full' ? 'full_moon'
+                : day.moonPhase.phase;
+              return (
+                <View key={index} style={styles.legendItem}>
+                  <View style={styles.legendIconContainer}>
+                    <MoonPhaseIcon phase={iconPhase} size={48} />
+                  </View>
+                  <Text style={styles.legendDate}>
+                    {day.day} {MONTH_NAMES[currentMonth].slice(0, 3)}
+                  </Text>
+                  <Text style={styles.legendPhase}>
+                    {day.moonPhase.phase === 'new' && 'Nouvelle Lune'}
+                    {day.moonPhase.phase === 'full' && 'Pleine Lune'}
+                    {day.moonPhase.phase === 'first_quarter' && '1er Quartier'}
+                    {day.moonPhase.phase === 'last_quarter' && 'Dernier Quartier'}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -504,8 +625,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
   },
-  legendEmoji: {
-    fontSize: 24,
+  legendIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(183, 148, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   legendDate: {

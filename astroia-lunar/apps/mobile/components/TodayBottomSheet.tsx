@@ -161,9 +161,10 @@ export const TodayBottomSheet = forwardRef<TodayBottomSheetRef, TodayBottomSheet
       }).start(() => setVisible(false));
     }, [slideAnim]);
 
-    // Derive data
+    // Derive data - IMPORTANT: utiliser les données du jour (lunarData) en priorité
+    // pour afficher le signe lunaire ACTUEL, pas celui de la révolution mensuelle
     const moonPhase = lunarData?.moon?.phase || 'new_moon';
-    const moonSign = lunarReturn?.moon_sign || lunarData?.moon?.sign || 'Aries';
+    const moonSign = lunarData?.moon?.sign || lunarReturn?.moon_sign || 'Aries';
     const normalizedPhase = normalizePhase(moonPhase);
 
     const phaseFrench = getMoonPhaseFrench(moonPhase);
