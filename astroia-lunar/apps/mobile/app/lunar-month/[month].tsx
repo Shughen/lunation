@@ -19,6 +19,7 @@ import { lunarReturns, LunarReturn } from '../../services/api';
 import { tPlanet, tSign } from '../../i18n/astro.format';
 import { MarkdownText } from '../../components/MarkdownText';
 import { translateAstrologyText } from '../../utils/astrologyTranslations';
+import { trackLunarReturnViewed, trackScreenView } from '../../services/analytics';
 
 export default function LunarMonthScreen() {
   const router = useRouter();
@@ -30,6 +31,9 @@ export default function LunarMonthScreen() {
   useEffect(() => {
     if (month) {
       loadLunarReturn();
+      // Track screen view et lunar return viewed
+      trackScreenView('lunar_month', { month });
+      trackLunarReturnViewed(month);
     }
   }, [month]);
 

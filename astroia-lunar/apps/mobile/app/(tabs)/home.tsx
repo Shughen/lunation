@@ -33,6 +33,9 @@ import { NatalMiniCard } from '../../components/NatalMiniCard';
 import { TodayBottomSheet, TodayBottomSheetRef } from '../../components/TodayBottomSheet';
 import { LunationLogo } from '../../components/LunationLogo';
 
+// Analytics
+import { trackScreenView } from '../../services/analytics';
+
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
   return <View style={[{ backgroundColor: bgColors?.[0] || '#1a0b2e' }, style]} {...props}>{children}</View>;
@@ -49,6 +52,11 @@ export default function HomeScreen() {
   const { current: lunarData, helpers } = useLunar();
   const { data: vocStatus } = useVocStatus();
   const { data: mansionData } = useMansionToday();
+
+  // Track screen view
+  useEffect(() => {
+    trackScreenView('home');
+  }, []);
 
   // Network state
   useEffect(() => {
@@ -102,7 +110,7 @@ export default function HomeScreen() {
             <View style={styles.offlineCard}>
               <Text style={styles.offlineTitle}>Mode hors ligne</Text>
               <Text style={styles.offlineText}>
-                Certaines fonctionnalites peuvent etre limitees.
+                Certaines fonctionnalités peuvent être limitées.
               </Text>
             </View>
           )}

@@ -3,7 +3,7 @@
 ## 🎯 TL;DR
 
 - **Projet** : Astrologie lunaire mobile (FastAPI + React Native)
-- **Phase** : Sprint 6 TERMINÉ - Production ready 🎉
+- **Phase** : Sprint 9 TERMINÉ - Phase Bêta v3.0 🎉
 - **Stack** : FastAPI + Expo + PostgreSQL (Supabase) + Claude Opus 4.5 + RapidAPI
 - **Monorepo** : `apps/api` (backend) + `apps/mobile` (frontend)
 - **État** : 100% production ready, 59 tests validés, génération IA activée
@@ -265,16 +265,48 @@ Système de commandes locales dans `.claude/commands/` pour charger du contexte 
 - ✅ Budget : $0 USD (génération manuelle dans Claude Code)
 - ✅ Qualité : Validation manuelle batch par batch
 
-**Derniers commits** :
-```
-f87b612 - docs: update aspect v5 generation progress
-86d794f - feat(mobile): add markdown rendering in aspect details
-772dece - fix(mobile): display natal chart only when data available
-7514952 - feat(mobile): request aspect v5 by default in natal chart
-5b1164d - feat(api): improve aspect v5 fallback and filtering
-5f4a325 - feat(api): add script to insert missing Moon aspects v5
-```
+**Sprint 9** : ✅ **TERMINÉ** - Phase Bêta v3.0 (31/01/2026)
+- ✅ **Corrections P0 (UX immédiat)**
+  - Version app.json : 1.0.0 → 3.0.0
+  - Version footer settings : "MVP v1.4" → "Lunation v3.0"
+  - Harmonisation tutoiement complet (vous → tu) dans i18n/fr.json, settings.tsx, profile.tsx
+  - Orthographe française home.tsx : "fonctionnalites peuvent etre limitees" → accents corrects
+- ✅ **Configuration Bêta (P1)**
+  - Nouveau fichier `config/features.ts` avec BETA_CONFIG (accès illimité)
+  - Structure PRODUCTION_CONFIG préparée pour freemium futur
+- ✅ **Analytics PostHog (P1)**
+  - Installation posthog-react-native
+  - Service `services/analytics/index.ts` complet
+  - Initialisation dans `_layout.tsx`
+  - Variables env documentées dans `.env.example`
+- ✅ **Tracking événements clés**
+  - `screen_view` : home.tsx, lunar-month/[month].tsx
+  - `lunar_return_viewed` : consultation révolution lunaire
+  - `journal_entry_created` : journalService.ts
+  - `notification_opened` : listener dans _layout.tsx
+  - `notifications_enabled` : useNotificationsStore.ts
+
+**Prochaines étapes Phase Bêta** :
+- [ ] Créer compte PostHog (eu.posthog.com)
+- [ ] Ajouter EXPO_PUBLIC_POSTHOG_KEY dans .env
+- [ ] Tester tracking en conditions réelles
 
 ---
 
-**Dernière màj** : 2026-01-30 | **Version** : 8.1 (aspects v5 100% complétés - 225 aspects)
+## 📱 Screenshots Android (adb)
+
+Quand l'utilisateur demande un **screenshot** ou **capture d'écran** de l'émulateur/device Android :
+
+```bash
+# Dossier de destination
+/Users/remibeaurain/astroia/astroia-lunar/apps/mobile/screenshots/
+
+# Commande à utiliser
+adb exec-out screencap -p > /Users/remibeaurain/astroia/astroia-lunar/apps/mobile/screenshots/screenshot_$(date +%Y%m%d_%H%M%S).png
+```
+
+**Convention de nommage** : `screenshot_YYYYMMDD_HHMMSS.png`
+
+---
+
+**Dernière màj** : 2026-01-31 | **Version** : 9.0 (Phase Bêta v3.0 + Analytics PostHog)

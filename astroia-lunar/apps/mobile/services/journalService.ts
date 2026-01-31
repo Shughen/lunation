@@ -9,6 +9,7 @@ import {
   GetJournalEntryResult,
 } from '../types/journal';
 import { journal as journalApi } from './api';
+import { trackJournalEntry } from './analytics';
 
 /**
  * Convertit une entrée backend vers le format frontend
@@ -67,6 +68,10 @@ export async function saveJournalEntry(
       // Le backend peut gérer le champ month si besoin (format YYYY-MM)
       month: payload.date.substring(0, 7), // Ex: "2026-01-16" -> "2026-01"
     });
+
+    // Track l'événement analytics
+    const wordCount = payload.text.split(/\s+/).filter(Boolean).length;
+    trackJournalEntry(wordCount, payload.moonContext?.sign, payload.moonContext?.phase);
 
     // Convertir en format frontend
     return mapBackendEntryToFrontend(backendEntry);

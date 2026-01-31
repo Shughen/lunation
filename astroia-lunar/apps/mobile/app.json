@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lunation",
     "slug": "astroia-lunar",
-    "version": "1.0.0",
+    "version": "3.0.0",
     "scheme": "lunation",
     "orientation": "portrait",
     "icon": "./assets/lunation-icon-1024.png",

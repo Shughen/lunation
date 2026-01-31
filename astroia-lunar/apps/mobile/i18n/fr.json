@@ -2,13 +2,13 @@
   "onboarding": {
     "welcome": {
       "title": "Bienvenue sur Lunation",
-      "body": "Lunation suit vos révolutions lunaires — un cycle personnel de 28 jours basé sur votre thème natal. Pas de notifications quotidiennes, pas de prédictions anxiogènes.",
+      "body": "Lunation suit tes révolutions lunaires — un cycle personnel de 28 jours basé sur ton thème natal. Pas de notifications quotidiennes, pas de prédictions anxiogènes.",
       "cta": "Commencer"
     },
     "profile": {
-      "title": "Créer votre profil",
-      "body": "Nous calculons vos cycles lunaires à partir de votre date et lieu de naissance. Ces données restent privées et ne sont jamais partagées.",
-      "nameLabel": "Votre prénom",
+      "title": "Créer ton profil",
+      "body": "Nous calculons tes cycles lunaires à partir de ta date et de ton lieu de naissance. Ces données restent privées et ne sont jamais partagées.",
+      "nameLabel": "Ton prénom",
       "namePlaceholder": "Alice",
       "birthLabel": "Date de naissance",
       "birthPlaceholder": "JJ/MM/AAAA",
@@ -17,8 +17,8 @@
       "cta": "Continuer"
     },
     "consent": {
-      "title": "Respect de vos données",
-      "body": "Lunation stocke vos informations astrologiques localement sur votre appareil. Aucune donnée personnelle n'est vendue ou transmise à des tiers.",
+      "title": "Respect de tes données",
+      "body": "Lunation stocke tes informations astrologiques localement sur ton appareil. Aucune donnée personnelle n'est vendue ou transmise à des tiers.",
       "checkbox": "J'accepte la politique de confidentialité",
       "cta": "Accepter et continuer"
     },
@@ -30,8 +30,8 @@
     },
     "slides": {
       "slide1": {
-        "title": "🌙 Votre cycle mensuel",
-        "body": "Chaque mois, la Lune revient à sa position natale. C'est votre révolution lunaire — un thème mensuel unique."
+        "title": "🌙 Ton cycle mensuel",
+        "body": "Chaque mois, la Lune revient à sa position natale. C'est ta révolution lunaire — un thème mensuel unique."
       },
       "slide2": {
         "title": "🌑 Pause Lunaire",
@@ -39,7 +39,7 @@
       },
       "slide3": {
         "title": "📅 Timeline structurée",
-        "body": "Visualisez 12 mois de cycles à venir. Préparez-vous aux transits clés sans surcharge."
+        "body": "Visualise 12 mois de cycles à venir. Prépare-toi aux transits clés sans surcharge."
       }
     }
   },
@@ -55,11 +55,11 @@
     "notifications": {
       "title": "Notifications",
       "lunarCycle": "Nouveau cycle lunaire",
-      "lunarCycleDesc": "1 notification par mois au début de votre révolution lunaire",
+      "lunarCycleDesc": "1 notification par mois au début de ta révolution lunaire",
       "voidOfCourse": "Pause Lunaire",
       "voidOfCourseDesc": "Alertes optionnelles pour les pauses lunaires à venir",
       "permissionRequired": "Permission requise",
-      "permissionDesc": "Autorisez les notifications dans les réglages système.",
+      "permissionDesc": "Autorise les notifications dans les réglages système.",
       "openSettings": "Ouvrir les réglages",
       "enabledSuccess": "Notifications activées"
     },
@@ -78,22 +78,22 @@
   "emptyStates": {
     "noCycles": {
       "title": "Aucune révolution lunaire générée",
-      "body": "Générez vos 12 prochains cycles mensuels pour voir votre rapport et votre timeline.",
+      "body": "Génère tes 12 prochains cycles mensuels pour voir ton rapport et ta timeline.",
       "cta": "Générer mes cycles"
     },
     "noVoC": {
       "title": "Aucune Pause Lunaire à venir",
-      "body": "Les prochaines pauses lunaires ne sont pas encore calculées. Revenez plus tard."
+      "body": "Les prochaines pauses lunaires ne sont pas encore calculées. Reviens plus tard."
     },
     "noJournal": {
       "title": "Aucune note de cycle",
-      "body": "Notez vos observations hebdomadaires pour mieux comprendre vos cycles lunaires."
+      "body": "Note tes observations hebdomadaires pour mieux comprendre tes cycles lunaires."
     }
   },
   "errors": {
     "network": {
       "title": "Erreur réseau",
-      "body": "Impossible de contacter le serveur. Vérifiez votre connexion internet.",
+      "body": "Impossible de contacter le serveur. Vérifie ta connexion internet.",
       "cta": "Réessayer"
     },
     "notFound": {
@@ -114,7 +114,7 @@
   "notifications": {
     "newCycle": {
       "title": "🌙 Nouveau cycle lunaire",
-      "body": "{month} — Lune en {sign}, Ascendant {ascendant}. Consultez votre rapport mensuel."
+      "body": "{month} — Lune en {sign}, Ascendant {ascendant}. Consulte ton rapport mensuel."
     },
     "vocStart": {
       "title": "🌑 Pause Lunaire",
@@ -126,7 +126,7 @@
     },
     "journalReminder": {
       "title": "🌙 Note hebdomadaire",
-      "body": "Semaine {weekNumber} de votre cycle. Notez vos observations si vous le souhaitez."
+      "body": "Semaine {weekNumber} de ton cycle. Note tes observations si tu le souhaites."
     }
   },
   "paywalls": {
@@ -144,9 +144,9 @@
     "timeline": {
       "title": "Timeline 12 mois",
       "features": [
-        "Visualisez vos 12 prochains cycles",
+        "Visualise tes 12 prochains cycles",
         "Aspects majeurs par mois",
-        "Préparez vos transits clés"
+        "Prépare tes transits clés"
       ],
       "price": "{price}/mois",
       "cta": "Débloquer la Timeline",
@@ -158,13 +158,13 @@
     "cycleJournal": {
       "title": "Journal de Cycle",
       "weekLabel": "Semaine {weekNumber}",
-      "placeholder": "Notez vos observations (50 caractères max)",
+      "placeholder": "Note tes observations (50 caractères max)",
       "charCount": "{count}/50",
       "saved": "Sauvegardé",
       "empty": "Aucune note pour cette semaine"
     },
-    "entryTitle": "Comment vous sentez-vous aujourd'hui ?",
-    "placeholder": "Notez votre ressenti, vos observations, ce qui vous marque aujourd'hui...",
+    "entryTitle": "Comment te sens-tu aujourd'hui ?",
+    "placeholder": "Note ton ressenti, tes observations, ce qui te marque aujourd'hui...",
     "save": "Enregistrer",
     "delete": "Supprimer",
     "cancel": "Annuler",
@@ -189,11 +189,11 @@
   "disclaimers": {
     "medical": {
       "title": "Avertissement médical",
-      "body": "Lunation propose des analyses symboliques mensuelles basées sur des calculs astronomiques et des interprétations astrologiques classiques.\n\nCe contenu est fourni à titre informatif et ne constitue en aucun cas un avis médical, psychologique, juridique ou financier.\n\nEn cas de doute sur votre santé physique ou mentale, consultez un professionnel de santé qualifié. Les contenus de Lunation ne doivent jamais remplacer un diagnostic ou un traitement médical."
+      "body": "Lunation propose des analyses symboliques mensuelles basées sur des calculs astronomiques et des interprétations astrologiques classiques.\n\nCe contenu est fourni à titre informatif et ne constitue en aucun cas un avis médical, psychologique, juridique ou financier.\n\nEn cas de doute sur ta santé physique ou mentale, consulte un professionnel de santé qualifié. Les contenus de Lunation ne doivent jamais remplacer un diagnostic ou un traitement médical."
     },
     "rgpd": {
       "title": "Politique de confidentialité",
-      "body": "Lunation stocke vos données de naissance et vos préférences localement sur votre appareil.\n\nAucune donnée personnelle n'est transmise à des tiers à des fins commerciales.\n\nVous pouvez à tout moment exporter ou supprimer vos données depuis les Paramètres."
+      "body": "Lunation stocke tes données de naissance et tes préférences localement sur ton appareil.\n\nAucune donnée personnelle n'est transmise à des tiers à des fins commerciales.\n\nTu peux à tout moment exporter ou supprimer tes données depuis les Paramètres."
     }
   },
   "common": {
@@ -220,7 +220,7 @@
       "waning_gibbous": "La lumière commence à décroître. Tu peux partager ce qui a porté ses fruits.",
       "last_quarter": "Un temps pour relâcher ce qui pèse. Tu peux faire de la place.",
       "waning_crescent": "Tout ralentit en douceur. Tu peux te reposer avant le renouveau.",
-      "fallback": "Écoutez votre intuition lunaire."
+      "fallback": "Écoute ton intuition lunaire."
     },
     "vocActive": "Pause lunaire jusqu'à {{endTime}}",
     "cachedData": "Données du {{date}}",

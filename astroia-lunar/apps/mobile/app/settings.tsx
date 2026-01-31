@@ -85,7 +85,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('[Settings] Erreur toggle notifications:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+      Alert.alert('Erreur', 'Une erreur est survenue. Merci de réessayer.');
     } finally {
       setIsTogglingNotifications(false);
     }
@@ -93,7 +93,7 @@ export default function SettingsScreen() {
 
   const handleLogout = () => {
     haptics.medium(); // Feedback tactile pour action importante
-    Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
+    Alert.alert('Déconnexion', 'Es-tu sûr de vouloir te déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Déconnexion',
@@ -110,13 +110,13 @@ export default function SettingsScreen() {
     haptics.warning(); // Feedback tactile d'avertissement pour action destructive
     Alert.alert(
       'Supprimer mes données locales',
-      'Cette action va supprimer toutes vos données locales stockées sur cet appareil :\n\n' +
+      'Cette action va supprimer toutes tes données locales stockées sur cet appareil :\n\n' +
       '• Onboarding (écran d\'accueil, consentement, profil)\n' +
-      '• Journal (toutes vos entrées)\n' +
+      '• Journal (toutes tes entrées)\n' +
       '• Cache lunaire\n' +
       '• Préférences et notifications\n\n' +
-      'Vous serez redirigé vers l\'écran d\'accueil pour recommencer.\n\n' +
-      'Note : Cette action ne supprime pas vos données sur le serveur.',
+      'Tu seras redirigé vers l\'écran d\'accueil pour recommencer.\n\n' +
+      'Note : Cette action ne supprime pas tes données sur le serveur.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -229,7 +229,7 @@ export default function SettingsScreen() {
           <View style={styles.notificationHint}>
             <Text style={styles.notificationHintEmoji}>✅</Text>
             <Text style={styles.notificationHintText}>
-              Vous recevrez des notifications au début des fenêtres VoC et lors des nouveaux cycles
+              Tu recevras des notifications au début des fenêtres VoC et lors des nouveaux cycles
               lunaires.
             </Text>
           </View>
@@ -266,8 +266,8 @@ export default function SettingsScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Lunation MVP v1.4</Text>
-        <Text style={styles.footerText}>Phase 1.4 : Notifications Push</Text>
+        <Text style={styles.footerText}>Lunation v3.0</Text>
+        <Text style={styles.footerText}>Phase Bêta</Text>
       </View>
     </ScrollView>
   );

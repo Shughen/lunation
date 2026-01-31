@@ -20,6 +20,7 @@ import {
   type MoonSignChange,
 } from '../services/notificationScheduler';
 import apiClient from '../services/api';
+import { trackEvent } from '../services/analytics';
 
 interface NotificationsState {
   // State
@@ -72,6 +73,9 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
         // Scheduler toutes les notifications
         await get().scheduleAllNotifications();
+
+        // Track l'activation des notifications
+        trackEvent('notifications_enabled', { source: 'settings' });
 
         console.log('[NotificationsStore] ✅ Notifications activées');
         return true;

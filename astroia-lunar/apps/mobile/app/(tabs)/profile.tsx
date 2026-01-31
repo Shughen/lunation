@@ -152,7 +152,7 @@ export default function ProfileScreen() {
       if (!success && value) {
         Alert.alert(
           'Permission requise',
-          'Merci d\'autoriser les notifications dans les paramètres de ton appareil.',
+          'Merci d\'autoriser les notifications dans les réglages de ton appareil.',
           [
             { text: 'Annuler', style: 'cancel' },
             {
@@ -195,12 +195,12 @@ export default function ProfileScreen() {
     haptics.warning();
     Alert.alert(
       'Supprimer mes données locales',
-      'Cette action va supprimer toutes vos données locales :\n\n' +
+      'Cette action va supprimer toutes tes données locales :\n\n' +
         '- Onboarding et profil\n' +
         '- Journal personnel\n' +
         '- Cache lunaire\n' +
         '- Préférences\n\n' +
-        'Vous serez redirigé vers l\'écran d\'accueil.',
+        'Tu seras redirigé vers l\'écran d\'accueil.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
           ) : !hasNatalData ? (
             <View style={styles.emptyNatalContainer}>
               <Text style={styles.emptyNatalText}>
-                Vous n'avez pas encore calculé votre thème natal complet.
+                Tu n'as pas encore calculé ton thème natal complet.
               </Text>
               <TouchableOpacity
                 style={styles.natalCtaButton}

@@ -4,7 +4,7 @@
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LogBox, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -16,6 +16,12 @@ LogBox.ignoreLogs([
 // Initialize i18n (side effect import)
 import '../i18n';
 
+// Analytics
+import { initAnalytics, shutdownAnalytics, trackNotificationOpened } from '../services/analytics';
+
+// Notifications
+import * as Notifications from 'expo-notifications';
+
 // Lunar Context Provider
 import { LunarProvider } from '../contexts/LunarProvider';
 
@@ -23,6 +29,28 @@ import { LunarProvider } from '../contexts/LunarProvider';
 import { ToastContainer } from '../components/ToastContainer';
 
 export default function RootLayout() {
+  // Initialiser les analytics au démarrage
+  useEffect(() => {
+    initAnalytics();
+
+    return () => {
+      shutdownAnalytics();
+    };
+  }, []);
+
+  // Listener pour tracker l'ouverture des notifications
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const notificationType = response.notification.request.content.data?.type as string || 'unknown';
+      trackNotificationOpened(notificationType, {
+        title: response.notification.request.content.title,
+        actionIdentifier: response.actionIdentifier,
+      });
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   // Vérifier que Stack est disponible au runtime
   if (!Stack) {
     console.error('[LAYOUT] Stack is undefined! Check expo-router installation.');
