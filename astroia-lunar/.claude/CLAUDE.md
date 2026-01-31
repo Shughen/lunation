@@ -286,10 +286,11 @@ Système de commandes locales dans `.claude/commands/` pour charger du contexte 
   - `notification_opened` : listener dans _layout.tsx
   - `notifications_enabled` : useNotificationsStore.ts
 
-**Prochaines étapes Phase Bêta** :
-- [ ] Créer compte PostHog (eu.posthog.com)
-- [ ] Ajouter EXPO_PUBLIC_POSTHOG_KEY dans .env
-- [ ] Tester tracking en conditions réelles
+**Analytics PostHog - Validé** :
+- [x] Compte PostHog créé (eu.posthog.com)
+- [x] Variables env configurées : `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST`
+- [x] Tracking testé et validé en conditions réelles (31/01/2026)
+- [x] Événement `screen_view` reçu dans dashboard PostHog
 
 ---
 
@@ -309,4 +310,4 @@ adb exec-out screencap -p > /Users/remibeaurain/astroia/astroia-lunar/apps/mobil
 
 ---
 
-**Dernière màj** : 2026-01-31 | **Version** : 9.0 (Phase Bêta v3.0 + Analytics PostHog)
+**Dernière màj** : 2026-01-31 | **Version** : 9.1 (Phase Bêta v3.0 + Analytics PostHog validé)
