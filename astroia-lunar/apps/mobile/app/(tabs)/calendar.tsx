@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
 import { haptics } from '../../services/haptics';
 import { MoonPhaseIcon } from '../../components/icons/MoonPhaseIcon';
-import { getPhaseSign } from '../../data/moonPhaseSigns2026';
+import { getPhaseSign } from '../../data/moonPhaseSigns';
 
 // Fallback si LinearGradient n'est pas disponible
 const LinearGradientComponent = LinearGradient || (({ colors: bgColors, style, children, ...props }: any) => {
@@ -126,6 +126,181 @@ const EXACT_PHASES: Record<string, string> = {
   '2026-09-04': 'last_quarter', '2026-10-03': 'last_quarter',
   '2026-11-01': 'last_quarter', '2026-12-01': 'last_quarter',
   '2026-12-30': 'last_quarter',
+  // Premiers Quartiers 2027
+  '2027-01-15': 'first_quarter', '2027-02-14': 'first_quarter',
+  '2027-03-15': 'first_quarter', '2027-04-14': 'first_quarter',
+  '2027-05-13': 'first_quarter', '2027-06-11': 'first_quarter',
+  '2027-07-10': 'first_quarter', '2027-08-09': 'first_quarter',
+  '2027-09-07': 'first_quarter', '2027-10-07': 'first_quarter',
+  '2027-11-06': 'first_quarter', '2027-12-06': 'first_quarter',
+  // Derniers Quartiers 2027
+  '2027-01-29': 'last_quarter', '2027-02-28': 'last_quarter',
+  '2027-03-30': 'last_quarter', '2027-04-28': 'last_quarter',
+  '2027-05-28': 'last_quarter', '2027-06-27': 'last_quarter',
+  '2027-07-26': 'last_quarter', '2027-08-25': 'last_quarter',
+  '2027-09-23': 'last_quarter', '2027-10-22': 'last_quarter',
+  '2027-11-21': 'last_quarter', '2027-12-20': 'last_quarter',
+  // Nouvelles Lunes 2028
+  '2028-01-26': 'new', '2028-02-25': 'new', '2028-03-26': 'new',
+  '2028-04-24': 'new', '2028-05-24': 'new', '2028-06-22': 'new',
+  '2028-07-22': 'new', '2028-08-20': 'new', '2028-09-18': 'new',
+  '2028-10-18': 'new', '2028-11-16': 'new', '2028-12-16': 'new',
+  // Premiers Quartiers 2028
+  '2028-01-05': 'first_quarter', '2028-02-03': 'first_quarter',
+  '2028-03-04': 'first_quarter', '2028-04-02': 'first_quarter',
+  '2028-05-02': 'first_quarter', '2028-05-31': 'first_quarter',
+  '2028-06-29': 'first_quarter', '2028-07-28': 'first_quarter',
+  '2028-08-27': 'first_quarter', '2028-09-25': 'first_quarter',
+  '2028-10-25': 'first_quarter', '2028-11-24': 'first_quarter',
+  '2028-12-23': 'first_quarter',
+  // Derniers Quartiers 2028
+  '2028-01-18': 'last_quarter', '2028-02-17': 'last_quarter',
+  '2028-03-18': 'last_quarter', '2028-04-16': 'last_quarter',
+  '2028-05-16': 'last_quarter', '2028-06-15': 'last_quarter',
+  '2028-07-14': 'last_quarter', '2028-08-13': 'last_quarter',
+  '2028-09-12': 'last_quarter', '2028-10-11': 'last_quarter',
+  '2028-11-09': 'last_quarter', '2028-12-09': 'last_quarter',
+  // Nouvelles Lunes 2029
+  '2029-01-14': 'new', '2029-02-13': 'new', '2029-03-15': 'new',
+  '2029-04-13': 'new', '2029-05-13': 'new', '2029-06-12': 'new',
+  '2029-07-11': 'new', '2029-08-10': 'new', '2029-09-08': 'new',
+  '2029-10-07': 'new', '2029-11-06': 'new', '2029-12-05': 'new',
+  // Premiers Quartiers 2029
+  '2029-01-22': 'first_quarter', '2029-02-21': 'first_quarter',
+  '2029-03-23': 'first_quarter', '2029-04-21': 'first_quarter',
+  '2029-05-21': 'first_quarter', '2029-06-19': 'first_quarter',
+  '2029-07-18': 'first_quarter', '2029-08-16': 'first_quarter',
+  '2029-09-15': 'first_quarter', '2029-10-14': 'first_quarter',
+  '2029-11-13': 'first_quarter', '2029-12-12': 'first_quarter',
+  // Derniers Quartiers 2029
+  '2029-01-07': 'last_quarter', '2029-02-05': 'last_quarter',
+  '2029-03-07': 'last_quarter', '2029-04-05': 'last_quarter',
+  '2029-05-05': 'last_quarter', '2029-06-04': 'last_quarter',
+  '2029-07-03': 'last_quarter', '2029-08-02': 'last_quarter',
+  '2029-09-01': 'last_quarter', '2029-09-30': 'last_quarter',
+  '2029-10-30': 'last_quarter', '2029-11-29': 'last_quarter',
+  '2029-12-28': 'last_quarter',
+  // Nouvelles Lunes 2030
+  '2030-01-04': 'new', '2030-02-02': 'new', '2030-03-04': 'new',
+  '2030-04-03': 'new', '2030-05-02': 'new', '2030-06-01': 'new',
+  '2030-06-30': 'new', '2030-07-30': 'new', '2030-08-29': 'new',
+  '2030-09-27': 'new', '2030-10-26': 'new', '2030-11-25': 'new',
+  '2030-12-24': 'new',
+  // Premiers Quartiers 2030
+  '2030-01-11': 'first_quarter', '2030-02-10': 'first_quarter',
+  '2030-03-12': 'first_quarter', '2030-04-11': 'first_quarter',
+  '2030-05-10': 'first_quarter', '2030-06-09': 'first_quarter',
+  '2030-07-08': 'first_quarter', '2030-08-06': 'first_quarter',
+  '2030-09-04': 'first_quarter', '2030-10-04': 'first_quarter',
+  '2030-11-02': 'first_quarter', '2030-12-01': 'first_quarter',
+  '2030-12-31': 'first_quarter',
+  // Derniers Quartiers 2030
+  '2030-01-26': 'last_quarter', '2030-02-25': 'last_quarter',
+  '2030-03-26': 'last_quarter', '2030-04-24': 'last_quarter',
+  '2030-05-24': 'last_quarter', '2030-06-22': 'last_quarter',
+  '2030-07-22': 'last_quarter', '2030-08-21': 'last_quarter',
+  '2030-09-19': 'last_quarter', '2030-10-19': 'last_quarter',
+  '2030-11-18': 'last_quarter', '2030-12-18': 'last_quarter',
+  // Nouvelles Lunes 2031
+  '2031-01-23': 'new', '2031-02-21': 'new', '2031-03-23': 'new',
+  '2031-04-21': 'new', '2031-05-21': 'new', '2031-06-20': 'new',
+  '2031-07-19': 'new', '2031-08-18': 'new', '2031-09-16': 'new',
+  '2031-10-16': 'new', '2031-11-14': 'new', '2031-12-14': 'new',
+  // Premiers Quartiers 2031
+  '2031-01-30': 'first_quarter', '2031-03-01': 'first_quarter',
+  '2031-03-31': 'first_quarter', '2031-04-29': 'first_quarter',
+  '2031-05-29': 'first_quarter', '2031-06-28': 'first_quarter',
+  '2031-07-27': 'first_quarter', '2031-08-25': 'first_quarter',
+  '2031-09-24': 'first_quarter', '2031-10-23': 'first_quarter',
+  '2031-11-21': 'first_quarter', '2031-12-21': 'first_quarter',
+  // Derniers Quartiers 2031
+  '2031-01-16': 'last_quarter', '2031-02-14': 'last_quarter',
+  '2031-03-16': 'last_quarter', '2031-04-14': 'last_quarter',
+  '2031-05-13': 'last_quarter', '2031-06-12': 'last_quarter',
+  '2031-07-11': 'last_quarter', '2031-08-10': 'last_quarter',
+  '2031-09-08': 'last_quarter', '2031-10-08': 'last_quarter',
+  '2031-11-07': 'last_quarter', '2031-12-07': 'last_quarter',
+  // Nouvelles Lunes 2032
+  '2032-01-12': 'new', '2032-02-11': 'new', '2032-03-11': 'new',
+  '2032-04-10': 'new', '2032-05-09': 'new', '2032-06-08': 'new',
+  '2032-07-07': 'new', '2032-08-06': 'new', '2032-09-04': 'new',
+  '2032-10-04': 'new', '2032-11-03': 'new', '2032-12-02': 'new',
+  // Premiers Quartiers 2032
+  '2032-01-19': 'first_quarter', '2032-02-18': 'first_quarter',
+  '2032-03-18': 'first_quarter', '2032-04-17': 'first_quarter',
+  '2032-05-17': 'first_quarter', '2032-06-16': 'first_quarter',
+  '2032-07-15': 'first_quarter', '2032-08-14': 'first_quarter',
+  '2032-09-12': 'first_quarter', '2032-10-12': 'first_quarter',
+  '2032-11-10': 'first_quarter', '2032-12-09': 'first_quarter',
+  // Derniers Quartiers 2032
+  '2032-01-05': 'last_quarter', '2032-02-04': 'last_quarter',
+  '2032-03-05': 'last_quarter', '2032-04-03': 'last_quarter',
+  '2032-05-02': 'last_quarter', '2032-05-31': 'last_quarter',
+  '2032-06-30': 'last_quarter', '2032-07-29': 'last_quarter',
+  '2032-08-27': 'last_quarter', '2032-09-26': 'last_quarter',
+  '2032-10-26': 'last_quarter', '2032-11-24': 'last_quarter',
+  '2032-12-24': 'last_quarter',
+  // Nouvelles Lunes 2033
+  '2033-01-01': 'new', '2033-01-30': 'new', '2033-03-01': 'new',
+  '2033-03-30': 'new', '2033-04-29': 'new', '2033-05-28': 'new',
+  '2033-06-26': 'new', '2033-07-26': 'new', '2033-08-24': 'new',
+  '2033-09-23': 'new', '2033-10-23': 'new', '2033-11-22': 'new',
+  '2033-12-21': 'new',
+  // Premiers Quartiers 2033
+  '2033-01-08': 'first_quarter', '2033-02-06': 'first_quarter',
+  '2033-03-08': 'first_quarter', '2033-04-06': 'first_quarter',
+  '2033-05-06': 'first_quarter', '2033-06-05': 'first_quarter',
+  '2033-07-04': 'first_quarter', '2033-08-03': 'first_quarter',
+  '2033-09-02': 'first_quarter', '2033-10-01': 'first_quarter',
+  '2033-10-31': 'first_quarter', '2033-11-29': 'first_quarter',
+  '2033-12-29': 'first_quarter',
+  // Derniers Quartiers 2033
+  '2033-01-23': 'last_quarter', '2033-02-22': 'last_quarter',
+  '2033-03-24': 'last_quarter', '2033-04-22': 'last_quarter',
+  '2033-05-21': 'last_quarter', '2033-06-20': 'last_quarter',
+  '2033-07-19': 'last_quarter', '2033-08-17': 'last_quarter',
+  '2033-09-15': 'last_quarter', '2033-10-15': 'last_quarter',
+  '2033-11-13': 'last_quarter', '2033-12-13': 'last_quarter',
+  // Nouvelles Lunes 2034
+  '2034-01-20': 'new', '2034-02-19': 'new', '2034-03-20': 'new',
+  '2034-04-18': 'new', '2034-05-18': 'new', '2034-06-16': 'new',
+  '2034-07-15': 'new', '2034-08-14': 'new', '2034-09-12': 'new',
+  '2034-10-12': 'new', '2034-11-11': 'new', '2034-12-10': 'new',
+  // Premiers Quartiers 2034
+  '2034-01-27': 'first_quarter', '2034-02-25': 'first_quarter',
+  '2034-03-27': 'first_quarter', '2034-04-25': 'first_quarter',
+  '2034-05-25': 'first_quarter', '2034-06-23': 'first_quarter',
+  '2034-07-23': 'first_quarter', '2034-08-22': 'first_quarter',
+  '2034-09-20': 'first_quarter', '2034-10-20': 'first_quarter',
+  '2034-11-19': 'first_quarter', '2034-12-18': 'first_quarter',
+  // Derniers Quartiers 2034
+  '2034-01-12': 'last_quarter', '2034-02-11': 'last_quarter',
+  '2034-03-13': 'last_quarter', '2034-04-12': 'last_quarter',
+  '2034-05-11': 'last_quarter', '2034-06-09': 'last_quarter',
+  '2034-07-09': 'last_quarter', '2034-08-07': 'last_quarter',
+  '2034-09-05': 'last_quarter', '2034-10-04': 'last_quarter',
+  '2034-11-03': 'last_quarter', '2034-12-02': 'last_quarter',
+  // Nouvelles Lunes 2035
+  '2035-01-09': 'new', '2035-02-08': 'new', '2035-03-10': 'new',
+  '2035-04-08': 'new', '2035-05-07': 'new', '2035-06-06': 'new',
+  '2035-07-05': 'new', '2035-08-03': 'new', '2035-09-02': 'new',
+  '2035-10-01': 'new', '2035-10-31': 'new', '2035-11-29': 'new',
+  '2035-12-29': 'new',
+  // Premiers Quartiers 2035
+  '2035-01-17': 'first_quarter', '2035-02-15': 'first_quarter',
+  '2035-03-16': 'first_quarter', '2035-04-15': 'first_quarter',
+  '2035-05-14': 'first_quarter', '2035-06-12': 'first_quarter',
+  '2035-07-12': 'first_quarter', '2035-08-10': 'first_quarter',
+  '2035-09-09': 'first_quarter', '2035-10-09': 'first_quarter',
+  '2035-11-08': 'first_quarter', '2035-12-08': 'first_quarter',
+  // Derniers Quartiers 2035
+  '2035-01-01': 'last_quarter', '2035-01-31': 'last_quarter',
+  '2035-03-02': 'last_quarter', '2035-04-01': 'last_quarter',
+  '2035-04-30': 'last_quarter', '2035-05-30': 'last_quarter',
+  '2035-06-28': 'last_quarter', '2035-07-28': 'last_quarter',
+  '2035-08-26': 'last_quarter', '2035-09-24': 'last_quarter',
+  '2035-10-23': 'last_quarter', '2035-11-22': 'last_quarter',
+  '2035-12-21': 'last_quarter',
 };
 
 // Calcul des phases lunaires avec dates exactes + fallback approximatif
